@@ -9,8 +9,11 @@ from Inksac_Data.database import Base, engine, ALLOWORIGINSLIST
 from Inksac_Data.Common.Response import HttpException
 
 #table classes go here
+from Inksac_Data.Entities.Users import User
+from Inksac_Data.Entities.Auth import UserAuth
 
 #controller routers go here
+from Inksac_Data.Controllers import AuthController, UsersController
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +23,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 
 #app.include_router(controller.router) goes here
+app.include_router(AuthController.router)
+app.include_router(UsersController.router)
 
 #this exposes the files in media for our image hosting
 #accessed via http://<ip>:<port>/media/path/to/file.png or with a domain

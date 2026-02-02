@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 load_dotenv()
 DBSTRING = os.getenv("DBSTRING")
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALLOWORIGINS = os.getenv("ALLOWORIGINS")
 ALLOWORIGINSLIST = json.loads(ALLOWORIGINS)
 

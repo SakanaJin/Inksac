@@ -16,6 +16,7 @@ Create a file named _.env_ inside of _Inksac_Data_.
 ```
 DBSTRING=mysql+pymysql://<dbuser>:<password>@localhost:3306/Inksac
 ALLOWORIGINS=["http://127.0.0.1:5173", "http://localhost:5173", "http://127.0.0.1:4173", "http://localhost:4173"]
+SECRET_KEY=<key for cookies>
 ```
 
 Create a file named _.env_ inside of _Inksac-Web_.
@@ -27,7 +28,7 @@ PORT=5173
 WDS_SOCKET_PORT=8000
 VITE_ENVIRONMENT=local
 VITE_BUILD_NUMBER=local
-VITE_API_BASE_URL=http://127.0.0.1:8000
+VITE_API_BASE_URL=http://127.0.0.1:8000/api
 ```
 
 While still in _Inksac-Web_ run the command:
