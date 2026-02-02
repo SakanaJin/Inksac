@@ -1,4 +1,4 @@
-import { Center, Space, Title } from "@mantine/core";
+import { Center, Title } from "@mantine/core";
 
 export const NotFoundPage = () => {
   return (

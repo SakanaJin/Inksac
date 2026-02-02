@@ -1,4 +1,4 @@
-import type { ApiResponse, LoginDto } from "../constants/types";
+import type { LoginDto } from "../constants/types";
 import { useForm } from "@mantine/form";
 import type { FormErrors } from "@mantine/form";
 import {
@@ -31,10 +31,7 @@ export const LoginPage = ({
   });
 
   const submitLogin = async (values: LoginDto) => {
-    const response = await api.post<ApiResponse<boolean>>(
-      `/auth/login`,
-      values,
-    );
+    const response = await api.post<boolean>(`/auth/login`, values);
     if (response.data.has_errors) {
       const formerrors = response.data.errors.reduce((obj, err) => {
         obj[err.property] = err.message;
