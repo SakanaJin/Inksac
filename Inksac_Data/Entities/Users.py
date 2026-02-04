@@ -33,6 +33,9 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False)
     role = Column(Enum(Role), default=Role.GUEST, nullable=False)
     pfp_path = Column(String(255), default=DEFAULT_PFP)
+
+    brushes = relationship("Brush", back_populates="owner")
+    brush_count = Column(Integer, default=0)
     
     auth = relationship("UserAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")
 

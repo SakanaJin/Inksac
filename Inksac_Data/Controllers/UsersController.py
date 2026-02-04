@@ -3,21 +3,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import os
 from pathlib import Path
-import re
 import uuid
-from typing import Any
+import re
 
 from Inksac_Data.Entities.Users import User, UserCreateDto, DEFAULT_PFP
 from Inksac_Data.Entities.Auth import UserAuth, create_password_hash
 from Inksac_Data.Controllers.AuthController import require_admin, get_current_user
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.Role import Role
-from Inksac_Data.database import get_db
+from Inksac_Data.database import get_db, ROOT
 
 PFP_PATH = "/media/user/pfp"
 EMAIL_PATTERN = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$"
-MAX_PFP_SIZE = 10 * 1024 * 1024 # 5MB
-ROOT = Path(__file__).resolve().parents[2] # /Inksac
+MAX_PFP_SIZE = 5 * 1024 * 1024 # 5MB
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -118,6 +116,8 @@ def delete_user(id: int, db: Session = Depends(get_db), admin: User = Depends(re
     if not user:
         response.add_error("id", "user not found")
         raise HttpException(status_code=404, response=response)
+    if user.pfp_path != DEFAULT_PFP:
+        os.remove(ROOT / user.pfp_path[1:])
     db.delete(user)
     db.commit()
     response.data = True

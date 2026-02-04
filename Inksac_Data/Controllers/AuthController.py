@@ -50,6 +50,13 @@ def require_admin(user: User = Depends(get_current_user)) -> Optional[User]:
         raise HttpException(status_code=403, response=response)
     return user
 
+def require_not_guest(user: User = Depends(get_current_user)) -> Optional[User]:
+    response = Response()
+    if user.role == Role.GUEST:
+        response.add_error("role", "Guests prohibited")
+        raise HttpException(status_code=403, response=response)
+    return user
+
 @router.get("/get-current-user")
 def get_current_user_endpoint(user: User = Depends(get_current_user)):
     response = Response()
