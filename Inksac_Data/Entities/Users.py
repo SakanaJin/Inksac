@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy import Column, Integer, String, Enum, Boolean
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel
 
@@ -36,6 +36,9 @@ class User(Base):
 
     brushes = relationship("Brush", back_populates="owner")
     brush_count = Column(Integer, default=0)
+
+    room = relationship("Room", back_populates="owner", uselist=False)
+    has_room = Column(Boolean, default=False)
     
     auth = relationship("UserAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")
 

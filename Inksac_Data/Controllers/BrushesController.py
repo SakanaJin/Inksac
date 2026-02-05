@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends, File, UploadFile, Request
 from sqlalchemy.orm import Session
 import os
-from pathlib import Path
 import uuid
 
 from Inksac_Data.database import get_db, ROOT
 from Inksac_Data.Common.Response import Response, HttpException
-from Inksac_Data.Common.Rotation import RotationMode
 from Inksac_Data.Entities.Brushes import Brush, BrushCreateDto, BrushUpdateDto, DEFAULT_BRUSH
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Controllers.AuthController import require_not_guest, get_current_user
