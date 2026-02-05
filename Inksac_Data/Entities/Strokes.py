@@ -23,7 +23,7 @@ class StrokeCreateDto(BaseModel):
     points: List[Point]
 
 class Stroke(Base):
-    __tablename__ = "stokes"
+    __tablename__ = "strokes"
     id = Column(Integer, primary_key=True)
     points = Column(JSON, nullable=False)
     color = Column(String(9), nullable=False)
@@ -35,6 +35,7 @@ class Stroke(Base):
     brush = relationship("Brush", back_populates=None)
 
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room = relationship("Room", back_populates="strokes")
 
     def toGetDto(self) -> StrokeGetDto:
         strokedto = StrokeGetDto(

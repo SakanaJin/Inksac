@@ -33,9 +33,17 @@ def create(roomid: int, brushid: int, strokedto: StrokeCreateDto, db: Session = 
         brush_id=brushid,
         room_id=roomid,
     )
+    room.brushes.append(brush)
     db.add(stroke)
     db.commit()
     response.data = stroke.toGetDto()
+    return response
+
+@router.get("")
+def get_all(db: Session = Depends(get_db)):
+    response = Response()
+    strokes = db.query(Stroke).all()
+    response.data = [stroke.toGetDto() for stroke in strokes]
     return response
 
 @router.get("/room/{id}")

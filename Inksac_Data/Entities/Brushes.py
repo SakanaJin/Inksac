@@ -31,6 +31,7 @@ class BrushGetDto(BaseModel):
     opacity: float
     rotation_mode: RotationMode
     owner: UserShallowDto
+    in_use: bool
 
 class BrushShallowDto(BaseModel):
     id: int
@@ -40,6 +41,7 @@ class BrushShallowDto(BaseModel):
     scale: float
     opacity: float
     rotation_mode: RotationMode
+    in_use: bool
 
 class Brush(Base):
     __tablename__ = "brushes"
@@ -54,6 +56,8 @@ class Brush(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="brushes")
 
+    rooms = relationship("Room", back_populates="brushes", secondary="usedbrushes")
+
     def toGetDto(self) -> BrushGetDto:
         brushdto = BrushGetDto(
             id=self.id,
@@ -63,7 +67,8 @@ class Brush(Base):
             scale=self.scale,
             opacity=self.opacity,
             rotation_mode=self.rotation_mode,
-            owner=self.owner.toShallowDto()
+            owner=self.owner.toShallowDto(),
+            in_use=bool(self.rooms)
         )
         return brushdto
     
@@ -76,5 +81,6 @@ class Brush(Base):
             scale=self.scale,
             opacity=self.opacity,
             rotation_mode=self.rotation_mode,
+            in_use=bool(self.rooms)
         )
         return brushdto

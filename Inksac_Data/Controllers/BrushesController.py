@@ -64,6 +64,9 @@ def update(brushdto: BrushUpdateDto, id: int, db: Session = Depends(get_db), use
     if not brush:
         response.add_error("id", "brush not found")
         raise HttpException(status_code=404, response=response)
+    if bool(brush.rooms):
+        response.add_error("brush", "cannot edit brush in use")
+        raise HttpException(status_code=400, response=response)
     brush.name = brushdto.name
     brush.spacing = brushdto.spacing
     brush.scale = brushdto.scale
@@ -87,6 +90,9 @@ async def update_imgurl(id: int, request: Request, file: UploadFile = File(...),
     if not brush:
         response.add_error("id", "brush not found")
         raise HttpException(status_code=404, response=response)
+    if bool(brush.rooms):
+        response.add_error("brush", "cannot edit brush in use")
+        raise HttpException(status_code=400, response=response)
     extension = file.filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{extension}"
     filepath = os.path.join(BRUSH_PATH, filename)
@@ -108,6 +114,9 @@ def remove_imgurl(id: int, db: Session = Depends(get_db), user: User = Depends(g
         raise HttpException(status_code=404, response=response)
     if brush.imgurl == DEFAULT_BRUSH:
         response.add_error("imgurl", "no imgurl")
+    if bool(brush.rooms):
+        response.add_error("brush", "cannot edit brush in use")
+    if response.has_errors:
         raise HttpException(status_code=400, response=response)
     os.remove(ROOT / brush.imgurl[1:])
     brush.imgurl = DEFAULT_BRUSH
@@ -122,6 +131,9 @@ def delete_brush(id: int, db: Session = Depends(get_db), user: User = Depends(ge
     if not brush:
         response.add_error("id", "brush not found")
         raise HttpException(status_code=404, response=response)
+    if bool(brush.rooms):
+        response.add_error("brush", "cannot delete brush in use")
+        raise HttpException(status_code=400, response=response)
     if brush.imgurl != DEFAULT_BRUSH:
         os.remove(ROOT / brush.imgurl[1:])
     db.delete(brush)

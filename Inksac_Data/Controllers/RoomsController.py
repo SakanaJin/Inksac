@@ -6,7 +6,7 @@ from Inksac_Data.database import get_db
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Controllers.AuthController import get_current_user, require_not_guest
 from Inksac_Data.Entities.Users import User
-from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto
+from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, round_nearest_hour
 
 router = APIRouter(prefix="/api/rooms", tags=["Rooms"])
 
@@ -41,7 +41,7 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         raise HttpException(status_code=400, response=response)
     room = Room(
         name=roomdto.name,
-        expiration=datetime.now() + timedelta(days=1),
+        expiration=round_nearest_hour(datetime.now() + timedelta(days=1)),
         owner=user
     )
     db.add(room)
