@@ -13,6 +13,7 @@ from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Auth import UserAuth
 from Inksac_Data.Entities.Brushes import Brush
 from Inksac_Data.Entities.Rooms import Room
+from Inksac_Data.Entities.Strokes import Stroke
 
 #controller routers go here
 from Inksac_Data.Controllers import (
@@ -20,6 +21,7 @@ from Inksac_Data.Controllers import (
     UsersController, 
     BrushesController,
     RoomsController,
+    StrokesController,
 )
 
 @asynccontextmanager
@@ -34,6 +36,7 @@ app.include_router(AuthController.router)
 app.include_router(UsersController.router)
 app.include_router(BrushesController.router)
 app.include_router(RoomsController.router)
+app.include_router(StrokesController.router)
 
 #this exposes the files in media for our image hosting
 #accessed via http://<ip>:<port>/media/path/to/file.png or with a domain

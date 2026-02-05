@@ -30,6 +30,9 @@ def get_by_id(id: int, db: Session = Depends(get_db)):
 @router.post("")
 def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: User = Depends(require_not_guest)):
     response = Response()
+    roomcount = db.query(Room).count()
+    if roomcount >= 10:
+        response.add_error("room", "too many rooms in server")
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
     if user.has_room:

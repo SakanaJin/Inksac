@@ -39,7 +39,7 @@ class BrushShallowDto(BaseModel):
     spacing: float
     scale: float
     opacity: float
-    roation_mode: RotationMode
+    rotation_mode: RotationMode
 
 class Brush(Base):
     __tablename__ = "brushes"
@@ -75,6 +75,6 @@ class Brush(Base):
             spacing=self.spacing,
             scale=self.scale,
             opacity=self.opacity,
-            rotation_mode=self.rotation_mode
+            rotation_mode=self.rotation_mode,
         )
         return brushdto
