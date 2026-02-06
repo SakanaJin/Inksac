@@ -9,14 +9,9 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useNavigate } from "react-router-dom";
 import api from "../config/axios";
-import { useAuth } from "../authentication/use-auth";
 
-export const LoginPage = () => {
-  const { fetchCurrentUser } = useAuth();
-  const navigate = useNavigate();
-
+export const LoginPage = ({ fetchCurrentUser }) => {
   const form = useForm<LoginDto>({
     initialValues: {
       username: "",
@@ -47,7 +42,6 @@ export const LoginPage = () => {
 
     if (response.data?.data) {
       await fetchCurrentUser();
-      navigate("/home");
     }
   };
 

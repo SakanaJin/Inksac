@@ -61,7 +61,7 @@ export const AuthProvider = (props: any) => {
   }
 
   if (!user && !fetchCurrentUserAsync.loading) {
-    return <LoginPage />;
+    return <LoginPage fetchCurrentUser={fetchCurrentUserAsync.retry} />;
   }
 
   return (

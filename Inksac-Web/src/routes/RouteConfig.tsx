@@ -1,12 +1,12 @@
-import { Routes, Route } from "react-router-dom";
-import { LoginPage } from "../pages/login-page";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { HomePage } from "../pages/home/home-page";
 import { NotFoundPage } from "../pages/not-found";
+import { routes } from "./RouteIndex";
 
 export const RouteConfig = () => (
   <Routes>
-    <Route path="/" element={<LoginPage />} />
-    <Route path="/home" element={<HomePage />} />
+    <Route path={routes.home} element={<HomePage />} />
+    <Route path={routes.root} element={<Navigate to={routes.home} />} />
     <Route path="*" element={<NotFoundPage />} />
   </Routes>
 );
