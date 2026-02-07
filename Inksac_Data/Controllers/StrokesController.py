@@ -23,6 +23,7 @@ def create(roomid: int, brushid: int, strokedto: StrokeCreateDto, db: Session = 
         response.add_error("id", "brush not found")
     if not room:
         response.add_error("room", "room not found")
+    if response.has_errors:
         raise HttpException(status_code=404, response=response)
     stroke = Stroke(
         points=strokedto.points,

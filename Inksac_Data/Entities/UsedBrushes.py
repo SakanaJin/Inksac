@@ -6,5 +6,5 @@ class UsedBrushes(Base):
     __tablename__ = "usedbrushes"
     id = Column(Integer, primary_key=True)
     brush_id = Column(Integer, ForeignKey("brushes.id"))
-    room_id = Column(Integer, ForeignKey("rooms.id"))
+    room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"))
     UniqueConstraint("brush_id", "room_id", name="uq_usedbrushes")

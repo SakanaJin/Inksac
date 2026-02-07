@@ -35,7 +35,7 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         response.add_error("room", "too many rooms in server")
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
-    if user.has_room:
+    if bool(user.room):
         response.add_error("room", "user already has an open room")
     if response.has_errors:
         raise HttpException(status_code=400, response=response)

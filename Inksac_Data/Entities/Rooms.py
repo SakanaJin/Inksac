@@ -32,7 +32,7 @@ class Room(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="room")
 
-    strokes = relationship("Stroke", back_populates="room", cascade="all, delete-orphan")
+    strokes = relationship("Stroke", back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
 
     brushes = relationship("Brush", back_populates="rooms", secondary="usedbrushes")
 

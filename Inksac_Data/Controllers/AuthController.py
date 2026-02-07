@@ -1,11 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Response as FastRes, Request, Cookie
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 import bcrypt
 import itsdangerous
+from uuid import uuid4
+from datetime import datetime
+import re
 
 from Inksac_Data.database import get_db, SECRET_KEY
-from Inksac_Data.Entities.Users import User, LoginDto
+from Inksac_Data.Entities.Users import User, LoginDto, UserCreateDto
+from Inksac_Data.Entities.Auth import UserAuth, create_password_hash, EMAIL_PATTERN
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.Role import Role
 
@@ -14,6 +19,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 serializer = itsdangerous.URLSafeTimedSerializer(SECRET_KEY)
 COOKIE_NAME = "session_token"
 COOKIE_MAX_AGE = 60 * 60 * 24 # one day
+MAX_GUEST_ATTEMPTS = 5
 
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
@@ -89,3 +95,73 @@ def user_login(fastres: FastRes, logindto: LoginDto, db: Session = Depends(get_d
     response.data = True
     return response
 
+@router.post("/guest")
+def create_guest(fastres: FastRes, db: Session = Depends(get_db)):
+    response = Response()
+    user = None
+    for _ in range(MAX_GUEST_ATTEMPTS):
+        try:
+            user = User(
+                username=f"Guest#{uuid4().hex[:5]}",
+                role=Role.GUEST,
+                created_at=datetime.now()
+            )
+            db.add(user)
+            db.commit()
+            break
+        except IntegrityError:
+            db.rollback()
+            user = None
+    if not user:
+        response.add_error("username", "unable to generate guest username")
+        raise HttpException(status_code=500, response=response)
+    token = create_session_token(user.id)
+    fastres.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=COOKIE_MAX_AGE,
+        samesite="lax",
+        secure=False,
+    )
+    response.data = True
+    return response
+
+@router.post("/guest/upgrade")
+def upgrade_guest(userdto: UserCreateDto, db: Session = Depends(get_db), guest: User = Depends(get_current_user)):
+    response = Response()
+    if len(userdto.username) == 0:
+        response.add_error("username", "username cannot be empty")
+    if len(userdto.email) == 0:
+        response.add_error("email", "email cannot be empty")
+    if not re.fullmatch(EMAIL_PATTERN, userdto.email):
+        response.add_error("email", "invalid email")
+    if len(userdto.password) == 0:
+        response.add_error("password", "password cannot be empty")
+    if userdto.password != userdto.confirm_password:
+        response.add_error("confirm_password", "password fields do not match")
+    if response.has_errors:
+        raise HttpException(status_code=400, response=response)
+    guest.username = userdto.username
+    guest.role = Role.USER
+    try:
+        db.flush
+    except IntegrityError:
+        db.rollback()
+        response.add_error("username", "username already taken")
+        raise HttpException(status_code=400, response=response)
+    auth = UserAuth(
+        id=guest.id,
+        email=userdto.email,
+        password_hash=create_password_hash(userdto.password)
+    )
+    db.add(auth)
+    try:
+        db.commit()
+        db.refresh(guest)
+        response.data = guest.toGetDto()
+        return response
+    except IntegrityError:
+        db.rollback()
+        response.add_error("email", "email has already been used")
+        raise HttpException(status_code=400, response=response)

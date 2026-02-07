@@ -3,10 +3,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import delete
+from datetime import datetime, timedelta
 
-from Inksac_Data.database import Base, engine, ALLOWORIGINSLIST
+from Inksac_Data.database import Base, engine, db_session, ALLOWORIGINSLIST
 
 from Inksac_Data.Common.Response import HttpException
+from Inksac_Data.Common.Role import Role
 
 #table classes go here
 from Inksac_Data.Entities.Users import User
@@ -25,9 +30,14 @@ from Inksac_Data.Controllers import (
     StrokesController,
 )
 
+GUEST_GRACE = timedelta(days=1)
+
+scheduler = AsyncIOScheduler()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    scheduler.start()
     yield
 
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
@@ -57,3 +67,23 @@ def HttpExceptionHandler(request: Request, exception: HttpException):
         exception.response.model_dump(),
         status_code=exception.status_code
     )
+
+@scheduler.scheduled_job(CronTrigger(minute=0)) # every hour
+async def expired_room_cleanup():
+    with db_session() as db:
+        db.execute(
+            delete(Room).where(Room.expiration <= datetime.now())
+        )
+        db.commit()
+
+@scheduler.scheduled_job(CronTrigger(hour=00)) # everyday at 00:00 (12:00 am)
+async def expired_guest_cleanup():
+    currtime = datetime.now()
+    with db_session() as db:
+        db.execute(
+            delete(User).where(
+                (User.role == Role.GUEST) and
+                (currtime - User.created_at >= GUEST_GRACE)
+            )
+        )
+        db.commit()

@@ -34,7 +34,7 @@ class Stroke(Base):
     brush_id = Column(Integer, ForeignKey("brushes.id"), nullable=False)
     brush = relationship("Brush", back_populates=None)
 
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
     room = relationship("Room", back_populates="strokes")
 
     def toGetDto(self) -> StrokeGetDto:
