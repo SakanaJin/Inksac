@@ -30,7 +30,7 @@ export const HomePage = () => {
       <AppShell.Header>
         <Group h="100%" px="md">
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" />
-          <Title order={3}>Inkasc</Title>
+          <Title order={3}>Inksac</Title>
         </Group>
       </AppShell.Header>
 
@@ -40,7 +40,6 @@ export const HomePage = () => {
             <Title order={2}>Available Rooms</Title>
             <Button>Create Room</Button>
           </Group>
-
           <RoomsList />
         </Container>
       </AppShell.Main>
