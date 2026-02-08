@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import json
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
@@ -10,6 +11,8 @@ DBSTRING = os.getenv("DBSTRING")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALLOWORIGINS = os.getenv("ALLOWORIGINS")
 ALLOWORIGINSLIST = json.loads(ALLOWORIGINS)
+
+ROOT = Path(__file__).resolve().parents[1] # /Inksac
 
 engine = create_engine(DBSTRING, echo=True, future=True)
 Base = declarative_base()
