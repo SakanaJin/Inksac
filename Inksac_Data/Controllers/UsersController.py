@@ -2,22 +2,19 @@ from fastapi import APIRouter, Depends, File, UploadFile, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import os
-from pathlib import Path
-import re
 import uuid
-from typing import Any
+import re
+from datetime import datetime
 
 from Inksac_Data.Entities.Users import User, UserCreateDto, DEFAULT_PFP
-from Inksac_Data.Entities.Auth import UserAuth, create_password_hash
-from Inksac_Data.Controllers.AuthController import require_admin, get_current_user
+from Inksac_Data.Entities.Auth import UserAuth, create_password_hash, EMAIL_PATTERN
+from Inksac_Data.Controllers.AuthController import require_admin, get_current_user, require_not_guest
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.Role import Role
-from Inksac_Data.database import get_db
+from Inksac_Data.database import get_db, ROOT
 
 PFP_PATH = "/media/user/pfp"
-EMAIL_PATTERN = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$"
-MAX_PFP_SIZE = 10 * 1024 * 1024 # 5MB
-ROOT = Path(__file__).resolve().parents[2] # /Inksac
+MAX_PFP_SIZE = 5 * 1024 * 1024 # 5MB
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -36,7 +33,7 @@ def create_user(userdto: UserCreateDto, db: Session = Depends(get_db)):
         response.add_error("confirm_password", "password fields do not match")
     if response.has_errors:
         raise HttpException(status_code=400, response=response)
-    user = User(username=userdto.username, role=Role.USER)
+    user = User(username=userdto.username, role=Role.USER, created_at=datetime.now())
     db.add(user)
     try:
         db.flush()
@@ -78,7 +75,7 @@ def get_user_by_id(id: int, db: Session = Depends(get_db)):
     return response
 
 @router.patch("/pfp")
-async def update_pfp(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def update_pfp(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(require_not_guest)):
     response = Response()
     if not file.content_type.startswith("image/"):
         response.add_error("File", "File must be an image")
@@ -118,6 +115,8 @@ def delete_user(id: int, db: Session = Depends(get_db), admin: User = Depends(re
     if not user:
         response.add_error("id", "user not found")
         raise HttpException(status_code=404, response=response)
+    if user.pfp_path != DEFAULT_PFP:
+        os.remove(ROOT / user.pfp_path[1:])
     db.delete(user)
     db.commit()
     response.data = True
