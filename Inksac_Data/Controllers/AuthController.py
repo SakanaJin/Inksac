@@ -145,7 +145,7 @@ def upgrade_guest(userdto: UserCreateDto, db: Session = Depends(get_db), guest: 
     guest.username = userdto.username
     guest.role = Role.USER
     try:
-        db.flush
+        db.flush()
     except IntegrityError:
         db.rollback()
         response.add_error("username", "username already taken")

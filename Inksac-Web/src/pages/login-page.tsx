@@ -1,6 +1,5 @@
 import type { LoginDto } from "../constants/types";
-import { useForm } from "@mantine/form";
-import type { FormErrors } from "@mantine/form";
+import { useForm, type FormErrors } from "@mantine/form";
 import {
   Button,
   Center,
@@ -12,11 +11,7 @@ import {
 } from "@mantine/core";
 import api from "../config/axios";
 
-export const LoginPage = ({
-  fetchCurrentUser,
-}: {
-  fetchCurrentUser: () => void;
-}) => {
+export const LoginPage = ({ fetchCurrentUser }) => {
   const form = useForm<LoginDto>({
     initialValues: {
       username: "",
@@ -31,17 +26,22 @@ export const LoginPage = ({
   });
 
   const submitLogin = async (values: LoginDto) => {
-    const response = await api.post<boolean>(`/auth/login`, values);
-    if (response.data.has_errors) {
-      const formerrors = response.data.errors.reduce((obj, err) => {
-        obj[err.property] = err.message;
-        return obj;
-      }, {} as FormErrors);
+    const response = await api.post(`/auth/login`, values);
+
+    if (response.data?.has_errors) {
+      const formerrors = response.data.errors.reduce(
+        (obj: FormErrors, err: any) => {
+          obj[err.property] = err.message;
+          return obj;
+        },
+        {},
+      );
       form.setErrors(formerrors);
+      return;
     }
 
-    if (response.data.data) {
-      fetchCurrentUser();
+    if (response.data?.data) {
+      await fetchCurrentUser();
     }
   };
 
@@ -51,20 +51,13 @@ export const LoginPage = ({
         <Title size="h2">Login</Title>
         <Space h="md" />
         <form onSubmit={form.onSubmit(submitLogin)}>
-          <label htmlFor="userName">Username</label>
-          <TextInput
-            key={form.key("username")}
-            {...form.getInputProps("username")}
-            style={{ width: "12vw" }}
-          />
+          <TextInput label="Username" {...form.getInputProps("username")} />
           <Space h="md" />
-          <label htmlFor="password">Password</label>
-          <PasswordInput
-            key={form.key("password")}
-            {...form.getInputProps("password")}
-          />
+          <PasswordInput label="Password" {...form.getInputProps("password")} />
           <Space h="md" />
-          <Button type="submit">Login</Button>
+          <Button type="submit" fullWidth>
+            Login
+          </Button>
         </form>
       </Paper>
     </Center>

@@ -8,14 +8,14 @@ import api from "../config/axios";
 interface AuthState {
   user: UserGetDto | null;
   errors: ApiError[];
-  refetchUser: () => void;
+  fetchCurrentUser: () => void;
   logout: () => void;
 }
 
 const INITIALSTATE: AuthState = {
   user: null,
   errors: [],
-  refetchUser: undefined as any,
+  fetchCurrentUser: undefined as any,
   logout: undefined as any,
 };
 
@@ -25,7 +25,7 @@ export const AuthProvider = (props: any) => {
   const [errors, setErrors] = useState<ApiError[]>(INITIALSTATE.errors);
   const [user, setUser] = useState<UserGetDto | null>(INITIALSTATE.user);
 
-  const fetchCurrentUser = useAsyncRetry(async () => {
+  const fetchCurrentUserAsync = useAsyncRetry(async () => {
     setErrors([]);
     const response = await api.get<UserGetDto>(`/auth/get-current-user`);
 
@@ -56,12 +56,12 @@ export const AuthProvider = (props: any) => {
     return response;
   }, []);
 
-  if (fetchCurrentUser.loading) {
+  if (fetchCurrentUserAsync.loading) {
     return <Loader />;
   }
 
-  if (!user && !fetchCurrentUser.loading) {
-    return <LoginPage fetchCurrentUser={fetchCurrentUser.retry} />;
+  if (!user && !fetchCurrentUserAsync.loading) {
+    return <LoginPage fetchCurrentUser={fetchCurrentUserAsync.retry} />;
   }
 
   return (
@@ -69,7 +69,7 @@ export const AuthProvider = (props: any) => {
       value={{
         user,
         errors,
-        refetchUser: fetchCurrentUser.retry,
+        fetchCurrentUser: fetchCurrentUserAsync.retry, // rename here
         logout: logoutUser,
       }}
       {...props}
