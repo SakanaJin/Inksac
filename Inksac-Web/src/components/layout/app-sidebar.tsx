@@ -17,9 +17,6 @@ export function AppSidebar() {
     <Stack p="md">
       <Avatar radius="xl" size="lg" />
       <Text fw={500}>John Doe</Text>
-      <Text size="sm" c="dimmed">
-        john@inksac.dev
-      </Text>
 
       <Divider my="sm" />
 

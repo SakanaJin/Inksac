@@ -11,7 +11,7 @@ import { AppSidebar } from "../../components/layout/app-sidebar";
 import { RoomsList } from "./rooms-list";
 
 export const HomePage = () => {
-  const [opened, { toggle }] = useDisclosure();
+  const [opened, { toggle }] = useDisclosure(false);
 
   return (
     <AppShell
@@ -19,7 +19,7 @@ export const HomePage = () => {
       navbar={{
         width: 260,
         breakpoint: "sm",
-        collapsed: { mobile: !opened },
+        collapsed: { mobile: !opened, desktop: !opened },
       }}
       padding="md"
     >
@@ -29,7 +29,7 @@ export const HomePage = () => {
 
       <AppShell.Header>
         <Group h="100%" px="md">
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" />
+          <Burger opened={opened} onClick={toggle} />
           <Title order={3}>Inksac</Title>
         </Group>
       </AppShell.Header>
