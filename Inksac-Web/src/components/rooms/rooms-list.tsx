@@ -1,5 +1,5 @@
 import { SimpleGrid, Text } from "@mantine/core";
-import { RoomCard } from "../../components/rooms/room-card";
+import { RoomCard } from "./room-card";
 
 // fake room data for now
 const mockRooms = [
