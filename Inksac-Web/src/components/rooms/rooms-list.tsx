@@ -3,9 +3,9 @@ import { RoomCard } from "./room-card";
 
 // fake room data for now
 const mockRooms = [
-  { id: "1", name: "Brainstorm Canvas", users: 3 },
-  { id: "2", name: "UX Sketch Room", users: 5 },
-  { id: "3", name: "Empty Room", users: 0 },
+  { id: "1", name: "testroom", owner: "Devin" },
+  { id: "2", name: "NSFW", owner: "Derrick" },
+  { id: "3", name: "Brainstorm", owner: "Caleb" },
 ];
 
 export function RoomsList() {
