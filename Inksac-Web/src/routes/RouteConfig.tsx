@@ -15,6 +15,13 @@ export const RouteConfig = () => (
       }
     />
     <Route path={routes.root} element={<Navigate to={routes.home} />} />
-    <Route path="*" element={<NotFoundPage />} />
+    <Route
+      path="*"
+      element={
+        <AppLayout>
+          <NotFoundPage />
+        </AppLayout>
+      }
+    />
   </Routes>
 );
