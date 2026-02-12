@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response as FastRes, Request, Cookie
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 import bcrypt
@@ -20,6 +21,7 @@ serializer = itsdangerous.URLSafeTimedSerializer(SECRET_KEY)
 COOKIE_NAME = "session_token"
 COOKIE_MAX_AGE = 60 * 60 * 24 # one day
 MAX_GUEST_ATTEMPTS = 5
+MAXGUESTS = 10
 
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
@@ -70,9 +72,12 @@ def get_current_user_endpoint(user: User = Depends(get_current_user)):
     return response
 
 @router.post("/logout")
-def user_logout(fastres: FastRes):
+def user_logout(fastres: FastRes, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     response = Response()
     fastres.delete_cookie(COOKIE_NAME)
+    if user.role == Role.GUEST:
+        db.delete(user)
+        db.commit()
     response.data = True
     return response
 
@@ -98,6 +103,10 @@ def user_login(fastres: FastRes, logindto: LoginDto, db: Session = Depends(get_d
 @router.post("/guest")
 def create_guest(fastres: FastRes, db: Session = Depends(get_db)):
     response = Response()
+    guestcount = db.scalar(select(func.count(User.id)).filter(User.role == Role.GUEST))
+    if guestcount >= MAXGUESTS:
+        response.add_error("guest", "too many guests")
+        raise HttpException(status_code=400, response=response)
     user = None
     for _ in range(MAX_GUEST_ATTEMPTS):
         try:

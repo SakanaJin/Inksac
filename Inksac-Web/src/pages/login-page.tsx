@@ -1,6 +1,7 @@
 import type { LoginDto } from "../constants/types";
 import { useForm, type FormErrors } from "@mantine/form";
 import {
+  Anchor,
   Button,
   Center,
   Paper,
@@ -10,6 +11,8 @@ import {
   Title,
 } from "@mantine/core";
 import api from "../config/axios";
+import { modals } from "@mantine/modals";
+import { notifications } from "@mantine/notifications";
 
 export const LoginPage = ({ fetchCurrentUser }) => {
   const form = useForm<LoginDto>({
@@ -45,6 +48,22 @@ export const LoginPage = ({ fetchCurrentUser }) => {
     }
   };
 
+  const continueAsGuest = async () => {
+    const response = await api.post<boolean>(`/auth/guest`);
+
+    if (response.data.has_errors) {
+      notifications.show({
+        title: "Error",
+        message: "Cannot make guest account at this time",
+        color: "red",
+      });
+    }
+
+    if (response.data.data) {
+      await fetchCurrentUser();
+    }
+  };
+
   return (
     <Center style={{ width: "100vw", height: "100vh" }}>
       <Paper shadow="sm" withBorder p="xl">
@@ -59,6 +78,23 @@ export const LoginPage = ({ fetchCurrentUser }) => {
             Login
           </Button>
         </form>
+        <Space h="sm" />
+        <Anchor
+          onClick={() => {
+            modals.openContextModal({
+              modal: "usercreatemodal",
+              title: "Sign Up",
+              centered: true,
+              innerProps: {
+                onSubmit: (logindto: LoginDto) => submitLogin(logindto),
+              },
+            });
+          }}
+        >
+          Sign Up
+        </Anchor>
+        <Space h="sm" />
+        <Anchor onClick={() => continueAsGuest()}>Continue as Guest</Anchor>
       </Paper>
     </Center>
   );
