@@ -106,6 +106,7 @@ class DrawManager {
     }
 
     // this is what actually "draws" the brush stroke, prob make a brush class to handle width, opacity, shape, etc
+    // add check for moving mouse off canvas then lifting mouse, doesn't put on redo/undo stack
     private onMouseMove(event: pixi.FederatedPointerEvent) {
         if (this.isDrawing == false || this.currentStroke == null || this.brushShape == null) return;
 
