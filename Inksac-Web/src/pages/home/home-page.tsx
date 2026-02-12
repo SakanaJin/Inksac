@@ -1,48 +1,62 @@
-import {
-  AppShell,
-  Burger,
-  Group,
-  Title,
-  Container,
-  Button,
-} from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { AppSidebar } from "../../components/layout/app-sidebar";
-import { RoomsList } from "./rooms-list";
+import { Group, Title, Container, Button, Loader, Center } from "@mantine/core";
+import { RoomsList } from "../../components/rooms/rooms-list";
+import { useEffect, useState } from "react";
+import api from "../../config/axios";
+import type { RoomGetDto } from "../../constants/types";
 
 export const HomePage = () => {
-  const [opened, { toggle }] = useDisclosure(false);
+  const [rooms, setRooms] = useState<RoomGetDto[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch rooms from backend
+  const fetchRooms = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get<RoomGetDto[]>("/rooms");
+      if (!response.data.has_errors) {
+        setRooms(response.data.data);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchRooms();
+  }, []);
 
   return (
-    <AppShell
-      header={{ height: 60 }}
-      navbar={{
-        width: 260,
-        breakpoint: "sm",
-        collapsed: { mobile: !opened, desktop: !opened },
-      }}
-      padding="md"
-    >
-      <AppShell.Navbar>
-        <AppSidebar />
-      </AppShell.Navbar>
+    <Container size="lg">
+      {/* Header: Title + Refresh + Create Room */}
+      <Group justify="space-between" mb="md">
+        <Group gap="sm" align="center">
+          <Title order={2}>Available Rooms</Title>
 
-      <AppShell.Header>
-        <Group h="100%" px="md">
-          <Burger opened={opened} onClick={toggle} />
-          <Title order={3}>Inksac</Title>
+          {/* Refresh button with emoji. change to something better later */}
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={fetchRooms}
+            disabled={loading}
+          >
+            🔄 Refresh
+          </Button>
+          {loading ? <Loader /> : <></>}
         </Group>
-      </AppShell.Header>
 
-      <AppShell.Main>
-        <Container size="lg">
-          <Group justify="space-between" mb="md">
-            <Title order={2}>Available Rooms</Title>
-            <Button>Create Room</Button>
-          </Group>
-          <RoomsList />
-        </Container>
-      </AppShell.Main>
-    </AppShell>
+        {/* Create room button - modal integration later */}
+        <Button>Create Room</Button>
+      </Group>
+
+      {/* Rooms List */}
+      {rooms.length === 0 ? (
+        <Center>
+          <p>No rooms available. Create one!</p>
+        </Center>
+      ) : (
+        <RoomsList rooms={rooms} />
+      )}
+    </Container>
   );
 };
