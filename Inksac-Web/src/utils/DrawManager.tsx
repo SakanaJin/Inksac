@@ -95,6 +95,7 @@ class DrawManager {
         this.app.stage.on('pointerdown', (event) => this.onMouseDown(event));
         this.app.stage.on('pointermove', (event) => this.onMouseMove(event));
         this.app.stage.on('pointerup', () => this.onMouseUp());
+        this.app.stage.on('pointerleave', () => this.onMouseUp());
     }
 
     private onMouseDown(event: pixi.FederatedPointerEvent) {
@@ -103,10 +104,10 @@ class DrawManager {
 
         this.currentStroke = new pixi.Container();
         this.drawingContainer.addChild(this.currentStroke);
+        
     }
 
     // this is what actually "draws" the brush stroke, prob make a brush class to handle width, opacity, shape, etc
-    // add check for moving mouse off canvas then lifting mouse, doesn't put on redo/undo stack
     private onMouseMove(event: pixi.FederatedPointerEvent) {
         if (this.isDrawing == false || this.currentStroke == null || this.brushShape == null) return;
 

@@ -43,9 +43,11 @@ export const RoomPage = () => {
   };
 
   return (
-    <AppShell padding={-20} h={100}>
+    <AppShell padding={60}>
       <AppShell.Main>
-          <Group justify='center'><Group h='80vh' w='80vw' ref={pixiContainer}></Group></Group>
+          <Group justify='center'>
+            <Group h='80vh' w='80vw' ref={pixiContainer}></Group>
+            </Group>
             <Group justify='center'>
               <Button variant='filled' onClick={handleUndo}>Undo</Button>
               <Button variant='filled' onClick={handleRedo}>Redo</Button>
