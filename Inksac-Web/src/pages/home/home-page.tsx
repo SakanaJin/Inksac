@@ -20,7 +20,15 @@ export const HomePage = () => {
 
   const user = useUser();
   const currentUserId = user.id;
-  const canCreateRoom = user.role !== UserRole.GUEST; /*&& !user.has_room*/
+
+  /* Determine whether the current user already owns a room.
+     We derive this from the rooms list instead of relying on user.has_room
+     to avoid stale auth state after room mutations. */
+  const ownsRoom = rooms.some((room) => room.owner.id === currentUserId);
+
+  /* A user can create a room if they are not a guest and
+     they do not already own one. */
+  const canCreateRoom = user.role !== UserRole.GUEST && !ownsRoom;
 
   // Fetch rooms from backend
   const fetchRooms = async () => {
@@ -71,9 +79,9 @@ export const HomePage = () => {
           label={
             user.role === UserRole.GUEST
               ? "Guests cannot create rooms"
-              : // : user.has_room
-                //   ? "You already own a room" // enable once UserGetDto has has_room property
-                ""
+              : ownsRoom
+                ? "You already own a room" // enable once UserGetDto has has_room property
+                : ""
           }
           disabled={canCreateRoom}
         >
