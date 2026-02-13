@@ -1,14 +1,10 @@
 import { AppShell } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import type { ReactNode } from "react";
 import { AppSidebar } from "./app-sidebar";
 import { AppHeader } from "./app-header";
+import { Outlet } from "react-router-dom";
 
-type AppLayoutProps = {
-  children: ReactNode;
-};
-
-export const AppLayout = ({ children }: AppLayoutProps) => {
+export const AppLayout = () => {
   const [opened, { toggle }] = useDisclosure(false);
 
   return (
@@ -29,7 +25,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         <AppHeader opened={opened} toggle={toggle} />
       </AppShell.Header>
 
-      <AppShell.Main>{children}</AppShell.Main>
+      <AppShell.Main>
+        <Outlet />
+      </AppShell.Main>
     </AppShell>
   );
 };
