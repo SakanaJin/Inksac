@@ -24,6 +24,7 @@ export interface UserGetDto {
   username: string;
   role: UserRole;
   pfp_path: string;
+  has_room: boolean;
 }
 
 export interface LoginDto {
@@ -42,6 +43,7 @@ export interface UserShallowDto {
   id: number;
   username: string;
   pfp_path: string;
+  has_room: boolean;
 }
 
 // brush types ------------------------------------------------------------------------------------
