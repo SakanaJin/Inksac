@@ -30,7 +30,7 @@ export function RoomCard({
   const openUpdateModal = () => {
     modals.openContextModal({
       modal: "roomupdatemodal",
-      title: "Update Room",
+      title: "Edit Room",
       innerProps: {
         room,
         onSuccess: onRoomAction,
@@ -64,20 +64,20 @@ export function RoomCard({
         <Group gap="xs">
           {/* Join button for all rooms */}
           <Button size="xs" color="green">
-            Join Room
+            Join
           </Button>
 
           {/* Update button only for your room */}
           {isUserRoom && (
             <Button size="xs" color="violet" onClick={openUpdateModal}>
-              Edit Room
+              Edit
             </Button>
           )}
 
           {/* Delete button only for your room */}
           {isUserRoom && (
             <Button size="xs" color="red" onClick={openDeleteModal}>
-              Delete Room
+              Delete
             </Button>
           )}
         </Group>

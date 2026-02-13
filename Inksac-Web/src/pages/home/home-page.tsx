@@ -1,4 +1,12 @@
-import { Group, Title, Container, Button, Loader, Center } from "@mantine/core";
+import {
+  Group,
+  Title,
+  Container,
+  Button,
+  Loader,
+  Center,
+  Tooltip,
+} from "@mantine/core";
 import { RoomsList } from "../../components/rooms/rooms-list";
 import { useEffect, useState } from "react";
 import api from "../../config/axios";
@@ -59,31 +67,31 @@ export const HomePage = () => {
         </Group>
 
         {/* Create room button */}
-        {/* <Tooltip
+        <Tooltip
           label={
             user.role === UserRole.GUEST
               ? "Guests cannot create rooms"
-              : user.has_room
-                ? "You already own a room"
-                : ""
+              : // : user.has_room
+                //   ? "You already own a room" // enable once UserGetDto has has_room property
+                ""
           }
           disabled={canCreateRoom}
-        > */}
-        <Button
-          onClick={() =>
-            modals.openContextModal({
-              modal: "roomcreatemodal",
-              title: "Create Room",
-              innerProps: {
-                onSuccess: fetchRooms,
-              },
-            })
-          }
-          disabled={!canCreateRoom}
         >
-          Create Room
-        </Button>
-        {/* </Tooltip> */}
+          <Button
+            onClick={() =>
+              modals.openContextModal({
+                modal: "roomcreatemodal",
+                title: "Create Room",
+                innerProps: {
+                  onSuccess: fetchRooms,
+                },
+              })
+            }
+            disabled={!canCreateRoom}
+          >
+            Create Room
+          </Button>
+        </Tooltip>
       </Group>
 
       {/* Rooms List */}
