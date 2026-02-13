@@ -23,11 +23,13 @@ class UserGetDto(BaseModel):
     username: str
     role: Role
     pfp_path: str
+    has_room: bool
 
 class UserShallowDto(BaseModel):
     id: int
     username: str
     pfp_path: str
+    has_room: bool
 
 class User(Base):
     __tablename__ = "users"
@@ -49,7 +51,8 @@ class User(Base):
             id=self.id,
             username=self.username,
             role=self.role,
-            pfp_path=self.pfp_path
+            pfp_path=self.pfp_path,
+            has_room=bool(self.room)
         )
         return userdto
     
@@ -57,6 +60,7 @@ class User(Base):
         userdto = UserShallowDto(
             id=self.id,
             username=self.username,
-            pfp_path=self.pfp_path
+            pfp_path=self.pfp_path,
+            has_room=bool(self.room)
         )
         return userdto
