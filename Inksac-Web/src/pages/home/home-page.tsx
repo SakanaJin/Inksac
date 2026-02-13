@@ -3,10 +3,15 @@ import { RoomsList } from "../../components/rooms/rooms-list";
 import { useEffect, useState } from "react";
 import api from "../../config/axios";
 import type { RoomGetDto } from "../../constants/types";
+import { modals } from "@mantine/modals";
+import { useUser } from "../../authentication/use-auth";
 
 export const HomePage = () => {
   const [rooms, setRooms] = useState<RoomGetDto[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const user = useUser();
+  const currentUserId = user.id;
 
   // Fetch rooms from backend
   const fetchRooms = async () => {
@@ -14,7 +19,14 @@ export const HomePage = () => {
     try {
       const response = await api.get<RoomGetDto[]>("/rooms");
       if (!response.data.has_errors) {
-        setRooms(response.data.data);
+        const allRooms = response.data.data;
+        const userRoom = allRooms.find(
+          (room) => room.owner.id === currentUserId,
+        );
+        const otherRooms = allRooms.filter(
+          (room) => room.owner.id !== currentUserId,
+        );
+        setRooms(userRoom ? [userRoom, ...otherRooms] : otherRooms);
       }
     } finally {
       setLoading(false);
@@ -45,8 +57,20 @@ export const HomePage = () => {
           {loading ? <Loader /> : <></>}
         </Group>
 
-        {/* Create room button - modal integration later */}
-        <Button>Create Room</Button>
+        {/* Create room button */}
+        <Button
+          onClick={() =>
+            modals.openContextModal({
+              modal: "roomcreatemodal",
+              title: "Create Room",
+              innerProps: {
+                onSuccess: fetchRooms,
+              },
+            })
+          }
+        >
+          Create Room
+        </Button>
       </Group>
 
       {/* Rooms List */}
@@ -55,7 +79,11 @@ export const HomePage = () => {
           <p>No rooms available. Create one!</p>
         </Center>
       ) : (
-        <RoomsList rooms={rooms} />
+        <RoomsList
+          rooms={rooms}
+          currentUserId={currentUserId}
+          onRoomAction={fetchRooms}
+        />
       )}
     </Container>
   );

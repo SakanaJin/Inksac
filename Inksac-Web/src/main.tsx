@@ -9,10 +9,16 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { UserCreateModal } from "./components/login/user-create-modal.tsx";
 import { ImageUploadModal } from "./components/image/upload-image-modal.tsx";
+import { RoomCreateModal } from "./components/rooms/room-create-modal";
+import { RoomDeleteModal } from "./components/rooms/room-delete-modal.tsx";
+import { RoomUpdateModal } from "./components/rooms/room-update-modal.tsx";
 
 const modals = {
   usercreatemodal: UserCreateModal,
   uploadimagemodal: ImageUploadModal,
+  roomcreatemodal: RoomCreateModal,
+  roomdeletemodal: RoomDeleteModal,
+  roomupdatemodal: RoomUpdateModal,
 };
 
 declare module "@mantine/modals" {
