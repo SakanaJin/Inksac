@@ -2,7 +2,7 @@ import { Group, Title, Container, Button, Loader, Center } from "@mantine/core";
 import { RoomsList } from "../../components/rooms/rooms-list";
 import { useEffect, useState } from "react";
 import api from "../../config/axios";
-import type { RoomGetDto } from "../../constants/types";
+import { UserRole, type RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useUser } from "../../authentication/use-auth";
 
@@ -12,6 +12,7 @@ export const HomePage = () => {
 
   const user = useUser();
   const currentUserId = user.id;
+  const canCreateRoom = user.role !== UserRole.GUEST; /*&& !user.has_room*/
 
   // Fetch rooms from backend
   const fetchRooms = async () => {
@@ -58,6 +59,16 @@ export const HomePage = () => {
         </Group>
 
         {/* Create room button */}
+        {/* <Tooltip
+          label={
+            user.role === UserRole.GUEST
+              ? "Guests cannot create rooms"
+              : user.has_room
+                ? "You already own a room"
+                : ""
+          }
+          disabled={canCreateRoom}
+        > */}
         <Button
           onClick={() =>
             modals.openContextModal({
@@ -68,9 +79,11 @@ export const HomePage = () => {
               },
             })
           }
+          disabled={!canCreateRoom}
         >
           Create Room
         </Button>
+        {/* </Tooltip> */}
       </Group>
 
       {/* Rooms List */}
