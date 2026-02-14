@@ -7,14 +7,14 @@ interface RoomCardProps {
   room: RoomGetDto;
   currentUserId: number;
   onRoomAction?: () => void;
-  onJoinRoom?: (roomId: number) => void; // ready to implement joining a room
+  onJoinRoom?: (roomId: number) => void;
 }
 
 export function RoomCard({
   room,
   currentUserId,
   onRoomAction,
-  onJoinRoom, // ready to implement joining a room
+  onJoinRoom,
 }: RoomCardProps) {
   const navigate = useNavigate();
   const isUserRoom = room.owner.id === currentUserId;

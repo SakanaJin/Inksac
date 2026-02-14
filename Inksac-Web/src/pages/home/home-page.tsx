@@ -13,12 +13,14 @@ import api from "../../config/axios";
 import { UserRole, type RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useUser } from "../../authentication/use-auth";
+import { useNavigate } from "react-router-dom";
 
 export const HomePage = () => {
   const [rooms, setRooms] = useState<RoomGetDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   const user = useUser();
+  const navigate = useNavigate();
   const currentUserId = user.id;
 
   /* Determine whether the current user already owns a room.
@@ -91,7 +93,9 @@ export const HomePage = () => {
                 modal: "roomcreatemodal",
                 title: "Create Room",
                 innerProps: {
-                  onSuccess: fetchRooms,
+                  onSuccess: (createdRoom: RoomGetDto) => {
+                    navigate(`/room/${createdRoom.id}`);
+                  },
                 },
               })
             }
