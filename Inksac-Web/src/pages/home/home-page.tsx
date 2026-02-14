@@ -32,6 +32,18 @@ export const HomePage = () => {
      they do not already own one. */
   const canCreateRoom = user.role !== UserRole.GUEST && !ownsRoom;
 
+  let createRoomTooltip: string | undefined;
+  if (user.role === UserRole.GUEST) {
+    createRoomTooltip = "Guests cannot create rooms";
+  } else if (ownsRoom) {
+    createRoomTooltip = "You already own a room";
+  }
+
+  const emptyMessage =
+    user.role === UserRole.GUEST
+      ? "No rooms available and you can't create a room as a guest."
+      : "No rooms available. Create a room and start doodling!";
+
   // Fetch rooms from backend
   const fetchRooms = async () => {
     setLoading(true);
@@ -57,6 +69,19 @@ export const HomePage = () => {
     fetchRooms();
   }, []);
 
+  const roomList =
+    rooms.length === 0 ? (
+      <Center>
+        <p>{emptyMessage}</p>
+      </Center>
+    ) : (
+      <RoomsList
+        rooms={rooms}
+        currentUserId={currentUserId}
+        onRoomAction={fetchRooms}
+      />
+    );
+
   return (
     <Container size="lg">
       {/* Header: Title + Refresh + Create Room */}
@@ -77,16 +102,7 @@ export const HomePage = () => {
         </Group>
 
         {/* Create room button */}
-        <Tooltip
-          label={
-            user.role === UserRole.GUEST
-              ? "Guests cannot create rooms"
-              : ownsRoom
-                ? "You already own a room" // enable once UserGetDto has has_room property
-                : ""
-          }
-          disabled={canCreateRoom}
-        >
+        <Tooltip label={createRoomTooltip} disabled={canCreateRoom}>
           <Button
             onClick={() =>
               modals.openContextModal({
@@ -107,25 +123,7 @@ export const HomePage = () => {
       </Group>
 
       {/* Rooms List */}
-      {rooms.length === 0 &&
-      (user.role === UserRole.ADMIN || user.role === UserRole.USER) ? (
-        <Center>
-          <p>No rooms available. You should create one!</p>
-        </Center>
-      ) : rooms.length === 0 && user.role === UserRole.GUEST ? (
-        <Center>
-          <p>
-            No rooms available. You can't create a room as a guest. Sucks to
-            suck!
-          </p>
-        </Center>
-      ) : (
-        <RoomsList
-          rooms={rooms}
-          currentUserId={currentUserId}
-          onRoomAction={fetchRooms}
-        />
-      )}
+      {roomList}
     </Container>
   );
 };
