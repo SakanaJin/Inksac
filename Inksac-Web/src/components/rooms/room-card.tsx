@@ -1,6 +1,7 @@
 import { Card, Group, Text, Badge, Button, Stack } from "@mantine/core";
 import type { RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
+import { useNavigate } from "react-router-dom";
 
 interface RoomCardProps {
   room: RoomGetDto;
@@ -15,7 +16,15 @@ export function RoomCard({
   onRoomAction,
   onJoinRoom, // ready to implement joining a room
 }: RoomCardProps) {
+  const navigate = useNavigate();
   const isUserRoom = room.owner.id === currentUserId;
+
+  const handleJoinRoom = () => {
+    if (onJoinRoom) {
+      onJoinRoom(room.id);
+    }
+    navigate(`/room/${room.id}`);
+  };
 
   const openDeleteModal = () => {
     modals.openContextModal({
@@ -63,7 +72,7 @@ export function RoomCard({
         {/* Action buttons */}
         <Group gap="xs">
           {/* Join button for all rooms */}
-          <Button size="xs" color="green">
+          <Button size="xs" color="green" onClick={handleJoinRoom}>
             Join
           </Button>
 
