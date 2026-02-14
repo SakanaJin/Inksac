@@ -3,7 +3,7 @@ import axios, { AxiosError } from "axios";
 import type { AxiosResponse } from "axios";
 import { EnvVars } from "./env-vars";
 import type { FileWithPath } from "@mantine/dropzone";
-import type { ApiResponse } from "../constants/types";
+import type { ApiResponse, ApiError } from "../constants/types";
 
 const baseurl = EnvVars.apiBaseUrl;
 
@@ -16,43 +16,77 @@ type ErrorHandler = (response?: AxiosResponse) => Promise<any> | void;
 
 const errorHandlers: Record<number, ErrorHandler> = {
   "400": (response) => {
-    console.log(response?.data.errors);
+    response.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+    });
     return Promise.resolve(response);
   },
   "401": (response) => {
-    console.log("Unauthenticated");
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+    });
     return Promise.resolve(response);
   },
   "403": (response) => {
-    console.log("not authorized to complete this action");
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+    });
     notifications.show({
       title: "Error",
       message: "You are not authorized to perform this action",
       color: "red",
     });
-    return Promise.resolve(response);
+    return Promise.reject(response);
   },
   "404": (response) => {
-    console.log(response?.data.errors);
-    return Promise.resolve(response);
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+    });
+    return Promise.reject(response);
   },
   "413": (response) => {
-    console.log("File too large");
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+    });
     notifications.show({
       title: "Error",
       message: "File size too large",
       color: "red",
     });
-    return Promise.resolve(response);
+    return Promise.reject(response);
   },
   "500": (response) => {
-    console.log("Internal server error");
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+    });
     notifications.show({
       title: "Error",
       message: "Internal server Error",
       color: "red",
     });
-    return Promise.resolve(response);
+    return Promise.reject(response);
+  },
+  "503": (response) => {
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+      notifications.show({
+        title: "Error",
+        message: `${error.message}`,
+        color: "red",
+      });
+    });
+    return Promise.reject(response);
+  },
+  "409": (response) => {
+    response?.data.errors.forEach((error: ApiError) => {
+      console.error(error);
+      notifications.show({
+        title: "Error",
+        message: `${error.message}`,
+        color: "red",
+      });
+    });
+    return Promise.reject(response);
   },
 };
 

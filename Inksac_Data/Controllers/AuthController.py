@@ -106,7 +106,7 @@ def create_guest(fastres: FastRes, db: Session = Depends(get_db)):
     guestcount = db.scalar(select(func.count(User.id)).filter(User.role == Role.GUEST))
     if guestcount >= MAXGUESTS:
         response.add_error("guest", "too many guests")
-        raise HttpException(status_code=400, response=response)
+        raise HttpException(status_code=503, response=response)
     user = None
     for _ in range(MAX_GUEST_ATTEMPTS):
         try:

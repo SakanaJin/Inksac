@@ -33,12 +33,13 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     roomcount = db.query(Room).count()
     if roomcount >= 10:
         response.add_error("room", "too many rooms in server")
+        raise HttpException(status_code=503, response=response)
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
+        raise HttpException(status_code=400, response=response)
     if bool(user.room):
         response.add_error("room", "user already has an open room")
-    if response.has_errors:
-        raise HttpException(status_code=400, response=response)
+        raise HttpException(status_code=409, response=response)
     room = Room(
         name=roomdto.name,
         expiration=round_nearest_hour(datetime.now() + timedelta(days=1)),
@@ -54,10 +55,10 @@ def update(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     response = Response()
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
-    if not user.room:
-        response.add_error("room", "user doesn't have an active room")
-    if response.has_errors:
         raise HttpException(status_code=400, response=response)
+    if not user.room:
+        response.add_error("room", "you do not own this room")
+        raise HttpException(status_code=403, response=response)
     user.room.name = roomdto.name
     db.commit()
     response.data = user.room.toGetDto()
@@ -67,8 +68,8 @@ def update(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
 def delete(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     response = Response()
     if not user.room:
-        response.add_error("room", "user doesn't have an active room")
-        raise HttpException(status_code=400, response=response)
+        response.add_error("room", "you do not own this room")
+        raise HttpException(status_code=403, response=response)
     db.delete(user.room)
     user.has_room = False
     db.commit()

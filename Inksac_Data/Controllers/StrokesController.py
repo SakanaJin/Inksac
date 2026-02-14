@@ -67,7 +67,7 @@ def delete(id: int, db: Session = Depends(get_db), user: User = Depends(get_curr
         raise HttpException(status_code=404, response=response)
     if stroke.creator_id != user.id and user.role != Role.ADMIN:
         response.add_error("creator", "user is not creator of stroke")
-        raise HttpException(status_code=400, response=response)
+        raise HttpException(status_code=403, response=response)
     db.delete(stroke)
     db.commit()
     response.data = True
