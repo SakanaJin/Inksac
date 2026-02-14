@@ -36,13 +36,13 @@ const errorHandlers: Record<number, ErrorHandler> = {
       message: "You are not authorized to perform this action",
       color: "red",
     });
-    return Promise.reject(response);
+    return Promise.resolve(response);
   },
   "404": (response) => {
     response?.data.errors.forEach((error: ApiError) => {
       console.error(error);
     });
-    return Promise.reject(response);
+    return Promise.resolve(response);
   },
   "413": (response) => {
     response?.data.errors.forEach((error: ApiError) => {
@@ -53,7 +53,7 @@ const errorHandlers: Record<number, ErrorHandler> = {
       message: "File size too large",
       color: "red",
     });
-    return Promise.reject(response);
+    return Promise.resolve(response);
   },
   "500": (response) => {
     response?.data.errors.forEach((error: ApiError) => {
@@ -64,7 +64,7 @@ const errorHandlers: Record<number, ErrorHandler> = {
       message: "Internal server Error",
       color: "red",
     });
-    return Promise.reject(response);
+    return Promise.resolve(response);
   },
   "503": (response) => {
     response?.data.errors.forEach((error: ApiError) => {
@@ -75,7 +75,7 @@ const errorHandlers: Record<number, ErrorHandler> = {
         color: "red",
       });
     });
-    return Promise.reject(response);
+    return Promise.resolve(response);
   },
   "409": (response) => {
     response?.data.errors.forEach((error: ApiError) => {
@@ -86,7 +86,7 @@ const errorHandlers: Record<number, ErrorHandler> = {
         color: "red",
       });
     });
-    return Promise.reject(response);
+    return Promise.resolve(response);
   },
 };
 
