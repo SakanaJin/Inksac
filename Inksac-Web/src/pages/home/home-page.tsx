@@ -107,9 +107,17 @@ export const HomePage = () => {
       </Group>
 
       {/* Rooms List */}
-      {rooms.length === 0 ? (
+      {rooms.length === 0 &&
+      (user.role === UserRole.ADMIN || user.role === UserRole.USER) ? (
         <Center>
-          <p>No rooms available. Create one!</p>
+          <p>No rooms available. You should create one!</p>
+        </Center>
+      ) : rooms.length === 0 && user.role === UserRole.GUEST ? (
+        <Center>
+          <p>
+            No rooms available. You can't create a room as a guest. Sucks to
+            suck!
+          </p>
         </Center>
       ) : (
         <RoomsList
