@@ -29,33 +29,21 @@ export const RoomUpdateModal = ({
     const response = await api.patch<RoomGetDto>("/rooms", values);
 
     if (response.data.has_errors) {
-      const formErrors = response.data.errors.reduce((obj, err) => {
+      const formErrors = response.data.errors.reduce((acc, err) => {
         if (err.property) {
-          obj[err.property] = err.message;
-        } else {
-          notifications.show({
-            title: "Error",
-            message: err.message,
-            color: "red",
-          });
+          acc[err.property] = err.message;
         }
-        return obj;
+        return acc;
       }, {} as FormErrors);
 
       form.setErrors(formErrors);
       return;
     }
 
-    if (response.data.data) {
-      notifications.show({
-        title: "Success",
-        message: "Room updated successfully",
-        color: "green",
-      });
+    const updatedRoom = response.data.data;
 
-      innerProps.onSuccess?.(response.data.data);
-      context.closeModal(id);
-    }
+    innerProps.onSuccess?.(updatedRoom);
+    context.closeModal(id);
   };
 
   return (

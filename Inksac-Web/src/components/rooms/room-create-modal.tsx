@@ -28,33 +28,21 @@ export const RoomCreateModal = ({
     const response = await api.post<RoomGetDto>("/rooms", values);
 
     if (response.data.has_errors) {
-      const formErrors = response.data.errors.reduce((obj, err) => {
+      const formErrors = response.data.errors.reduce((acc, err) => {
         if (err.property) {
-          obj[err.property] = err.message;
-        } else {
-          notifications.show({
-            title: "Error",
-            message: err.message,
-            color: "red",
-          });
+          acc[err.property] = err.message;
         }
-        return obj;
+        return acc;
       }, {} as FormErrors);
 
       form.setErrors(formErrors);
       return;
     }
 
-    if (response.data.data) {
-      notifications.show({
-        title: "Success",
-        message: "Room created successfully",
-        color: "green",
-      });
+    const createdRoom = response.data.data;
 
-      innerProps.onSuccess?.(response.data.data);
-      context.closeModal(id);
-    }
+    innerProps.onSuccess?.(createdRoom);
+    context.closeModal(id);
   };
 
   return (
