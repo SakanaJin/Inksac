@@ -41,6 +41,12 @@ export const RoomCreateModal = ({
 
     const createdRoom = response.data.data;
 
+    notifications.show({
+      title: "Success",
+      message: "Room Created! Welcome to your canvas!",
+      color: "green",
+    });
+
     innerProps.onSuccess?.(createdRoom);
     context.closeModal(id);
   };

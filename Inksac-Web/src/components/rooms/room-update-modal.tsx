@@ -42,6 +42,12 @@ export const RoomUpdateModal = ({
 
     const updatedRoom = response.data.data;
 
+    notifications.show({
+      title: "Success",
+      message: "Room updated Successfully!",
+      color: "green",
+    });
+
     innerProps.onSuccess?.(updatedRoom);
     context.closeModal(id);
   };
