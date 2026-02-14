@@ -6,6 +6,7 @@ export interface Env {
   name: VITE_ENVIRONMENT;
   buildNumber: string;
   apiBaseUrl?: string;
+  mediaBaseUrl?: string;
   host: string;
   subdirectory?: string;
   appRoot: string;
@@ -21,6 +22,7 @@ export const EnvVars: Env = {
   name: import.meta.env.VITE_ENVIRONMENT as VITE_ENVIRONMENT,
   buildNumber: import.meta.env.VITE_BUILD_NUMBER || "local",
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+  mediaBaseUrl: import.meta.env.VITE_MEDIA_BASE_URL,
   host,
   subdirectory,
   appRoot,
