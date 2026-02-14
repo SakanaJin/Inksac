@@ -13,6 +13,7 @@ ALLOWORIGINS = os.getenv("ALLOWORIGINS")
 ALLOWORIGINSLIST = json.loads(ALLOWORIGINS)
 
 ROOT = Path(__file__).resolve().parents[1] # /Inksac
+MEDIA_DIR = ROOT / "media" #/Inksac/media
 
 engine = create_engine(DBSTRING, echo=True, future=True)
 Base = declarative_base()

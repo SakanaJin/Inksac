@@ -3,14 +3,14 @@ from sqlalchemy.orm import Session
 import os
 import uuid
 
-from Inksac_Data.database import get_db, ROOT
+from Inksac_Data.database import get_db, MEDIA_DIR
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Entities.Brushes import Brush, BrushCreateDto, BrushUpdateDto, DEFAULT_BRUSH
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Controllers.AuthController import require_not_guest, get_current_user
 
 MAX_BRUSH_SIZE = 1 * 1024 * 1024 # 1MB
-BRUSH_PATH = "/media/user/brush"
+BRUSH_PATH = "/user/brush"
 
 router = APIRouter(prefix="/api/brushes", tags=['Brushes'])
 
@@ -97,8 +97,8 @@ async def update_imgurl(id: int, request: Request, file: UploadFile = File(...),
     filename = f"{uuid.uuid4()}.{extension}"
     filepath = os.path.join(BRUSH_PATH, filename)
     if brush.imgurl != DEFAULT_BRUSH:
-        os.remove(ROOT / brush.imgurl[1:])
-    with open(ROOT / filepath[1:], "wb") as f:
+        os.remove(MEDIA_DIR / brush.imgurl[1:])
+    with open(MEDIA_DIR / filepath[1:], "wb") as f:
         f.write(await file.read())
     brush.imgurl = filepath
     db.commit()
@@ -118,7 +118,7 @@ def remove_imgurl(id: int, db: Session = Depends(get_db), user: User = Depends(g
         response.add_error("brush", "cannot edit brush in use")
     if response.has_errors:
         raise HttpException(status_code=409, response=response)
-    os.remove(ROOT / brush.imgurl[1:])
+    os.remove(MEDIA_DIR / brush.imgurl[1:])
     brush.imgurl = DEFAULT_BRUSH
     db.commit()
     response.data = brush.toGetDto()
@@ -135,7 +135,7 @@ def delete_brush(id: int, db: Session = Depends(get_db), user: User = Depends(ge
         response.add_error("brush", "cannot delete brush in use")
         raise HttpException(status_code=409, response=response)
     if brush.imgurl != DEFAULT_BRUSH:
-        os.remove(ROOT / brush.imgurl[1:])
+        os.remove(MEDIA_DIR / brush.imgurl[1:])
     db.delete(brush)
     db.commit()
     response.data = True

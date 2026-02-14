@@ -6,7 +6,7 @@ from Inksac_Data.database import Base
 from Inksac_Data.Common.Rotation import RotationMode
 from Inksac_Data.Entities.Users import UserShallowDto
 
-DEFAULT_BRUSH = "/media/user/brush/softShape.png"
+DEFAULT_BRUSH = "/user/brush/softShape.png"
 
 class BrushCreateDto(BaseModel):
     name: str

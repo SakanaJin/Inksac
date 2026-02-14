@@ -11,9 +11,9 @@ from Inksac_Data.Entities.Auth import UserAuth, create_password_hash, EMAIL_PATT
 from Inksac_Data.Controllers.AuthController import require_admin, get_current_user, require_not_guest
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.Role import Role
-from Inksac_Data.database import get_db, ROOT
+from Inksac_Data.database import get_db, MEDIA_DIR
 
-PFP_PATH = "/media/user/pfp"
+PFP_PATH = "/user/pfp"
 MAX_PFP_SIZE = 5 * 1024 * 1024 # 5MB
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
@@ -88,8 +88,8 @@ async def update_pfp(request: Request, file: UploadFile = File(...), db: Session
     filename = f"{uuid.uuid4()}.{extension}"
     filepath = os.path.join(PFP_PATH, filename)
     if user.pfp_path != DEFAULT_PFP:
-        os.remove(ROOT / user.pfp_path[1:])
-    with open(ROOT / filepath[1:], "wb") as f:
+        os.remove(MEDIA_DIR / user.pfp_path[1:])
+    with open(MEDIA_DIR / filepath[1:], "wb") as f:
         f.write(await file.read())
     user.pfp_path = filepath
     db.commit()
@@ -102,7 +102,7 @@ def remove_pfp(db: Session = Depends(get_db), user: User = Depends(get_current_u
     if user.pfp_path == DEFAULT_PFP:
         response.add_error("pfp", "no pfp")
         raise HttpException(status_code=400, response=response)
-    os.remove(ROOT / user.pfp_path[1:])
+    os.remove(MEDIA_DIR / user.pfp_path[1:])
     user.pfp_path = DEFAULT_PFP
     db.commit()
     response.data = user.toGetDto()
@@ -116,7 +116,7 @@ def delete_user(id: int, db: Session = Depends(get_db), admin: User = Depends(re
         response.add_error("id", "user not found")
         raise HttpException(status_code=404, response=response)
     if user.pfp_path != DEFAULT_PFP:
-        os.remove(ROOT / user.pfp_path[1:])
+        os.remove(MEDIA_DIR / user.pfp_path[1:])
     db.delete(user)
     db.commit()
     response.data = True
