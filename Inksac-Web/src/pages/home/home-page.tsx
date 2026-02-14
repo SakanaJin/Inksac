@@ -41,7 +41,7 @@ export const HomePage = () => {
 
   const emptyMessage =
     user.role === UserRole.GUEST
-      ? "No rooms available and you can't create a room as a guest."
+      ? "No rooms available and you can't create a room as a guest. Sucks to suck!"
       : "No rooms available. Create a room and start doodling!";
 
   // Fetch rooms from backend
