@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { AppShell, Text, Grid, Button, Group, AppShellHeader } from '@mantine/core';
+import { AppShell, Text, Grid, Button, Group, AppShellHeader, Container } from '@mantine/core';
 import * as pixi from 'pixi.js'
 import DrawManager from '../utils/DrawManager';
 
@@ -43,8 +43,7 @@ export const RoomPage = () => {
   };
 
   return (
-    <AppShell padding={60}>
-      <AppShell.Main>
+      <Container size='100%' style={{padding: '60px'}}>
           <Group justify='center'>
             <Group h='80vh' w='80vw' ref={pixiContainer}></Group>
             </Group>
@@ -52,7 +51,6 @@ export const RoomPage = () => {
               <Button variant='filled' onClick={handleUndo}>Undo</Button>
               <Button variant='filled' onClick={handleRedo}>Redo</Button>
             </Group>   
-      </AppShell.Main>
-    </AppShell>
+      </Container>
   );
 };
