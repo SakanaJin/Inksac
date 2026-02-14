@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { TextInput, Button, Stack } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
+import { useForm, type FormErrors } from "@mantine/form";
 import type { ContextModalProps } from "@mantine/modals";
+import { Button, Flex, TextInput } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import api from "../../config/axios";
 import { type RoomUpdateDto, type RoomGetDto } from "../../constants/types";
 
@@ -10,63 +10,69 @@ export interface RoomUpdateModalProps {
   onSuccess?: (room: RoomGetDto) => void;
 }
 
-export function RoomUpdateModal({
+export const RoomUpdateModal = ({
   context,
   id,
   innerProps,
-}: ContextModalProps<RoomUpdateModalProps>) {
-  const [name, setName] = useState(innerProps.room.name);
-  const [loading, setLoading] = useState(false);
+}: ContextModalProps<RoomUpdateModalProps>) => {
+  const form = useForm({
+    initialValues: {
+      name: innerProps.room.name,
+    },
+    validate: {
+      name: (value) =>
+        value.trim().length === 0 ? "Room name cannot be empty" : null,
+    },
+  });
 
-  const handleUpdate = async () => {
-    setLoading(true);
-    try {
-      const payload: RoomUpdateDto = { name };
-      const response = await api.patch<RoomGetDto>("/rooms", payload);
+  const handleSubmit = async (values: RoomUpdateDto) => {
+    const response = await api.patch<RoomGetDto>("/rooms", values);
 
-      if (response.data.has_errors) {
-        response.data.errors.forEach((err) =>
+    if (response.data.has_errors) {
+      const formErrors = response.data.errors.reduce((obj, err) => {
+        if (err.property) {
+          obj[err.property] = err.message;
+        } else {
           notifications.show({
-            color: "red",
             title: "Error",
-            message: `${err.property}: ${err.message}`,
-          }),
-        );
-        return;
-      }
+            message: err.message,
+            color: "red",
+          });
+        }
+        return obj;
+      }, {} as FormErrors);
 
+      form.setErrors(formErrors);
+      return;
+    }
+
+    if (response.data.data) {
       notifications.show({
-        color: "green",
         title: "Success",
         message: "Room updated successfully",
+        color: "green",
       });
 
       innerProps.onSuccess?.(response.data.data);
       context.closeModal(id);
-    } catch (err: any) {
-      notifications.show({
-        color: "red",
-        title: "Server Error",
-        message: err?.response?.data?.message || "Something went wrong",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
-    <Stack>
+    <form onSubmit={form.onSubmit(handleSubmit)}>
       <TextInput
+        autoFocus
+        key={form.key("name")}
         label="Room Name"
-        placeholder="Enter room name"
-        value={name}
-        onChange={(e) => setName(e.currentTarget.value)}
-        required
+        {...form.getInputProps("name")}
       />
 
-      <Button onClick={handleUpdate} loading={loading}>
-        Update Room
-      </Button>
-    </Stack>
+      <Flex justify="space-between" pt="sm">
+        <Button variant="outline" onClick={() => context.closeModal(id)}>
+          Cancel
+        </Button>
+        <Button type="submit">Update</Button>
+      </Flex>
+    </form>
   );
-}
+};

@@ -1,74 +1,78 @@
-import { useState } from "react";
-import { TextInput, Button, Stack } from "@mantine/core";
+import { TextInput, Button, Flex } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import type { ContextModalProps } from "@mantine/modals";
 import api from "../../config/axios";
 import { type RoomGetDto, type RoomCreateDto } from "../../constants/types";
+import { useForm, type FormErrors } from "@mantine/form";
 
 export interface RoomCreateModalProps {
   onSuccess?: (room: RoomGetDto) => void;
 }
 
-export function RoomCreateModal({
+export const RoomCreateModal = ({
   context,
   id,
   innerProps,
-}: ContextModalProps<RoomCreateModalProps>) {
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
+}: ContextModalProps<RoomCreateModalProps>) => {
+  const form = useForm({
+    initialValues: {
+      name: "",
+    },
+    validate: {
+      name: (value) =>
+        value.trim().length === 0 ? "Room name cannot be empty" : null,
+    },
+  });
 
-  const handleCreate = async () => {
-    setLoading(true);
+  const handleSubmit = async (values: RoomCreateDto) => {
+    const response = await api.post<RoomGetDto>("/rooms", values);
 
-    try {
-      const payload: RoomCreateDto = { name };
-
-      const response = await api.post<RoomGetDto>("/rooms", payload);
-
-      if (response.data.has_errors) {
-        response.data.errors.forEach((err) => {
+    if (response.data.has_errors) {
+      const formErrors = response.data.errors.reduce((obj, err) => {
+        if (err.property) {
+          obj[err.property] = err.message;
+        } else {
           notifications.show({
-            color: "red",
             title: "Error",
-            message: `${err.property}: ${err.message}`,
+            message: err.message,
+            color: "red",
           });
-        });
-        return;
-      }
+        }
+        return obj;
+      }, {} as FormErrors);
 
+      form.setErrors(formErrors);
+      return;
+    }
+
+    if (response.data.data) {
       notifications.show({
-        color: "green",
         title: "Success",
         message: "Room created successfully",
+        color: "green",
       });
 
       innerProps.onSuccess?.(response.data.data);
-
       context.closeModal(id);
-    } catch (err: any) {
-      notifications.show({
-        color: "red",
-        title: "Server Error",
-        message: err?.response?.data?.message || "Something went wrong",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
-    <Stack>
+    <form onSubmit={form.onSubmit(handleSubmit)}>
       <TextInput
+        autoFocus
+        key={form.key("name")}
         label="Room Name"
         placeholder="Enter room name"
-        value={name}
-        onChange={(e) => setName(e.currentTarget.value)}
-        required
+        {...form.getInputProps("name")}
       />
 
-      <Button onClick={handleCreate} loading={loading}>
-        Create Room
-      </Button>
-    </Stack>
+      <Flex justify="space-between" pt="sm">
+        <Button variant="outline" onClick={() => context.closeModal(id)}>
+          Cancel
+        </Button>
+        <Button type="submit">Create</Button>
+      </Flex>
+    </form>
   );
-}
+};
