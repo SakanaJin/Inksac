@@ -21,10 +21,8 @@ export const LoginPage = ({ fetchCurrentUser }) => {
       password: "",
     },
     validate: {
-      username: (value) =>
-        value.length <= 0 ? "Username must not be empty" : null,
-      password: (value) =>
-        value.length <= 0 ? "Password must not be empty" : null,
+      username: (value) => (value.length <= 0 ? " " : null),
+      password: (value) => (value.length <= 0 ? " " : null),
     },
   });
 
