@@ -3,10 +3,11 @@ import {
   Title,
   Container,
   Button,
-  Loader,
   Center,
   Tooltip,
 } from "@mantine/core";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faRotateRight } from "@fortawesome/free-solid-svg-icons";
 import { RoomsList } from "../../components/rooms/rooms-list";
 import { useEffect, useState } from "react";
 import api from "../../config/axios";
@@ -94,11 +95,13 @@ export const HomePage = () => {
             size="xs"
             variant="outline"
             onClick={fetchRooms}
-            disabled={loading}
+            loading={loading}
+            leftSection={
+              <FontAwesomeIcon icon={faRotateRight} spin={loading} />
+            }
           >
-            🔄 Refresh
+            Refresh
           </Button>
-          {loading ? <Loader /> : <></>}
         </Group>
 
         {/* Create room button */}
