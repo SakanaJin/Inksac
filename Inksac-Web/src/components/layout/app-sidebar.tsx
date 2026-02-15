@@ -3,17 +3,16 @@ import { useAuth } from "../../authentication/use-auth";
 import { modals } from "@mantine/modals";
 import { EnvVars } from "../../config/env-vars";
 import { AvatarOverlay } from "../user/avatar-overlay";
-import { type UserGetDto, UserRole } from "../../constants/types";
+import { UserRole } from "../../constants/types";
 import { openImageUploadModal } from "../image/upload-image-modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCamera } from "@fortawesome/free-solid-svg-icons";
-import { useState } from "react";
+import type { FileWithPath } from "@mantine/dropzone";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
 export function AppSidebar() {
-  const { logout, user } = useAuth();
-  const [pfp_path, setPfp_path] = useState(user.pfp_path);
+  const { logout, user, updatePfp, defaultPfp } = useAuth();
   const isguest = user.role === UserRole.GUEST;
 
   const openLogoutModal = () =>
@@ -28,14 +27,16 @@ export function AppSidebar() {
     <Stack p="md">
       <AvatarOverlay
         size="4rem"
-        src={baseurl + pfp_path}
+        src={baseurl + user.pfp_path}
         overlay={!isguest}
         onClick={() => {
           !isguest
-            ? openImageUploadModal<UserGetDto>({
-                apiUrl: `/users/pfp`,
-                onUpload: (updatedUser: UserGetDto) => {
-                  setPfp_path(updatedUser.pfp_path);
+            ? openImageUploadModal({
+                onUpload: (file: FileWithPath) => {
+                  return updatePfp(file);
+                },
+                onDefault: () => {
+                  return defaultPfp();
                 },
               })
             : {};
