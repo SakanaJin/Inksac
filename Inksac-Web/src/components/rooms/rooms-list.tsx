@@ -9,12 +9,12 @@ interface RoomsListProps {
   onJoinRoom?: (roomId: number) => void; // ready to implement joining room logic
 }
 
-export function RoomsList({
+export const RoomsList = ({
   rooms,
   currentUserId,
   onRoomAction,
   onJoinRoom,
-}: RoomsListProps) {
+}: RoomsListProps) => {
   return (
     <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
       {rooms.map((room) => (
@@ -28,4 +28,4 @@ export function RoomsList({
       ))}
     </SimpleGrid>
   );
-}
+};

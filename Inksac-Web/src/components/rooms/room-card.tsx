@@ -10,12 +10,12 @@ interface RoomCardProps {
   onJoinRoom?: (roomId: number) => void;
 }
 
-export function RoomCard({
+export const RoomCard = ({
   room,
   currentUserId,
   onRoomAction,
   onJoinRoom,
-}: RoomCardProps) {
+}: RoomCardProps) => {
   const navigate = useNavigate();
   const isUserRoom = room.owner.id === currentUserId;
 
@@ -93,4 +93,4 @@ export function RoomCard({
       </Stack>
     </Card>
   );
-}
+};

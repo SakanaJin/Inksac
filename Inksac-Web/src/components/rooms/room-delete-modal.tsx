@@ -8,11 +8,11 @@ export interface RoomDeleteModalProps {
   onSuccess?: () => void;
 }
 
-export function RoomDeleteModal({
+export const RoomDeleteModal = ({
   context,
   id,
   innerProps,
-}: ContextModalProps<RoomDeleteModalProps>) {
+}: ContextModalProps<RoomDeleteModalProps>) => {
   const [loading, setLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -59,4 +59,4 @@ export function RoomDeleteModal({
       </Button>
     </Stack>
   );
-}
+};
