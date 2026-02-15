@@ -10,6 +10,7 @@ interface AuthState {
   errors: ApiError[];
   fetchCurrentUser: () => void;
   logout: () => void;
+  updateUser: (updates: Partial<UserGetDto>) => void;
 }
 
 const INITIALSTATE: AuthState = {
@@ -17,6 +18,7 @@ const INITIALSTATE: AuthState = {
   errors: [],
   fetchCurrentUser: undefined as any,
   logout: undefined as any,
+  updateUser: undefined as any,
 };
 
 export const AuthContext = createContext<AuthState>(INITIALSTATE);
@@ -56,6 +58,13 @@ export const AuthProvider = (props: any) => {
     return response;
   }, []);
 
+  const updateUser = (updates: Partial<UserGetDto>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      return { ...prev, ...updates };
+    });
+  };
+
   if (fetchCurrentUserAsync.loading) {
     return <Loader />;
   }
@@ -71,6 +80,7 @@ export const AuthProvider = (props: any) => {
         errors,
         fetchCurrentUser: fetchCurrentUserAsync.retry, // rename here
         logout: logoutUser,
+        updateUser,
       }}
       {...props}
     />
