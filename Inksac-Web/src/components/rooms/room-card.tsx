@@ -1,31 +1,138 @@
-import { Card, Text, Button, Stack, Badge, Group } from "@mantine/core";
+import { Card, Group, Text, Badge, Button, Stack } from "@mantine/core";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faRightToBracket,
+  faPen,
+  faTrash,
+} from "@fortawesome/free-solid-svg-icons";
 import type { RoomGetDto } from "../../constants/types";
+import { modals } from "@mantine/modals";
+import { useNavigate } from "react-router-dom";
 
-export function RoomCard({ room }: { room: RoomGetDto }) {
+interface RoomCardProps {
+  room: RoomGetDto;
+  currentUserId: number;
+  onRoomAction?: () => void;
+  onJoinRoom?: (roomId: number) => void;
+}
+
+/*
+  Helper: clears cached rooms so next HomePage visit fetches fresh data
+*/
+const invalidateRoomsCache = () => {
+  sessionStorage.removeItem("roomsCache");
+};
+
+export const RoomCard = ({
+  room,
+  currentUserId,
+  onRoomAction,
+  onJoinRoom,
+}: RoomCardProps) => {
+  const navigate = useNavigate();
+  const isUserRoom = room.owner.id === currentUserId;
+
+  const handleJoinRoom = () => {
+    invalidateRoomsCache();
+
+    if (onJoinRoom) {
+      onJoinRoom(room.id);
+    }
+
+    navigate(`/room/${room.id}`);
+  };
+
+  const openDeleteModal = () => {
+    modals.openContextModal({
+      modal: "roomdeletemodal",
+      title: "Delete Room",
+      innerProps: {
+        onSuccess: onRoomAction,
+      },
+    });
+  };
+
+  const openUpdateModal = () => {
+    modals.openContextModal({
+      modal: "roomupdatemodal",
+      title: "Edit Room",
+      innerProps: {
+        room,
+        onSuccess: onRoomAction,
+      },
+    });
+  };
+
   return (
-    <Card shadow="sm" padding="lg" radius="md" withBorder>
-      <Stack>
-        <Text fw={600} fz="lg">
-          {room.name}
-        </Text>
+    <Card shadow="sm" p="sm" mb="sm" withBorder>
+      <Stack gap="xs">
+        <Group justify="space-between">
+          {/* Always strong */}
+          <Text fw={600}>{room.name}</Text>
+
+          {isUserRoom ? (
+            <Badge color="blue" variant="outline">
+              Your Room
+            </Badge>
+          ) : (
+            <Group gap={6} align="center">
+              <Text size="sm" c="dimmed">
+                Owner:
+              </Text>
+              <Text size="sm" fw={500}>
+                {room.owner.username}
+              </Text>
+            </Group>
+          )}
+        </Group>
+
         <Text size="sm" c="dimmed">
           Expires: {new Date(room.expiration).toLocaleString()}
         </Text>
 
-        {/* Owner label */}
-        <Group gap="xs" align="center">
-          <Text size="sm" c="gray.5">
-            Owner:
-          </Text>
-          <Badge variant="light" color="teal" size="sm">
-            {room.owner.username}
-          </Badge>
-        </Group>
+        {/* Action buttons */}
+        <Group gap="xs">
+          {/* Join button for all rooms */}
+          <Button
+            size="xs"
+            radius="md"
+            variant="light"
+            color="green"
+            leftSection={<FontAwesomeIcon icon={faRightToBracket} />}
+            onClick={handleJoinRoom}
+          >
+            Join
+          </Button>
 
-        <Button fullWidth mt="sm">
-          Join Room
-        </Button>
+          {/* Update button only for your room */}
+          {isUserRoom && (
+            <Button
+              size="xs"
+              radius="md"
+              variant="light"
+              color="blue"
+              leftSection={<FontAwesomeIcon icon={faPen} />}
+              onClick={openUpdateModal}
+            >
+              Edit
+            </Button>
+          )}
+
+          {/* Delete button only for your room */}
+          {isUserRoom && (
+            <Button
+              size="xs"
+              radius="md"
+              variant="light"
+              color="red"
+              leftSection={<FontAwesomeIcon icon={faTrash} />}
+              onClick={openDeleteModal}
+            >
+              Delete
+            </Button>
+          )}
+        </Group>
       </Stack>
     </Card>
   );
-}
+};
