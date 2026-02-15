@@ -10,6 +10,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRotateRight, faDoorOpen } from "@fortawesome/free-solid-svg-icons";
 import { RoomsList } from "../../components/rooms/rooms-list";
+import { sortRooms } from "../../utils/room-utils";
 import { useEffect, useState } from "react";
 import api from "../../config/axios";
 import { UserRole, type RoomGetDto } from "../../constants/types";
@@ -26,7 +27,7 @@ export const HomePage = () => {
   const cachedRooms = sessionStorage.getItem("roomsCache");
 
   const [rooms, setRooms] = useState<RoomGetDto[]>(() =>
-    cachedRooms ? JSON.parse(cachedRooms) : [],
+    cachedRooms ? sortRooms(JSON.parse(cachedRooms), currentUserId) : [],
   );
 
   const [loading, setLoading] = useState(() => !cachedRooms);
@@ -59,7 +60,8 @@ export const HomePage = () => {
       const cached = sessionStorage.getItem("roomsCache");
 
       if (cached) {
-        setRooms(JSON.parse(cached));
+        const parsed = JSON.parse(cached);
+        setRooms(sortRooms(parsed, currentUserId));
         setLoading(false);
         return;
       }
@@ -74,15 +76,7 @@ export const HomePage = () => {
       if (!response.data.has_errors) {
         const allRooms = response.data.data;
 
-        const userRoom = allRooms.find(
-          (room) => room.owner.id === currentUserId,
-        );
-
-        const otherRooms = allRooms.filter(
-          (room) => room.owner.id !== currentUserId,
-        );
-
-        const sortedRooms = userRoom ? [userRoom, ...otherRooms] : otherRooms;
+        const sortedRooms = sortRooms(allRooms, currentUserId);
 
         // Persist cache in sessionStorage to survive page reloads
         sessionStorage.setItem("roomsCache", JSON.stringify(sortedRooms));
@@ -107,7 +101,6 @@ export const HomePage = () => {
   */
   const invalidateAndRefresh = () => {
     sessionStorage.removeItem("roomsCache");
-
     fetchRooms(true);
   };
 

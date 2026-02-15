@@ -9,6 +9,10 @@ export interface RoomCreateModalProps {
   onSuccess?: (room: RoomGetDto) => void;
 }
 
+const invalidateRoomsCache = () => {
+  sessionStorage.removeItem("roomsCache");
+};
+
 export const RoomCreateModal = ({
   context,
   id,
@@ -46,6 +50,8 @@ export const RoomCreateModal = ({
       message: "Room Created! Welcome to your canvas!",
       color: "green",
     });
+
+    invalidateRoomsCache();
 
     innerProps.onSuccess?.(createdRoom);
     context.closeModal(id);

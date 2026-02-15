@@ -16,6 +16,13 @@ interface RoomCardProps {
   onJoinRoom?: (roomId: number) => void;
 }
 
+/*
+  Helper: clears cached rooms so next HomePage visit fetches fresh data
+*/
+const invalidateRoomsCache = () => {
+  sessionStorage.removeItem("roomsCache");
+};
+
 export const RoomCard = ({
   room,
   currentUserId,
@@ -26,9 +33,12 @@ export const RoomCard = ({
   const isUserRoom = room.owner.id === currentUserId;
 
   const handleJoinRoom = () => {
+    invalidateRoomsCache();
+
     if (onJoinRoom) {
       onJoinRoom(room.id);
     }
+
     navigate(`/room/${room.id}`);
   };
 
