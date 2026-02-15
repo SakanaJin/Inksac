@@ -8,9 +8,11 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { UserCreateModal } from "./components/login/user-create-modal.tsx";
+import { ImageUploadModal } from "./components/image/upload-image-modal.tsx";
 
 const modals = {
   usercreatemodal: UserCreateModal,
+  uploadimagemodal: ImageUploadModal,
 };
 
 declare module "@mantine/modals" {

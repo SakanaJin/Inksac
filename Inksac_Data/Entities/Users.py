@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from Inksac_Data.database import Base
 from Inksac_Data.Common.Role import Role
 
-DEFAULT_PFP = "/media/user/pfp/default.png"
+DEFAULT_PFP = "/user/pfp/default.png"
 
 class LoginDto(BaseModel):
     username: str

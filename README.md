@@ -29,6 +29,7 @@ WDS_SOCKET_PORT=8000
 VITE_ENVIRONMENT=local
 VITE_BUILD_NUMBER=local
 VITE_API_BASE_URL=http://127.0.0.1:8000/api
+VITE_MEDIA_BASE_URL=http://127.0.0.1:8000
 ```
 
 While still in _/Inksac/Inksac-Web_ run the command:
