@@ -3,15 +3,16 @@ import { useAuth } from "../../authentication/use-auth";
 import { modals } from "@mantine/modals";
 import { EnvVars } from "../../config/env-vars";
 import { AvatarOverlay } from "../user/avatar-overlay";
-import { type UserGetDto, UserRole } from "../../constants/types";
+import { UserRole } from "../../constants/types";
 import { openImageUploadModal } from "../image/upload-image-modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCamera } from "@fortawesome/free-solid-svg-icons";
+import type { FileWithPath } from "@mantine/dropzone";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
 export function AppSidebar() {
-  const { logout, user, updateUser } = useAuth();
+  const { logout, user, updatePfp, defaultPfp } = useAuth();
   const isguest = user.role === UserRole.GUEST;
 
   const openLogoutModal = () =>
@@ -30,12 +31,12 @@ export function AppSidebar() {
         overlay={!isguest}
         onClick={() => {
           !isguest
-            ? openImageUploadModal<UserGetDto>({
-                apiUrl: `/users/pfp`,
-                onUpload: (updatedUser: UserGetDto) => {
-                  updateUser({
-                    pfp_path: updatedUser.pfp_path,
-                  });
+            ? openImageUploadModal({
+                onUpload: (file: FileWithPath) => {
+                  return updatePfp(file);
+                },
+                onDefault: () => {
+                  return defaultPfp();
                 },
               })
             : {};

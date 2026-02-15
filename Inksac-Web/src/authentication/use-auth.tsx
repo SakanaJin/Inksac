@@ -4,13 +4,16 @@ import type { ApiError, UserGetDto } from "../constants/types";
 import { LoginPage } from "../pages/login-page";
 import { Loader } from "@mantine/core";
 import api from "../config/axios";
+import type { FileWithPath } from "@mantine/dropzone";
+import { notifications } from "@mantine/notifications";
 
 interface AuthState {
   user: UserGetDto | null;
   errors: ApiError[];
   fetchCurrentUser: () => void;
   logout: () => void;
-  updateUser: (updates: Partial<UserGetDto>) => void;
+  updatePfp: (file: FileWithPath) => boolean;
+  defaultPfp: () => boolean;
 }
 
 const INITIALSTATE: AuthState = {
@@ -18,7 +21,8 @@ const INITIALSTATE: AuthState = {
   errors: [],
   fetchCurrentUser: undefined as any,
   logout: undefined as any,
-  updateUser: undefined as any,
+  updatePfp: undefined as any,
+  defaultPfp: undefined as any,
 };
 
 export const AuthContext = createContext<AuthState>(INITIALSTATE);
@@ -58,11 +62,42 @@ export const AuthProvider = (props: any) => {
     return response;
   }, []);
 
-  const updateUser = (updates: Partial<UserGetDto>) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      return { ...prev, ...updates };
-    });
+  const updatePfp = async (file: FileWithPath) => {
+    const response = await api.patchf<UserGetDto>(`/users/pfp`, file);
+
+    if (response.data.has_errors) {
+      notifications.show({
+        title: "Error",
+        message: "Error updating pfp",
+        color: "red",
+      });
+      return false;
+    }
+
+    if (response.data.data) {
+      setUser(response.data.data);
+      return true;
+    }
+    return false;
+  };
+
+  const defaultPfp = async () => {
+    const response = await api.delete<UserGetDto>(`/users/pfp`);
+
+    if (response.data.has_errors) {
+      notifications.show({
+        title: "Error",
+        message: "Error updating pfp",
+        color: "red",
+      });
+      return false;
+    }
+
+    if (response.data.data) {
+      setUser(response.data.data);
+      return true;
+    }
+    return false;
   };
 
   if (fetchCurrentUserAsync.loading) {
@@ -80,7 +115,8 @@ export const AuthProvider = (props: any) => {
         errors,
         fetchCurrentUser: fetchCurrentUserAsync.retry, // rename here
         logout: logoutUser,
-        updateUser,
+        updatePfp: updatePfp,
+        defaultPfp: defaultPfp,
       }}
       {...props}
     />
