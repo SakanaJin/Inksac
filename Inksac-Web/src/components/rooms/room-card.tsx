@@ -1,4 +1,10 @@
 import { Card, Group, Text, Badge, Button, Stack } from "@mantine/core";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faRightToBracket,
+  faPen,
+  faTrash,
+} from "@fortawesome/free-solid-svg-icons";
 import type { RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useNavigate } from "react-router-dom";
@@ -51,16 +57,21 @@ export const RoomCard = ({
     <Card shadow="sm" p="sm" mb="sm" withBorder>
       <Stack gap="xs">
         <Group justify="space-between">
-          <Text style={{ fontWeight: 500 }}>{room.name}</Text>
+          {/* Always strong */}
+          <Text fw={600}>{room.name}</Text>
 
           {isUserRoom ? (
-            <Badge color="blue">Your Room</Badge>
+            <Badge color="blue" variant="outline">
+              Your Room
+            </Badge>
           ) : (
-            <Group gap="xs" align="center">
+            <Group gap={6} align="center">
               <Text size="sm" c="dimmed">
                 Owner:
               </Text>
-              <Badge color="gray">{room.owner.username}</Badge>
+              <Text size="sm" fw={500}>
+                {room.owner.username}
+              </Text>
             </Group>
           )}
         </Group>
@@ -72,20 +83,41 @@ export const RoomCard = ({
         {/* Action buttons */}
         <Group gap="xs">
           {/* Join button for all rooms */}
-          <Button size="xs" color="green" onClick={handleJoinRoom}>
+          <Button
+            size="xs"
+            radius="md"
+            variant="light"
+            color="green"
+            leftSection={<FontAwesomeIcon icon={faRightToBracket} />}
+            onClick={handleJoinRoom}
+          >
             Join
           </Button>
 
           {/* Update button only for your room */}
           {isUserRoom && (
-            <Button size="xs" color="violet" onClick={openUpdateModal}>
+            <Button
+              size="xs"
+              radius="md"
+              variant="light"
+              color="blue"
+              leftSection={<FontAwesomeIcon icon={faPen} />}
+              onClick={openUpdateModal}
+            >
               Edit
             </Button>
           )}
 
           {/* Delete button only for your room */}
           {isUserRoom && (
-            <Button size="xs" color="red" onClick={openDeleteModal}>
+            <Button
+              size="xs"
+              radius="md"
+              variant="light"
+              color="red"
+              leftSection={<FontAwesomeIcon icon={faTrash} />}
+              onClick={openDeleteModal}
+            >
               Delete
             </Button>
           )}
