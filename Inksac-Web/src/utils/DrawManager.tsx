@@ -1,5 +1,15 @@
 import * as pixi from "pixi.js";
 import softShape from "../../../media/user/brush/softShape.png";
+import { EnvVars } from "../config/env-vars";
+
+//[TEST] ws test
+//this current configuration does not close the ws
+//when you change pages. Problem for later.
+const wsbaseurl = EnvVars.wsBaseUrl;
+interface wsm {
+  type: string;
+  payload: any;
+}
 
 class DrawManager {
   private app: pixi.Application;
@@ -17,7 +27,13 @@ class DrawManager {
 
   private brushShape: pixi.Texture | null = null;
 
-  constructor(pixiApp: pixi.Application, maxUndoSteps: number = 10) {
+  private ws: WebSocket | null = null;
+
+  constructor(
+    pixiApp: pixi.Application,
+    roomid: string,
+    maxUndoSteps: number = 10,
+  ) {
     this.app = pixiApp;
     this.undoStack = [];
     this.redoStack = [];
@@ -34,6 +50,18 @@ class DrawManager {
 
     this.app.stage.addChild(this.drawingContainer);
     this.initMouseEvents();
+
+    //[TEST] ws test
+    this.ws = new WebSocket(wsbaseurl + `/rooms/${roomid}`);
+    this.ws.onmessage = (event) => {
+      try {
+        const data: wsm = JSON.parse(event.data);
+        console.log(data.type);
+        console.log(data.payload);
+      } catch (error) {
+        console.error(error);
+      }
+    };
   }
 
   async init() {
@@ -168,6 +196,10 @@ class DrawManager {
     if (this.undoStack.length > this.maxUndoSteps) {
       this.flattenOldestUndo();
     }
+
+    //[TEST] ws test
+    const data: wsm = { type: "application/json", payload: "worked" };
+    this.ws.send(JSON.stringify(data));
   }
 }
 

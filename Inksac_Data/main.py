@@ -28,6 +28,7 @@ from Inksac_Data.Controllers import (
     BrushesController,
     RoomsController,
     StrokesController,
+    RoomsWSController,
 )
 
 GUEST_GRACE = timedelta(days=1)
@@ -48,6 +49,7 @@ app.include_router(UsersController.router)
 app.include_router(BrushesController.router)
 app.include_router(RoomsController.router)
 app.include_router(StrokesController.router)
+app.include_router(RoomsWSController.router)
 
 #this exposes the files in media for our image hosting
 #accessed via http://<ip>:<port>/media/path/to/file.png or with a domain
