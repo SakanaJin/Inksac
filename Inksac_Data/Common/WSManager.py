@@ -18,7 +18,6 @@ class ConnectionManager:
             if not self.rooms[roomid]: del self.rooms[roomid]
 
     async def broadcast(self, roomid: int, data: dict, websocket: WebSocket):
-        print(self.rooms)
         if roomid in self.rooms:
             for connection in self.rooms[roomid]:
                 if connection == websocket:
