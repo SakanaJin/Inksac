@@ -4,20 +4,24 @@ import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
 import { useParams } from "react-router-dom";
 import { EnvVars } from "../config/env-vars";
+import { type MessageHandlers, WSManager } from "../config/websocket-manager";
+import { WSType } from "../constants/types";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
-//this is dumb and will be deleted later
-interface wsm {
-  type: string;
-  payload: any;
-}
 
 export const RoomPage = () => {
   const drawerRef = useRef<DrawManager | null>(null);
   const pixiContainer = useRef<HTMLDivElement>(null);
   const appRef = useRef<pixi.Application | null>(null);
   const { id } = useParams();
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<WSManager | null>(null);
+
+  const messageHandlers: MessageHandlers = {
+    [WSType.STROKE]: (message) => {
+      console.log(message.Mtype);
+      console.log(message.data);
+    },
+  };
 
   useEffect(() => {
     if (!pixiContainer.current || appRef.current) return;
@@ -44,28 +48,15 @@ export const RoomPage = () => {
       drawerRef.current.init();
     };
 
-    const ws = new WebSocket(wsbaseurl + `/rooms/${id}`);
+    const ws = new WSManager(wsbaseurl + `/rooms/${id}`, messageHandlers);
     wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      try {
-        const data: wsm = JSON.parse(event.data);
-        /*
-        if data.type == img: drawerRef.current.loadbg(data.payload)
-        if data.type == stroke: drawerRef.current.drawstroke(data.payload)
-        */
-        console.log(data.type);
-        console.log(data.payload);
-      } catch (error) {
-        console.error(error);
-      }
-    };
+    wsRef.current.connect();
 
     initPixi();
 
     return () => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.close(1000);
+      if (wsRef.current && wsRef.current.isOpen()) {
+        wsRef.current.close();
       }
     };
   }, [id]);

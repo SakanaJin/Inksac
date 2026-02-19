@@ -11,6 +11,20 @@ export interface ApiError {
   message: string;
 }
 
+// ws types-------------------------------------------------------------------------------
+
+export enum WSType {
+  STROKE = "stroke",
+  READY = "ready",
+}
+
+export interface WSMessage {
+  Mtype: WSType;
+  data: any;
+}
+
+export type WSCodes = 1000 | 1001 | 1011 | 1006 | 1008;
+
 // user types ----------------------------------------------------------------------------
 
 export enum UserRole {

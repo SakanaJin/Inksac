@@ -1,11 +1,7 @@
 import * as pixi from "pixi.js";
 import softShape from "../../../media/user/brush/softShape.png";
-
-//this is dumb and will be deleted later
-interface wsm {
-  type: string;
-  payload: any;
-}
+import { WSType, type WSMessage } from "../constants/types";
+import type { WSManager } from "../config/websocket-manager";
 
 class DrawManager {
   private app: pixi.Application;
@@ -23,11 +19,11 @@ class DrawManager {
 
   private brushShape: pixi.Texture | null = null;
 
-  private ws: WebSocket | null = null;
+  private ws: WSManager | null = null;
 
   constructor(
     pixiApp: pixi.Application,
-    websocket: WebSocket,
+    wsManager: WSManager,
     maxUndoSteps: number = 10,
   ) {
     this.app = pixiApp;
@@ -47,7 +43,7 @@ class DrawManager {
     this.app.stage.addChild(this.drawingContainer);
     this.initMouseEvents();
 
-    this.ws = websocket;
+    this.ws = wsManager;
   }
 
   async init() {
@@ -183,8 +179,8 @@ class DrawManager {
       this.flattenOldestUndo();
     }
 
-    const data: wsm = { type: "application/json", payload: "worked" };
-    this.ws.send(JSON.stringify(data));
+    const message: WSMessage = { Mtype: WSType.STROKE, data: "worked" };
+    this.ws.send(message);
   }
 }
 
