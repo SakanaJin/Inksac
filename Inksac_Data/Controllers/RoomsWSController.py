@@ -2,7 +2,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketExceptio
 from pydantic import ValidationError
 
 from Inksac_Data.Common.WSManager import WSManager, WSMHandler, WSMTypes, WSMessage
-from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.database import db_session
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Controllers.AuthController import get_current_user
