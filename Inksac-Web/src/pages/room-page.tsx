@@ -9,11 +9,9 @@ import {
   type MessageHandlers,
   WSManager,
 } from "../config/websocket-manager";
-import { WSCodes, WSType } from "../constants/types";
+import { WSCodes, WSType, type StrokeData } from "../constants/types";
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
-import { type MessageHandlers, WSManager } from "../config/websocket-manager";
-import { WSType, type StrokeData } from "../constants/types";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 
@@ -27,8 +25,6 @@ export const RoomPage = () => {
 
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: (message) => {
-      // console.log(message.Mtype);
-      // console.log(message.data);
       if (drawerRef.current && message.data) {
         drawerRef.current.renderReceivedStroke(message.data as StrokeData);
       }

@@ -88,7 +88,6 @@ class DrawManager {
     const stroke = this.undoStack.pop()!;
     this.redoStack.push(stroke);
     this.drawingContainer.removeChild(stroke);
-    console.log(stroke.label);
   }
 
   public redo() {
@@ -97,7 +96,6 @@ class DrawManager {
     const stroke = this.redoStack.pop()!;
     this.undoStack.push(stroke);
     this.drawingContainer.addChild(stroke);
-    console.log(stroke.label);
   }
 
   // POINTER EVENTS
@@ -145,10 +143,6 @@ class DrawManager {
 
       const brushSprite = new pixi.Sprite(this.brushShape);
       brushSprite.anchor.set(0.5);
-
-      // color changes atm just to see how brush strokes layer on top of each other better
-      // brush shape pngs are white atm because it makes changing the color easy, if the png was black, it doesn't change color
-      // there might be a better way to change brush color
       brushSprite.tint = `rgb(24, 20, 36)`;
       brushSprite.scale.set(0.05);
       brushSprite.position.set(x, y);
@@ -196,6 +190,7 @@ class DrawManager {
   }
 
   // RECEIVING STROKE FUNCTIONS
+  // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer, redo/undo kinda busted for multiple people rn
   public async renderReceivedStroke(strokeData: StrokeData) {
     if (this.brushShape == null) return;
 
