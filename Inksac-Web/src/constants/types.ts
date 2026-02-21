@@ -11,6 +11,20 @@ export interface ApiError {
   message: string;
 }
 
+// stroke data types----------------------------------------------------------------------
+
+export interface BrushCoord {
+  x: number;
+  y: number;
+}
+
+export interface StrokeData {
+  points: BrushCoord[];
+  color: string;
+  scale: number;
+  opacity: number;
+}
+
 // ws types-------------------------------------------------------------------------------
 
 export enum WSType {

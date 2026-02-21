@@ -195,6 +195,7 @@ class DrawManager {
     this.ws.send(message);
   }
 
+  // RECEIVING STROKE FUNCTIONS
   public async renderReceivedStroke(strokeData: StrokeData) {
     if (this.brushShape == null) return;
 
