@@ -1,7 +1,8 @@
 import * as pixi from "pixi.js";
 import softShape from "../../../media/user/brush/softShape.png";
-import { WSType, type WSMessage } from "../constants/types";
+import { WSType, type BrushCoord, type WSMessage, type StrokeData} from "../constants/types";
 import type { WSManager } from "../config/websocket-manager";
+import { Container } from "@mantine/core";
 
 class DrawManager {
   private app: pixi.Application;
@@ -16,6 +17,7 @@ class DrawManager {
 
   private currentStroke: pixi.Container | null = null;
   private isDrawing = false;
+  private strokePoints: BrushCoord[] = [];
 
   private brushShape: pixi.Texture | null = null;
 
@@ -37,7 +39,6 @@ class DrawManager {
       height: this.app.screen.height,
     });
     this.baseSprite = new pixi.Sprite(this.baseLayer);
-
     this.drawingContainer = new pixi.Container();
 
     this.app.stage.addChild(this.drawingContainer);
@@ -87,6 +88,7 @@ class DrawManager {
     const stroke = this.undoStack.pop()!;
     this.redoStack.push(stroke);
     this.drawingContainer.removeChild(stroke);
+    console.log(stroke.label);
   }
 
   public redo() {
@@ -95,6 +97,7 @@ class DrawManager {
     const stroke = this.redoStack.pop()!;
     this.undoStack.push(stroke);
     this.drawingContainer.addChild(stroke);
+    console.log(stroke.label);
   }
 
   // POINTER EVENTS
@@ -111,6 +114,7 @@ class DrawManager {
   private onMouseDown(event: pixi.FederatedPointerEvent) {
     this.isDrawing = true;
     this.lastPosition.set(event.global.x, event.global.y);
+    this.strokePoints = [];
 
     this.currentStroke = new pixi.Container();
     this.drawingContainer.addChild(this.currentStroke);
@@ -129,7 +133,6 @@ class DrawManager {
     const dx = currPosition.x - this.lastPosition.x;
     const dy = currPosition.y - this.lastPosition.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-
     const gap = 1;
     const numStamps = Math.ceil(distance / gap);
 
@@ -138,13 +141,15 @@ class DrawManager {
       const x = this.lastPosition.x + dx * t;
       const y = this.lastPosition.y + dy * t;
 
+      this.strokePoints.push({x,y});
+
       const brushSprite = new pixi.Sprite(this.brushShape);
       brushSprite.anchor.set(0.5);
 
       // color changes atm just to see how brush strokes layer on top of each other better
       // brush shape pngs are white atm because it makes changing the color easy, if the png was black, it doesn't change color
       // there might be a better way to change brush color
-      brushSprite.tint = `rgb(${distance + 1}, 0, 100)`;
+      brushSprite.tint = `rgb(24, 20, 36)`;
       brushSprite.scale.set(0.05);
       brushSprite.position.set(x, y);
 
@@ -163,25 +168,66 @@ class DrawManager {
     const combinedTexture = this.app.renderer.generateTexture(
       this.currentStroke,
     );
-    const combinedStrokeSprite = new pixi.Sprite(combinedTexture);
-    combinedStrokeSprite.position.set(bounds.x, bounds.y);
+    const combinedSprite = new pixi.Sprite(combinedTexture);
+    combinedSprite.position.set(bounds.x, bounds.y);
 
-    const combinedStrokeSpriteContainer = new pixi.Container();
-    combinedStrokeSpriteContainer.addChild(combinedStrokeSprite);
-    this.drawingContainer.addChild(combinedStrokeSpriteContainer);
+    const combinedSpriteContainer = new pixi.Container();
+    combinedSpriteContainer.addChild(combinedSprite);
+    this.drawingContainer.addChild(combinedSpriteContainer);
 
     this.currentStroke.destroy({ children: true });
     this.currentStroke = null;
 
     this.redoStack = [];
-    this.undoStack.push(combinedStrokeSpriteContainer);
+    this.undoStack.push(combinedSpriteContainer);
     if (this.undoStack.length > this.maxUndoSteps) {
       this.flattenOldestUndo();
     }
 
-    const message: WSMessage = { Mtype: WSType.STROKE, data: "worked" };
+    const strokeData: StrokeData = {
+      points: this.strokePoints,
+      color: "rgb(81, 46, 146)",
+      scale: 0.05,
+      opacity: 1
+    };
+
+    const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
     this.ws.send(message);
   }
+
+  public async renderReceivedStroke(strokeData: StrokeData) {
+    if (this.brushShape == null) return;
+
+    const receivedStroke = new pixi.Container();
+
+    for (const point of strokeData.points) {
+      const brushSprite = new pixi.Sprite(this.brushShape);
+
+      brushSprite.anchor.set(0.5);
+      brushSprite.tint = strokeData.color;
+      brushSprite.scale.set(strokeData.scale);
+      brushSprite.position.set(point.x, point.y);
+      receivedStroke.addChild(brushSprite);
+    }
+
+    const bounds = receivedStroke.getBounds();
+    const combinedTexture = this.app.renderer.generateTexture(receivedStroke);
+    const combinedSprite = new pixi.Sprite(combinedTexture);
+    combinedSprite.position.set(bounds.x, bounds.y);
+
+    const combinedSpriteContainer = new pixi.Container();
+    combinedSpriteContainer.addChild(combinedSprite);
+
+    receivedStroke.destroy({ children: true });
+
+    this.drawingContainer.addChild(combinedSpriteContainer);
+    this.undoStack.push(combinedSpriteContainer);
+    if (this.undoStack.length > this.maxUndoSteps) {
+      this.flattenOldestUndo();
+    }
+
+  }
+
 }
 
 export default DrawManager;
