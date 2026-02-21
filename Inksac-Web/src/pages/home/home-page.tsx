@@ -139,6 +139,7 @@ export const HomePage = () => {
               <IconRefresh
                 size={16}
                 style={{
+                  transform: "scaleX(-1)",
                   animation: isFetching ? "spin 1s linear infinite" : undefined,
                 }}
               />
