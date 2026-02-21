@@ -39,7 +39,8 @@ export const HomePage = () => {
 */
   const ownsRoom = rooms.some((room) => room.owner.id === currentUserId);
 
-  const canCreateRoom = user.role !== UserRole.GUEST && !ownsRoom;
+  // !loading disables Create Room button during rooms loading to prevent ownership flicker
+  const canCreateRoom = !loading && user.role !== UserRole.GUEST && !ownsRoom;
 
   let createRoomTooltip: string | undefined;
 
