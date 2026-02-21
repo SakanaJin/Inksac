@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends
 from pydantic import ValidationError
 
-from Inksac_Data.Common.WSManager import WSManager, WSMHandler, WSMTypes, WSMessage
+from Inksac_Data.Common.WSManager import WSManager, WSMHandler, WSMTypes, WSMessage, WSCodes
 from Inksac_Data.database import db_session
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Controllers.AuthController import get_current_user
@@ -24,10 +24,11 @@ async def room_websocket(websocket: WebSocket, roomid: int, user: User = Depends
                 userid=user.id, 
                 websocket=websocket
             )
-    except WebSocketDisconnect:
-        WSManager.disconnect(roomid=roomid, userid=user.id)
+    except WebSocketDisconnect as e:
+        if e.code != WSCodes.FORCE_DC:
+            WSManager.disconnect(roomid=roomid, userid=user.id)
     except WebSocketException as e:
-        if e.code != 1008:
+        if e.code != WSCodes.POLICY_VIOLATION:
             WSManager.disconnect(roomid=roomid, userid=user.id)
  
 @WSMHandler.register(WSMTypes.READY)
