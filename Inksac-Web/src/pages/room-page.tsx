@@ -2,10 +2,16 @@ import { useRef, useEffect } from "react";
 import { Button, Group, Container } from "@mantine/core";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { EnvVars } from "../config/env-vars";
-import { type MessageHandlers, WSManager } from "../config/websocket-manager";
-import { WSType } from "../constants/types";
+import {
+  type CloseHandlers,
+  type MessageHandlers,
+  WSManager,
+} from "../config/websocket-manager";
+import { WSCodes, WSType } from "../constants/types";
+import { notifications } from "@mantine/notifications";
+import { routes } from "../routes/RouteIndex";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 
@@ -15,11 +21,33 @@ export const RoomPage = () => {
   const appRef = useRef<pixi.Application | null>(null);
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
+  const navigate = useNavigate();
 
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: (message) => {
       console.log(message.Mtype);
       console.log(message.data);
+    },
+  };
+
+  const closeHandlers: CloseHandlers = {
+    [WSCodes.FORCE_DC]: (event) => {
+      console.error("Connection closed, ", event.reason);
+      notifications.show({
+        title: "Connection",
+        message: `Connection closed, ${event.reason}`,
+        color: "red",
+      });
+      navigate(routes.home);
+    },
+    [WSCodes.POLICY_VIOLATION]: (event) => {
+      console.error("Connection refused, ", event.reason);
+      notifications.show({
+        title: "Connection",
+        message: `Connection refused, ${event.reason}`,
+        color: "red",
+      });
+      navigate(routes.home);
     },
   };
 
@@ -48,7 +76,11 @@ export const RoomPage = () => {
       drawerRef.current.init();
     };
 
-    const ws = new WSManager(wsbaseurl + `/rooms/${id}`, messageHandlers);
+    const ws = new WSManager(
+      wsbaseurl + `/rooms/${id}`,
+      messageHandlers,
+      closeHandlers,
+    );
     wsRef.current = ws;
     wsRef.current.connect();
 

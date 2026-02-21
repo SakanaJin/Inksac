@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from Inksac_Data.database import get_db
 from Inksac_Data.Common.Response import Response, HttpException
+from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Controllers.AuthController import get_current_user, require_not_guest
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, round_nearest_hour
@@ -65,11 +66,12 @@ def update(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     return response
 
 @router.delete("")
-def delete(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def delete(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     response = Response()
     if not user.room:
         response.add_error("room", "you do not own this room")
         raise HttpException(status_code=403, response=response)
+    await WSManager.disconnect_room(roomid=user.room.id)
     db.delete(user.room)
     user.has_room = False
     db.commit()

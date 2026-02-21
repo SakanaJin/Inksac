@@ -1,5 +1,5 @@
 import { notifications } from "@mantine/notifications";
-import type { WSCodes, WSMessage, WSType } from "../constants/types";
+import { WSCodes, type WSMessage, type WSType } from "../constants/types";
 
 type MessageHandler = (message: WSMessage) => Promise<any> | void;
 export type MessageHandlers = Partial<Record<WSType, MessageHandler>>;
@@ -14,25 +14,33 @@ export class WSManager {
   private messageHandlers: MessageHandlers = {} as MessageHandlers;
   private closeHandlers: CloseHandlers = {} as CloseHandlers;
   private defaultCloseHandlers: CloseHandlers = {
-    "1000": () => {
+    [WSCodes.NORMAL_CLOSURE]: () => {
       return;
     },
-    "1001": () => {
+    [WSCodes.GOING_AWAY]: () => {
       return;
     },
-    "1011": () => {
+    [WSCodes.INTERNAL_SERVER_ERROR]: () => {
       this.reconnect();
       return;
     },
-    "1006": () => {
+    [WSCodes.UNEXPECTED_ERROR]: () => {
       this.reconnect();
       return;
     },
-    "1008": (event) => {
+    [WSCodes.POLICY_VIOLATION]: (event) => {
       console.error("Connection refused, ", event.reason);
       notifications.show({
         title: "Error",
         message: `Connection refused, ${event.reason}`,
+        color: "red",
+      });
+    },
+    [WSCodes.FORCE_DC]: (event) => {
+      console.error("Connection closed, ", event.reason);
+      notifications.show({
+        title: "Error",
+        message: `Connection closed, ${event.reason}`,
         color: "red",
       });
     },

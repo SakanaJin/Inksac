@@ -5,12 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import delete
+from sqlalchemy import delete, select, exists
 from datetime import datetime, timedelta
 
 from Inksac_Data.database import Base, engine, db_session, ALLOWORIGINSLIST
 
 from Inksac_Data.Common.Response import HttpException
+from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Common.Role import Role
 
 #table classes go here
@@ -73,9 +74,12 @@ def HttpExceptionHandler(request: Request, exception: HttpException):
 @scheduler.scheduled_job(CronTrigger(minute=0)) # every hour
 async def expired_room_cleanup():
     with db_session() as db:
-        db.execute(
-            delete(Room).where(Room.expiration <= datetime.now())
-        )
+        rooms = db.execute(
+            select(Room).where(Room.expiration <= datetime.now())
+        ).scalars().all()
+        for room in rooms:
+            await WSManager.disconnect_room(roomid=room.id)
+            db.delete(room)
         db.commit()
 
 @scheduler.scheduled_job(CronTrigger(hour=00)) # everyday at 00:00 (12:00 am)
@@ -83,9 +87,12 @@ async def expired_guest_cleanup():
     currtime = datetime.now()
     with db_session() as db:
         db.execute(
-            delete(User).where(
-                (User.role == Role.GUEST) and
-                (currtime - User.created_at >= GUEST_GRACE)
-            )
+            delete(User)
+            .where(User.role == Role.GUEST)
+            .where(currtime - User.created_at >= GUEST_GRACE)
+            .where(~exists(
+                select(Stroke.id)
+                .where(Stroke.creator_id == User.id)
+            ))
         )
         db.commit()

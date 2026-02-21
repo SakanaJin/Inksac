@@ -23,7 +23,14 @@ export interface WSMessage {
   data: any;
 }
 
-export type WSCodes = 1000 | 1001 | 1011 | 1006 | 1008;
+export enum WSCodes {
+  NORMAL_CLOSURE = 1000,
+  GOING_AWAY = 1001,
+  INTERNAL_SERVER_ERROR = 1011,
+  UNEXPECTED_ERROR = 1006,
+  POLICY_VIOLATION = 1008,
+  FORCE_DC = 4001,
+}
 
 // user types ----------------------------------------------------------------------------
 
