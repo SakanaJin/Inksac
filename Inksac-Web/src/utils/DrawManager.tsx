@@ -305,55 +305,5 @@ class DrawManager {
 export default DrawManager;
 
 /*
-we can hold strokes and temp strokes in maps 
-strokesmap = new Map<number, PIXI.Graphics>()
-tempStrokesmap = new Map<string, PIXI.Graphics>() string will likely be uuid4
 
-[UNDO]
--> send stroke to redo stack
--> ws sends undo to backend
-{
-id
-}
--> backend deletes stroke
--> backend sends undo to all clients except sender
--> client searches map for stroke
-stroke = strokesmap.get(id)
--> client removes stroke from draw container by ref
-this.drawingContainer.remove(stroke)
--> client destroys stroke
-stroke.destroy
-strokesmap.delete(id)
-
-[REDO]
--> send stroke to undo stack
--> ws sends redo to the backend
-full stroke data dto
--> backend creates stroke
--> backend sends redo with stroke to all clients except sender
--> client finds correct index by id
-index = this.drawingContainer.findIndex(child => child.id > stroke.id)
-strokesmap.set(id, stroke) stroke here should be the actual object not the data from the ws
--> client inserts stroke at index
-if(index === -1) this.drawingContainer.addChild(stroke)
-else this.drawingContainer.addChildAt(stroke, index)
-
-[MOUSEUP]
--> mouse up creates temporary stroke
--> ws sends stroke to the backend
--> backend creates stroke
--> backend sends stroke to ALL clients
--> creator replaces temp stroke with one from backend (for the generated id we're sorting by)
-this doesnt even need to touch the draw container its just swapping where the ref is in the maps
-stroke = tempStrokes.get(tempid)
-tempStrokes.delete(tempid)
-strokesmap.set(id, stroke)
--> other clients add stroke to map and container
-strokesmap.set(id, stroke)
-this.drawingContainer.addChild(stroke) //this might need to sort but maybe not we'll see
-the recieve stroke can be one function becuase of strokesmap.has(id) 
-
-The maps arent going to eat up that much memory since they're only storing *pointers* to the
-stroke objects, but they're going to be faster than searching the children array since
-it's a hashmap. Thank God it's simpler than I thought. I will probably start doing this tommorrow 2/21/26.
 */

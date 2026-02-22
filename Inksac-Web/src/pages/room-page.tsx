@@ -90,9 +90,7 @@ export const RoomPage = () => {
       });
 
       pixiContainer.current!.appendChild(app.canvas);
-      /*
-      if !wsRef.current {err the fuck out}
-      */
+
       const ws = new WSManager(
         wsbaseurl + `/rooms/${id}`,
         messageHandlers,
