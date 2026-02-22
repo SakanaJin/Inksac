@@ -9,7 +9,12 @@ import {
   type MessageHandlers,
   WSManager,
 } from "../config/websocket-manager";
-import { WSCodes, WSType, type StrokeData } from "../constants/types";
+import {
+  WSCodes,
+  WSType,
+  type StrokeGetDto,
+  type WSMessage,
+} from "../constants/types";
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
 
@@ -24,9 +29,24 @@ export const RoomPage = () => {
   const navigate = useNavigate();
 
   const messageHandlers: MessageHandlers = {
-    [WSType.STROKE]: (message) => {
+    [WSType.STROKE]: async (message) => {
       if (drawerRef.current && message.data) {
-        drawerRef.current.renderReceivedStroke(message.data as StrokeData);
+        await drawerRef.current.receiveStroke(message.data as StrokeGetDto);
+      }
+    },
+    [WSType.UNDO]: async (message) => {
+      if (drawerRef.current && message.data) {
+        await drawerRef.current.undoStroke(message.data as number);
+      }
+    },
+    [WSType.REDO]: async (message) => {
+      if (drawerRef.current && message.data) {
+        await drawerRef.current.redoStroke(message.data as StrokeGetDto);
+      }
+    },
+    [WSType.READY]: async (message) => {
+      if (drawerRef.current && message.data) {
+        await drawerRef.current.receiveInit(message.data as StrokeGetDto[]);
       }
     },
   };
@@ -73,17 +93,21 @@ export const RoomPage = () => {
       /*
       if !wsRef.current {err the fuck out}
       */
-      drawerRef.current = new DrawManager(app, wsRef.current);
-      drawerRef.current.init();
-    };
+      const ws = new WSManager(
+        wsbaseurl + `/rooms/${id}`,
+        messageHandlers,
+        closeHandlers,
+      );
+      wsRef.current = ws;
 
-    const ws = new WSManager(
-      wsbaseurl + `/rooms/${id}`,
-      messageHandlers,
-      closeHandlers,
-    );
-    wsRef.current = ws;
-    wsRef.current.connect();
+      await wsRef.current.connect();
+
+      drawerRef.current = new DrawManager(app, wsRef.current);
+      await drawerRef.current.init();
+
+      const message: WSMessage = { Mtype: WSType.READY, data: true };
+      wsRef.current.send(message);
+    };
 
     initPixi();
 

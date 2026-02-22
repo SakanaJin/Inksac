@@ -10,6 +10,8 @@ from Inksac_Data.Entities.Rooms import Room
 class WSMTypes(str, Enum):
     READY = "ready"
     STROKE = "stroke"
+    UNDO = "undo"
+    REDO = "redo"
 
 class WSCodes(IntEnum):
     NORMAL_CLOSURE = 1000
@@ -69,12 +71,10 @@ class ConnectionManager:
             await connection.close(code=WSCodes.FORCE_DC, reason="room closing")
         del self.rooms[roomid]
 
-    async def broadcast(self, roomid: int, message: WSMessage, websocket: WebSocket):
+    async def broadcast(self, roomid: int, message: WSMessage):
         if roomid in self.rooms:
             for connection in self.rooms[roomid].values():
-                if connection == websocket:
-                    continue
-                await connection.send_json(message.model_dump())
+                await connection.send_json(message.model_dump(mode="json"))
 
     def user_in_room(self, userid: int, roomid: int) -> bool:
         if roomid in self.rooms and userid in self.rooms[roomid]:

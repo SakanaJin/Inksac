@@ -56,26 +56,29 @@ export class WSManager {
     this.closeHandlers = { ...this.defaultCloseHandlers, ...closeHandlers };
   }
 
-  connect() {
-    this.ws = new WebSocket(this.url);
+  connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(this.url);
 
-    this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-    };
+      this.ws.onopen = () => {
+        this.reconnectAttempts = 0;
+        resolve();
+      };
 
-    this.ws.onmessage = (event) => {
-      const message: WSMessage = JSON.parse(event.data);
-      this.handleMessage(message);
-    };
+      this.ws.onmessage = (event) => {
+        const message: WSMessage = JSON.parse(event.data);
+        this.handleMessage(message);
+      };
 
-    this.ws.onclose = (event) => {
-      console.log("WS disconnected");
-      this.handleClose(event);
-    };
+      this.ws.onclose = (event) => {
+        console.log("WS disconnected");
+        this.handleClose(event);
+      };
 
-    this.ws.onerror = (error) => {
-      console.error(error);
-    };
+      this.ws.onerror = (error) => {
+        reject(error);
+      };
+    });
   }
 
   send(message: WSMessage) {

@@ -11,25 +11,13 @@ export interface ApiError {
   message: string;
 }
 
-// stroke data types----------------------------------------------------------------------
-
-export interface BrushCoord {
-  x: number;
-  y: number;
-}
-
-export interface StrokeData {
-  points: BrushCoord[];
-  color: string;
-  scale: number;
-  opacity: number;
-}
-
 // ws types-------------------------------------------------------------------------------
 
 export enum WSType {
   STROKE = "stroke",
   READY = "ready",
+  UNDO = "undo",
+  REDO = "redo",
 }
 
 export interface WSMessage {
@@ -155,9 +143,10 @@ export interface RoomUpdateDto {
 
 export interface StrokeGetDto {
   id: number;
+  tempid: string | null;
   color: string;
   created_at: string;
-  points: [number[]];
+  points: BrushCoord[];
   creator_id: number;
   brush: BrushShallowDto;
   room_id: number;
@@ -165,5 +154,25 @@ export interface StrokeGetDto {
 
 export interface StrokeCreateDto {
   color: string;
-  points: [number[]];
+  points: BrushCoord[];
+}
+
+export interface BrushCoord {
+  x: number;
+  y: number;
+}
+
+// export interface StrokeData {
+//   tempid: string;
+//   points: BrushCoord[];
+//   color: string;
+//   scale: number;
+//   opacity: number;
+// }
+
+export interface StrokeData {
+  tempid: string;
+  points: BrushCoord[];
+  color: string;
+  brushid: number;
 }
