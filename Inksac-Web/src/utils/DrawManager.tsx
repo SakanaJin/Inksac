@@ -240,7 +240,6 @@ class DrawManager {
       receivedStroke.addChild(brushSprite);
     }
 
-    this.app.renderer.render(this.app.stage);
     const bounds = receivedStroke.getBounds();
     const combinedTexture = this.app.renderer.generateTexture(receivedStroke);
     const combinedSprite = new pixi.Sprite(combinedTexture);
@@ -305,5 +304,6 @@ class DrawManager {
 export default DrawManager;
 
 /*
-
+  I think the flatten oldest undo is causing the order of the strokes to mess up.
+  Point thinning is a MUST!!!!! 
 */
