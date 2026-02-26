@@ -1,0 +1,8 @@
+@keyframes spin {
+  from {
+    transform: scaleX(-1) rotate(0deg);
+  }
+  to {
+    transform: scaleX(-1) rotate(-360deg);
+  }
+}
