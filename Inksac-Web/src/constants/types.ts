@@ -11,6 +11,29 @@ export interface ApiError {
   message: string;
 }
 
+// ws types-------------------------------------------------------------------------------
+
+export enum WSType {
+  STROKE = "stroke",
+  READY = "ready",
+  UNDO = "undo",
+  REDO = "redo",
+}
+
+export interface WSMessage {
+  Mtype: WSType;
+  data: any;
+}
+
+export enum WSCodes {
+  NORMAL_CLOSURE = 1000,
+  GOING_AWAY = 1001,
+  INTERNAL_SERVER_ERROR = 1011,
+  UNEXPECTED_ERROR = 1006,
+  POLICY_VIOLATION = 1008,
+  FORCE_DC = 4001,
+}
+
 // user types ----------------------------------------------------------------------------
 
 export enum UserRole {
@@ -120,9 +143,10 @@ export interface RoomUpdateDto {
 
 export interface StrokeGetDto {
   id: number;
+  tempid: string | null;
   color: string;
   created_at: string;
-  points: [number[]];
+  points: BrushCoord[];
   creator_id: number;
   brush: BrushShallowDto;
   room_id: number;
@@ -130,5 +154,25 @@ export interface StrokeGetDto {
 
 export interface StrokeCreateDto {
   color: string;
-  points: [number[]];
+  points: BrushCoord[];
+}
+
+export interface BrushCoord {
+  x: number;
+  y: number;
+}
+
+// export interface StrokeData {
+//   tempid: string;
+//   points: BrushCoord[];
+//   color: string;
+//   scale: number;
+//   opacity: number;
+// }
+
+export interface StrokeData {
+  tempid: string;
+  points: BrushCoord[];
+  color: string;
+  brushid: number;
 }

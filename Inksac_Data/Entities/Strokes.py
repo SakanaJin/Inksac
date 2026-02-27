@@ -1,16 +1,17 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Optional
 
 from Inksac_Data.database import Base
 from Inksac_Data.Entities.Brushes import BrushShallowDto
 
-Point = list[float]
+Point = Dict[str, float]
 
 class StrokeGetDto(BaseModel):
     id: int
+    tempid: Optional[str] = ""
     color: str
     created_at: datetime
     points: List[Point]
@@ -22,12 +23,19 @@ class StrokeCreateDto(BaseModel):
     color: str
     points: List[Point]
 
+class StrokeData(BaseModel):
+    tempid: str
+    points: List[Point]
+    color: str
+    brushid: int
+
 class Stroke(Base):
     __tablename__ = "strokes"
     id = Column(Integer, primary_key=True)
     points = Column(JSON, nullable=False)
-    color = Column(String(9), nullable=False)
+    color = Column(String(25), nullable=False)
     created_at = Column(DateTime(timezone=True), default=datetime.now(), nullable=False)
+    deleted = Column(Boolean, default=False)
 
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
@@ -37,9 +45,10 @@ class Stroke(Base):
     room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
     room = relationship("Room", back_populates="strokes")
 
-    def toGetDto(self) -> StrokeGetDto:
+    def toGetDto(self, tempid: str = None) -> StrokeGetDto:
         strokedto = StrokeGetDto(
             id=self.id,
+            tempid=tempid,
             color=self.color,
             created_at=self.created_at,
             points=self.points,
