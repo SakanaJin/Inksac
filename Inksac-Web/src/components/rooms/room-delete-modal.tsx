@@ -8,10 +8,6 @@ export interface RoomDeleteModalProps {
   onSuccess?: () => void;
 }
 
-const invalidateRoomsCache = () => {
-  sessionStorage.removeItem("roomsCache");
-};
-
 export const RoomDeleteModal = ({
   context,
   id,
@@ -42,8 +38,6 @@ export const RoomDeleteModal = ({
       title: "Deleted",
       message: "Room deleted successfully",
     });
-
-    invalidateRoomsCache();
 
     innerProps.onSuccess?.();
     context.closeModal(id);
