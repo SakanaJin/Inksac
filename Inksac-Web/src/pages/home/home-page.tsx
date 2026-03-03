@@ -11,38 +11,24 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconRefresh } from "@tabler/icons-react";
 import { faDoorOpen } from "@fortawesome/free-solid-svg-icons";
 import { RoomsList } from "../../components/rooms/rooms-list";
-import { sortRooms } from "../../utils/room-utils";
-import { useEffect, useState, type ReactNode } from "react";
-import api from "../../config/axios";
+import { type ReactNode } from "react";
 import { UserRole, type RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useUser } from "../../authentication/use-auth";
 import { useNavigate } from "react-router-dom";
+import { useRooms } from "../../context/rooms-context";
 
 export const HomePage = () => {
   const user = useUser();
   const navigate = useNavigate();
   const currentUserId = user.id;
+  const { rooms, isFetching, hasFetched, refresh, invalidateAndRefresh } =
+    useRooms();
 
-  // Initialize from sessionStorage cache to prevent UI flicker on reload
-  const cachedRooms = sessionStorage.getItem("roomsCache");
-
-  const [rooms, setRooms] = useState<RoomGetDto[]>(() =>
-    cachedRooms ? sortRooms(JSON.parse(cachedRooms), currentUserId) : [],
-  );
-
-  const [isFetching, setIsFetching] = useState(() => !cachedRooms);
-
-  /*
-  Derived state based on current rooms list
-  */
   const ownsRoom = rooms.some((room) => room.owner.id === currentUserId);
-
-  // !isFetching disables Create Room button during rooms loading to prevent ownership flicker
-  const canCreateRoom = user.role !== UserRole.GUEST && !ownsRoom;
+  const canCreateRoom = user.role !== UserRole.GUEST && !ownsRoom && hasFetched;
 
   let createRoomTooltip: string | undefined;
-
   if (user.role === UserRole.GUEST)
     createRoomTooltip = "Guests cannot create rooms";
   else if (ownsRoom) createRoomTooltip = "You already own a room";
@@ -52,62 +38,10 @@ export const HomePage = () => {
       ? "No rooms available and you can't create a room as a guest. Sucks to suck!"
       : "No rooms available. Create a room and start doodling!";
 
-  /*
-    Fetch rooms
-  */
-  const fetchRooms = async (forceRefresh = false) => {
-    if (!forceRefresh) {
-      const cached = sessionStorage.getItem("roomsCache");
-
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        setRooms(sortRooms(parsed, currentUserId));
-        setIsFetching(false);
-        return;
-      }
-    }
-
-    setIsFetching(true);
-
-    try {
-      // await new Promise((resolve) => setTimeout(resolve, 500)); // test for room loading animations
-      const response = await api.get<RoomGetDto[]>("/rooms");
-
-      if (!response.data.has_errors) {
-        const allRooms = response.data.data;
-
-        const sortedRooms = sortRooms(allRooms, currentUserId);
-
-        // Persist cache in sessionStorage to survive page reloads
-        sessionStorage.setItem("roomsCache", JSON.stringify(sortedRooms));
-
-        setRooms(sortedRooms);
-      }
-    } finally {
-      setIsFetching(false);
-    }
-  };
-
-  /*
-    Initial fetch
-  */
-  useEffect(() => {
-    fetchRooms();
-  }, []);
-
-  /*
-    Called when room created / deleted / joined / left
-  */
-  const invalidateAndRefresh = () => {
-    sessionStorage.removeItem("roomsCache");
-    fetchRooms(true);
-  };
-
-  /*
-    Room list render
-  */
   let roomList: ReactNode;
-  if (rooms.length === 0) {
+  if (!hasFetched) {
+    roomList = null;
+  } else if (rooms.length === 0) {
     roomList = (
       <Center>
         <p>{emptyMessage}</p>
@@ -125,16 +59,14 @@ export const HomePage = () => {
 
   return (
     <Container size="lg">
-      {/* Header */}
       <Group justify="space-between" mb="md">
         <Group gap="sm">
           <Title order={2}>Available Rooms</Title>
-
           <Button
             size="xs"
             radius="md"
             variant="outline"
-            onClick={() => fetchRooms(true)}
+            onClick={() => refresh()}
             leftSection={
               <IconRefresh
                 size={16}
@@ -149,7 +81,6 @@ export const HomePage = () => {
           </Button>
         </Group>
 
-        {/* Create Room */}
         <Tooltip label={createRoomTooltip} disabled={canCreateRoom}>
           <Button
             onClick={() =>
@@ -158,16 +89,6 @@ export const HomePage = () => {
                 title: "Create Room",
                 innerProps: {
                   onSuccess: (createdRoom: RoomGetDto) => {
-                    const updatedRooms = sortRooms(
-                      [...rooms, createdRoom],
-                      currentUserId,
-                    );
-
-                    sessionStorage.setItem(
-                      "roomsCache",
-                      JSON.stringify(updatedRooms),
-                    );
-                    setRooms(updatedRooms);
                     navigate(`/room/${createdRoom.id}`);
                   },
                 },
@@ -192,7 +113,6 @@ export const HomePage = () => {
         </Tooltip>
       </Group>
 
-      {/* Room list */}
       <Box mih={200}>{roomList}</Box>
     </Container>
   );

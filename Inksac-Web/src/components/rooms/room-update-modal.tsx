@@ -10,10 +10,6 @@ export interface RoomUpdateModalProps {
   onSuccess?: (room: RoomGetDto) => void;
 }
 
-const invalidateRoomsCache = () => {
-  sessionStorage.removeItem("roomsCache");
-};
-
 export const RoomUpdateModal = ({
   context,
   id,
@@ -51,8 +47,6 @@ export const RoomUpdateModal = ({
       message: "Room updated Successfully!",
       color: "green",
     });
-
-    invalidateRoomsCache();
 
     innerProps.onSuccess?.(updatedRoom);
     context.closeModal(id);
