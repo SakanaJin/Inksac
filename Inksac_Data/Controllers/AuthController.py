@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response as FastRes, Request, Cookie
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete, exists, select
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 import bcrypt
@@ -12,6 +12,7 @@ import re
 from Inksac_Data.database import get_db, SECRET_KEY
 from Inksac_Data.Entities.Users import User, LoginDto, UserCreateDto
 from Inksac_Data.Entities.Auth import UserAuth, create_password_hash, EMAIL_PATTERN
+from Inksac_Data.Entities.Strokes import Stroke
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.Role import Role
 
@@ -76,7 +77,16 @@ def user_logout(fastres: FastRes, db: Session = Depends(get_db), user: User = De
     response = Response()
     fastres.delete_cookie(COOKIE_NAME)
     if user.role == Role.GUEST:
-        db.delete(user)
+        db.execute(
+            delete(User)
+            .where(User.id == user.id)
+            .where(
+                ~exists(
+                    select(Stroke.id)
+                    .where(Stroke.creator_id == user.id)
+                )
+            )
+        )
         db.commit()
     response.data = True
     return response
