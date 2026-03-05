@@ -170,9 +170,9 @@ export interface BrushCoord {
 //   opacity: number;
 // }
 
-export interface StrokeData {
-  tempid: string;
-  points: BrushCoord[];
-  color: string;
-  brushid: number;
-}
+// export interface StrokeData {
+//   tempid: string;
+//   points: BrushCoord[];
+//   color: string;
+//   brushid: number;
+// }

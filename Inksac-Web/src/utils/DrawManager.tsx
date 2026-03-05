@@ -1,14 +1,17 @@
 import * as pixi from "pixi.js";
-import softShape from "../../../media/user/brush/softShape.png";
+//import softShape from "../../../media/user/brush/softShape.png";
 import {
   WSType,
   type BrushCoord,
   type WSMessage,
   type StrokeData,
   type StrokeGetDto,
+  type BrushGetDto
 } from "../constants/types";
 import type { WSManager } from "../config/websocket-manager";
 import { Stroke, type stringornumber } from "./Stroke";
+import api from "../config/axios";
+import { EnvVars } from "../config/env-vars";
 
 class DrawManager {
   private app: pixi.Application;
@@ -60,7 +63,35 @@ class DrawManager {
   }
 
   async init() {
-    this.brushShape = await pixi.Assets.load(softShape);
+    try{
+      const response = await api.get<BrushGetDto>("/brushes/1");
+      console.log(response.data.data);
+      this.defaultBrush = response.data.data;
+      this.brushTexture = await this.loadBrushTexture(this.defaultBrush.imgurl);
+      this.brush = {
+        scale: this.defaultBrush.scale,
+        opacity: this.defaultBrush.opacity,
+        spacing: this.defaultBrush.spacing,
+        rotation_mode: this.defaultBrush.rotation_mode,
+        tint: 0xffffff
+      };
+    } catch (err) {
+        console.error("DrawManager: failed to load default brush", err);
+    }
+  }
+
+  private async loadBrushTexture(imgurl: string): Promise<pixi.Texture | null> {
+    if (this.textureCache.has(imgurl)) {
+      return this.textureCache.get(imgurl)!;
+    }
+    try {
+      const texture = await pixi.Assets.load<pixi.Texture>(baseurl + imgurl);
+      this.textureCache.set(imgurl, texture);
+      return texture;
+    } catch(err) {
+      console.error(`DrawManager: failed to load brush texture at ${imgurl}`, err);
+      return null;
+    }
   }
 
   // UNDO/REDO HANDLING
@@ -204,19 +235,11 @@ class DrawManager {
 
     this.tempStrokes.set(tempid, combinedSpriteContainer);
 
-    // const strokeData: StrokeData = {
-    //   tempid: tempid,
-    //   points: this.strokePoints,
-    //   color: "rgb(81, 46, 146)",
-    //   scale: 0.05,
-    //   opacity: 1,
-    // };
-
     const strokeData: StrokeData = {
       tempid: tempid,
       points: this.strokePoints,
-      color: "rgb(81, 46, 146)",
-      brushid: 1,
+      color: "rgb(13, 13, 14)",
+      brushid: this.defaultBrush?.id ?? 1,
     };
 
     const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
@@ -226,7 +249,8 @@ class DrawManager {
   // RECEIVING STROKE FUNCTIONS
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer, redo/undo kinda busted for multiple people rn
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
-    if (this.brushShape == null) return;
+    const brushTexture = await this.loadBrushTexture(strokeData.brush.imgurl);
+    if (!brushTexture) return;
 
     const receivedStroke = new pixi.Container();
 
@@ -267,7 +291,7 @@ class DrawManager {
       this.strokesMap.set(strokeData.id, stroke);
       this.undoStack.push(stroke);
       if (this.undoStack.length > this.maxUndoSteps) {
-        this.flattenOldestUndo();
+        //this.flattenOldestUndo();
       }
       return;
     }
