@@ -13,6 +13,8 @@ import { Stroke, type stringornumber } from "./Stroke";
 import api from "../config/axios";
 import { EnvVars } from "../config/env-vars";
 
+const baseurl = EnvVars.mediaBaseUrl;
+
 class DrawManager {
   private app: pixi.Application;
   private undoStack: Stroke[];
@@ -28,7 +30,8 @@ class DrawManager {
   private isDrawing = false;
   private strokePoints: BrushCoord[] = [];
 
-  private brushShape: pixi.Texture | null = null;
+  private brushTexture: pixi.Texture | null = null;
+  private defaultBrush: BrushGetDto | null = null;
 
   private ws: WSManager | null = null;
 
@@ -63,33 +66,17 @@ class DrawManager {
   }
 
   async init() {
-    try{
       const response = await api.get<BrushGetDto>("/brushes/1");
-      console.log(response.data.data);
       this.defaultBrush = response.data.data;
       this.brushTexture = await this.loadBrushTexture(this.defaultBrush.imgurl);
-      this.brush = {
-        scale: this.defaultBrush.scale,
-        opacity: this.defaultBrush.opacity,
-        spacing: this.defaultBrush.spacing,
-        rotation_mode: this.defaultBrush.rotation_mode,
-        tint: 0xffffff
-      };
-    } catch (err) {
-        console.error("DrawManager: failed to load default brush", err);
-    }
   }
 
   private async loadBrushTexture(imgurl: string): Promise<pixi.Texture | null> {
-    if (this.textureCache.has(imgurl)) {
-      return this.textureCache.get(imgurl)!;
-    }
     try {
       const texture = await pixi.Assets.load<pixi.Texture>(baseurl + imgurl);
-      this.textureCache.set(imgurl, texture);
       return texture;
     } catch(err) {
-      console.error(`DrawManager: failed to load brush texture at ${imgurl}`, err);
+      console.error(`failed to load brush texture at ${imgurl}`, err);
       return null;
     }
   }
@@ -177,7 +164,7 @@ class DrawManager {
     if (
       this.isDrawing == false ||
       this.currentStroke == null ||
-      this.brushShape == null
+      this.brushTexture == null
     )
       return;
 
@@ -195,10 +182,10 @@ class DrawManager {
 
       this.strokePoints.push({ x, y });
 
-      const brushSprite = new pixi.Sprite(this.brushShape);
+      const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
       brushSprite.tint = `rgb(24, 20, 36)`;
-      brushSprite.scale.set(0.05);
+      brushSprite.scale.set(this.defaultBrush.scale);
       brushSprite.position.set(x, y);
 
       this.currentStroke.addChild(brushSprite);
@@ -238,7 +225,7 @@ class DrawManager {
     const strokeData: StrokeData = {
       tempid: tempid,
       points: this.strokePoints,
-      color: "rgb(13, 13, 14)",
+      color: "rgb(218, 218, 227)",
       brushid: this.defaultBrush?.id ?? 1,
     };
 
@@ -255,7 +242,7 @@ class DrawManager {
     const receivedStroke = new pixi.Container();
 
     for (const point of strokeData.points) {
-      const brushSprite = new pixi.Sprite(this.brushShape);
+      const brushSprite = new pixi.Sprite(this.brushTexture);
 
       brushSprite.anchor.set(0.5);
       brushSprite.tint = strokeData.color;
