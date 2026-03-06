@@ -31,7 +31,7 @@ class DrawManager {
   private strokePoints: BrushCoord[] = [];
 
   private brushTexture: pixi.Texture | null = null;
-  private defaultBrush: BrushGetDto | null = null;
+  private activeBrush: BrushGetDto | null = null;
 
   private ws: WSManager | null = null;
 
@@ -67,8 +67,8 @@ class DrawManager {
 
   async init() {
       const response = await api.get<BrushGetDto>("/brushes/1");
-      this.defaultBrush = response.data.data;
-      this.brushTexture = await this.loadBrushTexture(this.defaultBrush.imgurl);
+      this.activeBrush = response.data.data;
+      this.brushTexture = await this.loadBrushTexture(this.activeBrush.imgurl);
   }
 
   private async loadBrushTexture(imgurl: string): Promise<pixi.Texture | null> {
@@ -148,6 +148,8 @@ class DrawManager {
     this.app.stage.on("pointermove", (event) => this.onMouseMove(event));
     this.app.stage.on("pointerup", () => this.onMouseUp());
     this.app.stage.on("pointerleave", () => this.onMouseUp());
+    this.app.stage.on("rightdown", () => this.onMouseUp());
+
   }
 
   private onMouseDown(event: pixi.FederatedPointerEvent) {
@@ -185,7 +187,7 @@ class DrawManager {
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
       brushSprite.tint = `rgb(24, 20, 36)`;
-      brushSprite.scale.set(this.defaultBrush.scale);
+      brushSprite.scale.set(this.activeBrush.scale);
       brushSprite.position.set(x, y);
 
       this.currentStroke.addChild(brushSprite);
@@ -226,7 +228,7 @@ class DrawManager {
       tempid: tempid,
       points: this.strokePoints,
       color: "rgb(218, 218, 227)",
-      brushid: this.defaultBrush?.id ?? 1,
+      brushid: this.activeBrush?.id ?? 1,
     };
 
     const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
@@ -236,13 +238,12 @@ class DrawManager {
   // RECEIVING STROKE FUNCTIONS
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer, redo/undo kinda busted for multiple people rn
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
-    const brushTexture = await this.loadBrushTexture(strokeData.brush.imgurl);
-    if (!brushTexture) return;
+    const receivedBrushTexture = await this.loadBrushTexture(strokeData.brush.imgurl);
+    if (!receivedBrushTexture) return;
 
     const receivedStroke = new pixi.Container();
-
     for (const point of strokeData.points) {
-      const brushSprite = new pixi.Sprite(this.brushTexture);
+      const brushSprite = new pixi.Sprite(receivedBrushTexture);
 
       brushSprite.anchor.set(0.5);
       brushSprite.tint = strokeData.color;
@@ -259,7 +260,7 @@ class DrawManager {
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
-
+    
     receivedStroke.destroy({ children: true });
 
     this.drawingContainer.addChild(combinedSpriteContainer);
