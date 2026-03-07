@@ -13,6 +13,7 @@ import { ImageUploadModal } from "./components/image/upload-image-modal.tsx";
 import { RoomCreateModal } from "./components/rooms/room-create-modal";
 import { RoomDeleteModal } from "./components/rooms/room-delete-modal.tsx";
 import { RoomUpdateModal } from "./components/rooms/room-update-modal.tsx";
+import { BrushEditorModal } from "./components/brushes/brush-editor-modal.tsx";
 
 const modals = {
   usercreatemodal: UserCreateModal,
@@ -20,6 +21,7 @@ const modals = {
   roomcreatemodal: RoomCreateModal,
   roomdeletemodal: RoomDeleteModal,
   roomupdatemodal: RoomUpdateModal,
+  brusheditormodal: BrushEditorModal,
 };
 
 declare module "@mantine/modals" {
