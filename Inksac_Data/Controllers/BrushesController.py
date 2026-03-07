@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, File, UploadFile, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import select, or_
 import os
 import uuid
 
 from Inksac_Data.database import get_db, MEDIA_DIR
 from Inksac_Data.Common.Response import Response, HttpException
+from Inksac_Data.Common.BrushType import BrushType
 from Inksac_Data.Entities.Brushes import Brush, BrushCreateDto, BrushUpdateDto, DEFAULT_BRUSH
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Controllers.AuthController import require_not_guest, get_current_user
@@ -18,6 +20,19 @@ router = APIRouter(prefix="/api/brushes", tags=['Brushes'])
 def get_all(db: Session = Depends(get_db)):
     response = Response()
     brushes = db.query(Brush).all()
+    response.data = [brush.toGetDto() for brush in brushes]
+    return response
+
+@router.get("/user-and-system")
+def get_user_and_system(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    response = Response()
+    brushes = db.execute(
+        select(Brush)
+        .where(or_(
+            Brush.owner_id == user.id,
+            Brush.brush_type == BrushType.SYSTEM
+        ))
+    ).scalars().all()
     response.data = [brush.toGetDto() for brush in brushes]
     return response
 
