@@ -1,9 +1,11 @@
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel
+from typing import Optional
 
 from Inksac_Data.database import Base
 from Inksac_Data.Common.Rotation import RotationMode
+from Inksac_Data.Common.BrushType import BrushType
 from Inksac_Data.Entities.Users import UserShallowDto
 
 DEFAULT_BRUSH = "/user/brush/softShape.png"
@@ -30,7 +32,8 @@ class BrushGetDto(BaseModel):
     scale: float
     opacity: float
     rotation_mode: RotationMode
-    owner: UserShallowDto
+    brush_type: BrushType
+    owner: Optional[UserShallowDto]
     in_use: bool
 
 class BrushShallowDto(BaseModel):
@@ -41,6 +44,7 @@ class BrushShallowDto(BaseModel):
     scale: float
     opacity: float
     rotation_mode: RotationMode
+    brush_type: BrushType
     in_use: bool
 
 class Brush(Base):
@@ -52,6 +56,7 @@ class Brush(Base):
     scale = Column(Float, nullable=False)
     opacity = Column(Float, nullable=False)
     rotation_mode = Column(Enum(RotationMode), nullable=False, default=RotationMode.FOLLOWSTROKE)
+    brush_type = Column(Enum(BrushType), nullable=False, default=BrushType.USER)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="brushes")
@@ -59,6 +64,9 @@ class Brush(Base):
     rooms = relationship("Room", back_populates="brushes", secondary="usedbrushes")
 
     def toGetDto(self) -> BrushGetDto:
+        owner = None
+        if self.owner:
+            owner = self.owner.toShallowDto()
         brushdto = BrushGetDto(
             id=self.id,
             name=self.name,
@@ -67,7 +75,8 @@ class Brush(Base):
             scale=self.scale,
             opacity=self.opacity,
             rotation_mode=self.rotation_mode,
-            owner=self.owner.toShallowDto(),
+            brush_type=self.brush_type,
+            owner=owner,
             in_use=bool(self.rooms)
         )
         return brushdto
@@ -81,6 +90,7 @@ class Brush(Base):
             scale=self.scale,
             opacity=self.opacity,
             rotation_mode=self.rotation_mode,
+            brush_type=self.brush_type,
             in_use=bool(self.rooms)
         )
         return brushdto

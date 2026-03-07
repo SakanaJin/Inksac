@@ -1,3 +1,4 @@
+import json
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +14,7 @@ from Inksac_Data.database import Base, engine, db_session, ALLOWORIGINSLIST
 from Inksac_Data.Common.Response import HttpException
 from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Common.Role import Role
+from Inksac_Data.Common.BrushType import BrushType
 
 #table classes go here
 from Inksac_Data.Entities.Users import User
@@ -39,6 +41,7 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    seed_brushes()
     scheduler.start()
     yield
 
@@ -95,4 +98,27 @@ async def expired_guest_cleanup():
                 .where(Stroke.creator_id == User.id)
             ))
         )
+        db.commit()
+
+def seed_brushes():
+    with open("./Inksac_Data/Brushes.json") as f:
+        seed_brushes = json.load(f)
+    with db_session() as db:
+        system_brush_names = db.execute(
+            select(Brush.name)
+            .where(Brush.brush_type == BrushType.SYSTEM)
+        ).scalars()
+        for seed_brush in seed_brushes:
+            if seed_brush['name'] in system_brush_names:
+                continue
+            brush = Brush(
+                name=seed_brush['name'],
+                spacing=seed_brush['spacing'],
+                scale=seed_brush['scale'],
+                opacity=seed_brush['opacity'],
+                rotation_mode=seed_brush['rotation_mode'],
+                brush_type=BrushType.SYSTEM,
+                imgurl=seed_brush['imgurl']
+            )
+            db.add(brush)
         db.commit()

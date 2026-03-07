@@ -18,7 +18,7 @@ import { notifications } from "@mantine/notifications";
 import api from "../../config/axios";
 import { useAuth } from "../../authentication/use-auth";
 import { EnvVars } from "../../config/env-vars";
-import { UserRole, type BrushGetDto } from "../../constants/types";
+import { BrushType, UserRole, type BrushGetDto } from "../../constants/types";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
@@ -34,7 +34,7 @@ export function BrushSidePanel() {
     setLoading(true);
 
     try {
-      const response = await api.get<BrushGetDto[]>("/brushes");
+      const response = await api.get<BrushGetDto[]>("/brushes/user-and-system");
 
       if (response.data.data) {
         setBrushes(response.data.data);
@@ -172,8 +172,9 @@ export function BrushSidePanel() {
           <ScrollArea h="100%" type="always" scrollbarSize={6} offsetScrollbars>
             <SimpleGrid cols={3} spacing={2}>
               {filtered.map((brush) => {
-                const isowner = brush.owner.id === user.id;
-                const canedit = !isguest && isowner;
+                const isowner = brush.owner?.id === user.id;
+                const canedit =
+                  !isguest && isowner && brush.brush_type !== BrushType.SYSTEM;
 
                 return (
                   <Paper
