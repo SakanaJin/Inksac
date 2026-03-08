@@ -136,6 +136,7 @@ def delete_brush(id: int, db: Session = Depends(get_db), user: User = Depends(ge
         raise HttpException(status_code=409, response=response)
     if brush.imgurl != DEFAULT_BRUSH:
         os.remove(MEDIA_DIR / brush.imgurl[1:])
+    user.brush_count -= 1
     db.delete(brush)
     db.commit()
     response.data = True
