@@ -17,6 +17,7 @@ import {
 } from "../constants/types";
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
+import { BrushSidePanel } from "../components/brushes/brush-side-panel";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 
@@ -125,11 +126,21 @@ export const RoomPage = () => {
   };
 
   return (
-    <Container size="100%" style={{ padding: "60px" }}>
-      <Group justify="center">
-        <Group h="80vh" w="80vw" ref={pixiContainer}></Group>
+    <Container size="100%" style={{ padding: "60px", overflow: "hidden" }}>
+      <Group align="flex-start" wrap="nowrap" style={{ overflow: "hidden" }}>
+        <BrushSidePanel />
+
+        <div
+          ref={pixiContainer}
+          style={{
+            flex: 1,
+            height: "80vh",
+            minWidth: 0,
+          }}
+        />
       </Group>
-      <Group justify="center">
+
+      <Group justify="center" mt="md">
         <Button variant="filled" onClick={handleUndo}>
           Undo
         </Button>
