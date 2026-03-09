@@ -22,13 +22,19 @@ import { UserRole, type BrushGetDto } from "../../constants/types";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
-export function BrushSidePanel() {
+interface BrushSidePanelProps {
+  onBrushSelect?: (brush: BrushGetDto) => void;
+}
+
+export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
   const { user } = useAuth();
   const isguest = user.role === UserRole.GUEST;
 
   const [brushes, setBrushes] = useState<BrushGetDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
+
+  const [selectedBrushId, setSelectedBrushId] = useState<number | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -58,6 +64,11 @@ export function BrushSidePanel() {
 
       return [brush, ...prev];
     });
+  };
+
+  const handleBrushClick = (brush: BrushGetDto) => {
+    setSelectedBrushId(brush.id);
+    onBrushSelect?.(brush);
   };
 
   const openCreateModal = () => {
@@ -180,9 +191,10 @@ export function BrushSidePanel() {
                     key={brush.id}
                     p={4}
                     radius={0}
+                    onClick={() => handleBrushClick(brush)}
                     style={{
-                      cursor: "default",
-                      background: "#323131",
+                      cursor: "pointer",
+                      background: selectedBrushId === brush.id ? "#4a4848" : "#323131",
                     }}
                   >
                     <Box
