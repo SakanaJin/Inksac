@@ -1,13 +1,14 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
 from Inksac_Data.Common.WSManager import WSManager, WSMHandler, WSMTypes, WSMessage, WSCodes
 from Inksac_Data.database import db_session
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Strokes import StrokeData, Stroke
-from Inksac_Data.Entities.Brushes import Brush
+from Inksac_Data.Entities.UsedBrushes import UsedBrushes
 from Inksac_Data.Controllers.AuthController import get_current_user
 
 router = APIRouter(prefix="/ws/rooms", tags=["RoomsWS"])
@@ -64,6 +65,15 @@ async def recieve_stroke(message: WSMessage, roomid: int, userid: int, **kwargs)
             created_at = datetime.now(),
             points = strokeData.points,
         )
+        try:
+            usedBrush = UsedBrushes(
+                room_id=roomid,
+                brush_id=strokeData.brushid
+            )
+            db.add(usedBrush)
+            db.flush()
+        except IntegrityError:
+            db.rollback()
         db.add(stroke)
         db.commit()
         newMessage = WSMessage(Mtype=message.Mtype, data=stroke.toGetDto(tempid=strokeData.tempid))
