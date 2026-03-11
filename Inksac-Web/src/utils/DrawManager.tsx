@@ -181,7 +181,7 @@ class DrawManager {
 
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
-      brushSprite.tint = `rgb(98, 25, 172)`;
+      brushSprite.tint = `rgb(27, 21, 32)`;
       brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
 
@@ -222,7 +222,7 @@ class DrawManager {
     const strokeData: StrokeData = {
       tempid: tempid,
       points: this.strokePoints,
-      color: "rgb(120, 120, 187)",
+      color: "rgb(143, 143, 172)",
       brushid: this.activeBrush?.id ?? 1,
     };
 
@@ -316,4 +316,6 @@ export default DrawManager;
   Point thinning is a MUST!!!!!
 
   fix right mouse click disrupting stroke and not pushing stroke to undo stack
+
+  probably a better way to load the brushtexture for a stroke in renderReceivedStroke, i'll do it later
 */
