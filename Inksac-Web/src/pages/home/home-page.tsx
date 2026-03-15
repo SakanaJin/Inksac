@@ -11,7 +11,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconRefresh } from "@tabler/icons-react";
 import { faDoorOpen } from "@fortawesome/free-solid-svg-icons";
 import { RoomsList } from "../../components/rooms/rooms-list";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { UserRole, type RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useUser } from "../../authentication/use-auth";
@@ -56,6 +56,10 @@ export const HomePage = () => {
       />
     );
   }
+
+  useEffect(() => {
+    invalidateAndRefresh();
+  }, []);
 
   return (
     <Container size="lg">

@@ -4,6 +4,7 @@ import {
   faRightToBracket,
   faPen,
   faTrash,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import type { RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
@@ -24,6 +25,7 @@ export const RoomCard = ({
 }: RoomCardProps) => {
   const navigate = useNavigate();
   const isUserRoom = room.owner.id === currentUserId;
+  const userCount = room.user_count;
 
   const handleJoinRoom = () => {
     if (onJoinRoom) {
@@ -77,9 +79,18 @@ export const RoomCard = ({
           )}
         </Group>
 
-        <Text size="sm" c="dimmed">
-          Expires: {new Date(room.expiration).toLocaleString()}
-        </Text>
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            Expires: {new Date(room.expiration).toLocaleString()}
+          </Text>
+          <Badge
+            color={userCount > 0 ? "green" : "gray"}
+            variant="light"
+            leftSection={<FontAwesomeIcon icon={faUsers} size="xs" />}
+          >
+            {userCount}
+          </Badge>
+        </Group>
 
         {/* Action buttons */}
         <Group gap="xs">

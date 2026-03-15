@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 
+from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.database import Base
 from Inksac_Data.Entities.Users import UserShallowDto
 
@@ -17,6 +18,7 @@ class RoomGetDto(BaseModel):
     name: str
     expiration: datetime
     owner: UserShallowDto
+    user_count: int
 
 class RoomShallowDto(BaseModel):
     id: int
@@ -41,7 +43,8 @@ class Room(Base):
             id=self.id,
             name=self.name,
             expiration=self.expiration,
-            owner=self.owner.toShallowDto()
+            owner=self.owner.toShallowDto(),
+            user_count=len(WSManager.rooms.get(self.id, {}))
         )
         return roomdto
     
