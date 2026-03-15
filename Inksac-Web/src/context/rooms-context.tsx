@@ -9,10 +9,11 @@ import {
 import api from "../config/axios";
 import { useUser } from "../authentication/use-auth";
 import { sortRooms } from "../utils/room-utils";
-import type { RoomGetDto } from "../constants/types";
+import type { RoomGetDto, RoomOccupancy } from "../constants/types";
 
 interface RoomContextValue {
   rooms: RoomGetDto[];
+  occupancies: Record<number, RoomOccupancy>;
   isFetching: boolean;
   hasFetched: boolean;
   refresh: () => Promise<void>;
@@ -26,15 +27,24 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const currentUserId = user.id;
 
   const [rooms, setRooms] = useState<RoomGetDto[]>([]);
+  const [occupancies, setOccupancies] = useState<Record<number, RoomOccupancy>>(
+    {},
+  );
   const [isFetching, setIsFetching] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
 
   const fetchRooms = useCallback(async () => {
     setIsFetching(true);
     try {
-      const response = await api.get<RoomGetDto[]>("/rooms");
-      if (!response.data.has_errors) {
-        setRooms(sortRooms(response.data.data, currentUserId));
+      const [roomsRes, occupancyRes] = await Promise.all([
+        api.get<RoomGetDto[]>("/rooms"),
+        api.get<Record<number, RoomOccupancy>>("/rooms/occupancy"),
+      ]);
+      if (!roomsRes.data.has_errors) {
+        setRooms(sortRooms(roomsRes.data.data, currentUserId));
+      }
+      if (!occupancyRes.data.has_errors) {
+        setOccupancies(occupancyRes.data.data);
       }
     } finally {
       setIsFetching(false);
@@ -57,6 +67,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     <RoomContext.Provider
       value={{
         rooms,
+        occupancies,
         isFetching,
         hasFetched,
         refresh: fetchRooms,

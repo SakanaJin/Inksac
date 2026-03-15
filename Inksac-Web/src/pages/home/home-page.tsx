@@ -11,7 +11,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconRefresh } from "@tabler/icons-react";
 import { faDoorOpen } from "@fortawesome/free-solid-svg-icons";
 import { RoomsList } from "../../components/rooms/rooms-list";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { UserRole, type RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useUser } from "../../authentication/use-auth";
@@ -22,8 +22,18 @@ export const HomePage = () => {
   const user = useUser();
   const navigate = useNavigate();
   const currentUserId = user.id;
-  const { rooms, isFetching, hasFetched, refresh, invalidateAndRefresh } =
-    useRooms();
+  const {
+    rooms,
+    occupancies,
+    isFetching,
+    hasFetched,
+    refresh,
+    invalidateAndRefresh,
+  } = useRooms();
+
+  useEffect(() => {
+    invalidateAndRefresh();
+  }, []);
 
   const ownsRoom = rooms.some((room) => room.owner.id === currentUserId);
   const canCreateRoom = user.role !== UserRole.GUEST && !ownsRoom && hasFetched;
@@ -51,6 +61,7 @@ export const HomePage = () => {
     roomList = (
       <RoomsList
         rooms={rooms}
+        occupancies={occupancies}
         currentUserId={currentUserId}
         onRoomAction={invalidateAndRefresh}
       />

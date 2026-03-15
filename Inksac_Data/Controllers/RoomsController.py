@@ -18,6 +18,17 @@ def get_all(db: Session = Depends(get_db)):
     response.data = [room.toGetDto() for room in rooms]
     return response
 
+@router.get("/occupancy")
+def get_occupancy(db: Session = Depends(get_db)):
+    response = Response()
+    result = {}
+    for room_id, connections in WSManager.rooms.items():
+        user_ids = list(connections.keys())
+        users = db.query(User).filter(User.id.in_(user_ids)).all()
+        result[room_id] = {"users": [u.toShallowDto() for u in users]}
+    response.data = result
+    return response
+
 @router.get("/{id}")
 def get_by_id(id: int, db: Session = Depends(get_db)):
     response = Response()

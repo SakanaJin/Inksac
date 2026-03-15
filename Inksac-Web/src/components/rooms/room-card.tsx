@@ -1,16 +1,26 @@
-import { Card, Group, Text, Badge, Button, Stack } from "@mantine/core";
+import {
+  Card,
+  Group,
+  Text,
+  Badge,
+  Button,
+  Stack,
+  Tooltip,
+} from "@mantine/core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faRightToBracket,
   faPen,
   faTrash,
 } from "@fortawesome/free-solid-svg-icons";
-import type { RoomGetDto } from "../../constants/types";
+import type { RoomGetDto, RoomOccupancy } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useNavigate } from "react-router-dom";
+import { IconUsers } from "@tabler/icons-react";
 
 interface RoomCardProps {
   room: RoomGetDto;
+  occupancy: RoomOccupancy;
   currentUserId: number;
   onRoomAction?: () => void;
   onJoinRoom?: (roomId: number) => void;
@@ -18,12 +28,26 @@ interface RoomCardProps {
 
 export const RoomCard = ({
   room,
+  occupancy,
   currentUserId,
   onRoomAction,
   onJoinRoom,
 }: RoomCardProps) => {
   const navigate = useNavigate();
   const isUserRoom = room.owner.id === currentUserId;
+  const userCount = occupancy.users.length;
+  const tooltipLabel =
+    userCount > 0 ? (
+      <Stack gap={2}>
+        {occupancy.users.map((u) => (
+          <Text key={u.id} size="xs">
+            {u.username}
+          </Text>
+        ))}
+      </Stack>
+    ) : (
+      "No users online"
+    );
 
   const handleJoinRoom = () => {
     if (onJoinRoom) {
@@ -58,9 +82,9 @@ export const RoomCard = ({
     <Card shadow="sm" p="sm" mb="sm" withBorder>
       <Stack gap="xs">
         <Group justify="space-between">
-          {/* Always strong */}
-          <Text fw={600}>{room.name}</Text>
-
+          <Text fw={600} size="lg">
+            {room.name}
+          </Text>
           {isUserRoom ? (
             <Badge color="blue" variant="outline">
               Your Room
@@ -77,9 +101,21 @@ export const RoomCard = ({
           )}
         </Group>
 
-        <Text size="sm" c="dimmed">
-          Expires: {new Date(room.expiration).toLocaleString()}
-        </Text>
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            Expires: {new Date(room.expiration).toLocaleString()}
+          </Text>
+          <Tooltip label={tooltipLabel} withArrow position="bottom">
+            <Badge
+              color={userCount > 0 ? "green" : "gray"}
+              variant="light"
+              leftSection={<IconUsers size={12} />}
+              style={{ cursor: "default" }}
+            >
+              {userCount}
+            </Badge>
+          </Tooltip>
+        </Group>
 
         {/* Action buttons */}
         <Group gap="xs">

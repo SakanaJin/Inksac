@@ -1,9 +1,10 @@
 import { SimpleGrid } from "@mantine/core";
 import { RoomCard } from "./room-card";
-import type { RoomGetDto } from "../../constants/types";
+import type { RoomGetDto, RoomOccupancy } from "../../constants/types";
 
 interface RoomsListProps {
   rooms: RoomGetDto[];
+  occupancies: Record<number, RoomOccupancy>;
   currentUserId: number;
   onRoomAction?: () => void;
   onJoinRoom?: (roomId: number) => void; // ready to implement joining room logic
@@ -11,6 +12,7 @@ interface RoomsListProps {
 
 export const RoomsList = ({
   rooms,
+  occupancies,
   currentUserId,
   onRoomAction,
   onJoinRoom,
@@ -21,6 +23,7 @@ export const RoomsList = ({
         <RoomCard
           key={room.id}
           room={room}
+          occupancy={occupancies[room.id] ?? { users: [] }}
           currentUserId={currentUserId}
           onRoomAction={onRoomAction}
           onJoinRoom={onJoinRoom}

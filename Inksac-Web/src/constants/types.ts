@@ -146,6 +146,10 @@ export interface RoomUpdateDto {
   name: string;
 }
 
+export interface RoomOccupancy {
+  users: UserShallowDto[];
+}
+
 // stroke types ---------------------------------------------------------------------------------
 
 export interface StrokeGetDto {
