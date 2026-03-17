@@ -5,7 +5,6 @@ from enum import Enum, IntEnum
 from sqlalchemy import select
 
 from Inksac_Data.database import db_session
-from Inksac_Data.Entities.Rooms import Room
 
 class WSMTypes(str, Enum):
     READY = "ready"
@@ -43,6 +42,7 @@ class ConnectionManager:
 
     async def connect(self, roomid: int, userid: int, websocket: WebSocket):
         await websocket.accept()
+        from Inksac_Data.Entities.Rooms import Room
         with db_session() as db:
             rooms = db.execute(
                 select(Room)

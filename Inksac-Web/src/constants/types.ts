@@ -130,6 +130,7 @@ export interface RoomGetDto {
   name: string;
   expiration: string;
   owner: UserShallowDto;
+  user_count: number;
 }
 
 export interface RoomShallowDto {
