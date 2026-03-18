@@ -13,6 +13,8 @@ import { Stroke, type stringornumber } from "./Stroke";
 import api from "../config/axios";
 import { EnvVars } from "../config/env-vars";
 
+const baseurl = EnvVars.mediaBaseUrl;
+
 class DrawManager {
   private app: pixi.Application;
   private undoStack: Stroke[];
@@ -28,7 +30,8 @@ class DrawManager {
   private isDrawing = false;
   private strokePoints: BrushCoord[] = [];
 
-  private brushShape: pixi.Texture | null = null;
+  private brushTexture: pixi.Texture | null = null;
+  private activeBrush: BrushGetDto | null = null;
 
   private ws: WSManager | null = null;
 
@@ -63,35 +66,14 @@ class DrawManager {
   }
 
   async init() {
-    try{
       const response = await api.get<BrushGetDto>("/brushes/1");
-      console.log(response.data.data);
-      this.defaultBrush = response.data.data;
-      this.brushTexture = await this.loadBrushTexture(this.defaultBrush.imgurl);
-      this.brush = {
-        scale: this.defaultBrush.scale,
-        opacity: this.defaultBrush.opacity,
-        spacing: this.defaultBrush.spacing,
-        rotation_mode: this.defaultBrush.rotation_mode,
-        tint: 0xffffff
-      };
-    } catch (err) {
-        console.error("DrawManager: failed to load default brush", err);
-    }
+      this.setActiveBrush(response.data.data);
   }
 
-  private async loadBrushTexture(imgurl: string): Promise<pixi.Texture | null> {
-    if (this.textureCache.has(imgurl)) {
-      return this.textureCache.get(imgurl)!;
-    }
-    try {
-      const texture = await pixi.Assets.load<pixi.Texture>(baseurl + imgurl);
-      this.textureCache.set(imgurl, texture);
-      return texture;
-    } catch(err) {
-      console.error(`DrawManager: failed to load brush texture at ${imgurl}`, err);
-      return null;
-    }
+  public async setActiveBrush(brush: BrushGetDto) {
+    // pixijs automatically caches textures by url
+    this.activeBrush = brush;
+    this.brushTexture = await pixi.Assets.load<pixi.Texture>(baseurl + this.activeBrush.imgurl);
   }
 
   // UNDO/REDO HANDLING
@@ -161,6 +143,8 @@ class DrawManager {
     this.app.stage.on("pointermove", (event) => this.onMouseMove(event));
     this.app.stage.on("pointerup", () => this.onMouseUp());
     this.app.stage.on("pointerleave", () => this.onMouseUp());
+    this.app.stage.on("rightdown", () => this.onMouseUp());
+
   }
 
   private onMouseDown(event: pixi.FederatedPointerEvent) {
@@ -177,7 +161,7 @@ class DrawManager {
     if (
       this.isDrawing == false ||
       this.currentStroke == null ||
-      this.brushShape == null
+      this.brushTexture == null
     )
       return;
 
@@ -195,10 +179,10 @@ class DrawManager {
 
       this.strokePoints.push({ x, y });
 
-      const brushSprite = new pixi.Sprite(this.brushShape);
+      const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
-      brushSprite.tint = `rgb(24, 20, 36)`;
-      brushSprite.scale.set(0.05);
+      brushSprite.tint = `rgb(27, 21, 32)`;
+      brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
 
       this.currentStroke.addChild(brushSprite);
@@ -238,8 +222,8 @@ class DrawManager {
     const strokeData: StrokeData = {
       tempid: tempid,
       points: this.strokePoints,
-      color: "rgb(13, 13, 14)",
-      brushid: this.defaultBrush?.id ?? 1,
+      color: "rgb(143, 143, 172)",
+      brushid: this.activeBrush?.id ?? 1,
     };
 
     const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
@@ -249,18 +233,18 @@ class DrawManager {
   // RECEIVING STROKE FUNCTIONS
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer, redo/undo kinda busted for multiple people rn
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
-    const brushTexture = await this.loadBrushTexture(strokeData.brush.imgurl);
-    if (!brushTexture) return;
+    const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(baseurl + strokeData.brush.imgurl);
+    if (!receivedBrushTexture) return;
 
     const receivedStroke = new pixi.Container();
-
     for (const point of strokeData.points) {
-      const brushSprite = new pixi.Sprite(this.brushShape);
+      const brushSprite = new pixi.Sprite(receivedBrushTexture);
 
       brushSprite.anchor.set(0.5);
       brushSprite.tint = strokeData.color;
-      brushSprite.scale.set(strokeData.brush.scale);
+      brushSprite.setSize(strokeData.brush.scale);
       brushSprite.position.set(point.x, point.y);
+      brushSprite.alpha = 1;
       receivedStroke.addChild(brushSprite);
     }
 
@@ -272,7 +256,7 @@ class DrawManager {
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
-
+    
     receivedStroke.destroy({ children: true });
 
     this.drawingContainer.addChild(combinedSpriteContainer);
@@ -329,5 +313,9 @@ export default DrawManager;
 
 /*
   I think the flatten oldest undo is causing the order of the strokes to mess up.
-  Point thinning is a MUST!!!!! 
+  Point thinning is a MUST!!!!!
+
+  fix right mouse click disrupting stroke and not pushing stroke to undo stack
+
+  probably a better way to load the brushtexture for a stroke in renderReceivedStroke, i'll do it later
 */

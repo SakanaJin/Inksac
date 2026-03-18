@@ -77,6 +77,11 @@ export enum RotationMode {
   FOLLOWSTROKE = "followstroke",
 }
 
+export enum BrushType {
+  USER = "user",
+  SYSTEM = "system",
+}
+
 export interface BrushGetDto {
   id: number;
   name: string;
@@ -85,6 +90,7 @@ export interface BrushGetDto {
   scale: number;
   opacity: number;
   rotation_mode: RotationMode;
+  brush_type: BrushType;
   owner: UserShallowDto;
   in_use: boolean;
 }
@@ -97,6 +103,7 @@ export interface BrushShallowDto {
   scale: number;
   opacity: number;
   rotation_mode: RotationMode;
+  brush_type: BrushType;
   in_use: boolean;
 }
 
@@ -123,6 +130,7 @@ export interface RoomGetDto {
   name: string;
   expiration: string;
   owner: UserShallowDto;
+  user_count: number;
 }
 
 export interface RoomShallowDto {
@@ -170,9 +178,9 @@ export interface BrushCoord {
 //   opacity: number;
 // }
 
-// export interface StrokeData {
-//   tempid: string;
-//   points: BrushCoord[];
-//   color: string;
-//   brushid: number;
-// }
+export interface StrokeData {
+  tempid: string;
+  points: BrushCoord[];
+  color: string;
+  brushid: number;
+}
