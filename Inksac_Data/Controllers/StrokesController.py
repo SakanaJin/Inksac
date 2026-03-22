@@ -28,6 +28,7 @@ def create(roomid: int, brushid: int, strokedto: StrokeCreateDto, db: Session = 
     stroke = Stroke(
         points=strokedto.points,
         color=strokedto.color,
+        opacity=strokedto.opacity,
         created_at=datetime.now(),
         creator_id=user.id,
         brush=brush,

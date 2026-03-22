@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime, Boolean, Float
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel
 from datetime import datetime
@@ -13,6 +13,7 @@ class StrokeGetDto(BaseModel):
     id: int
     tempid: Optional[str] = ""
     color: str
+    opacity: float
     created_at: datetime
     points: List[Point]
     creator_id: int
@@ -21,12 +22,14 @@ class StrokeGetDto(BaseModel):
 
 class StrokeCreateDto(BaseModel):
     color: str
+    opacity: float
     points: List[Point]
 
 class StrokeData(BaseModel):
     tempid: str
     points: List[Point]
     color: str
+    opacity: float
     brushid: int
 
 class Stroke(Base):
@@ -34,6 +37,7 @@ class Stroke(Base):
     id = Column(Integer, primary_key=True)
     points = Column(JSON, nullable=False)
     color = Column(String(25), nullable=False)
+    opacity = Column(Float, nullable=False, default=1.00)
     created_at = Column(DateTime(timezone=True), default=datetime.now(), nullable=False)
     deleted = Column(Boolean, default=False)
 
@@ -50,6 +54,7 @@ class Stroke(Base):
             id=self.id,
             tempid=tempid,
             color=self.color,
+            opacity=self.opacity,
             created_at=self.created_at,
             points=self.points,
             creator_id=self.creator_id,

@@ -6,7 +6,7 @@ import {
   type WSMessage,
   type StrokeData,
   type StrokeGetDto,
-  type BrushGetDto
+  type BrushGetDto,
 } from "../constants/types";
 import type { WSManager } from "../config/websocket-manager";
 import { Stroke, type stringornumber } from "./Stroke";
@@ -66,14 +66,16 @@ class DrawManager {
   }
 
   async init() {
-      const response = await api.get<BrushGetDto>("/brushes/1");
-      this.setActiveBrush(response.data.data);
+    const response = await api.get<BrushGetDto>("/brushes/1");
+    this.setActiveBrush(response.data.data);
   }
 
   public async setActiveBrush(brush: BrushGetDto) {
     // pixijs automatically caches textures by url
     this.activeBrush = brush;
-    this.brushTexture = await pixi.Assets.load<pixi.Texture>(baseurl + this.activeBrush.imgurl);
+    this.brushTexture = await pixi.Assets.load<pixi.Texture>(
+      baseurl + this.activeBrush.imgurl,
+    );
   }
 
   // UNDO/REDO HANDLING
@@ -144,7 +146,6 @@ class DrawManager {
     this.app.stage.on("pointerup", () => this.onMouseUp());
     this.app.stage.on("pointerleave", () => this.onMouseUp());
     this.app.stage.on("rightdown", () => this.onMouseUp());
-
   }
 
   private onMouseDown(event: pixi.FederatedPointerEvent) {
@@ -181,7 +182,8 @@ class DrawManager {
 
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
-      brushSprite.tint = `rgb(27, 21, 32)`;
+      brushSprite.tint = `rgb(27, 21, 32)`; //change this to selected color
+      brushSprite.alpha = 0.01; //change this to selected opacity
       brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
 
@@ -222,7 +224,8 @@ class DrawManager {
     const strokeData: StrokeData = {
       tempid: tempid,
       points: this.strokePoints,
-      color: "rgb(143, 143, 172)",
+      color: "rgb(143, 143, 172)", //change this to selected color
+      opacity: 0.01, //change this to selected opacity
       brushid: this.activeBrush?.id ?? 1,
     };
 
@@ -233,7 +236,9 @@ class DrawManager {
   // RECEIVING STROKE FUNCTIONS
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer, redo/undo kinda busted for multiple people rn
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
-    const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(baseurl + strokeData.brush.imgurl);
+    const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(
+      baseurl + strokeData.brush.imgurl,
+    );
     if (!receivedBrushTexture) return;
 
     const receivedStroke = new pixi.Container();
@@ -244,7 +249,7 @@ class DrawManager {
       brushSprite.tint = strokeData.color;
       brushSprite.setSize(strokeData.brush.scale);
       brushSprite.position.set(point.x, point.y);
-      brushSprite.alpha = 1;
+      brushSprite.alpha = strokeData.opacity;
       receivedStroke.addChild(brushSprite);
     }
 
@@ -256,7 +261,7 @@ class DrawManager {
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
-    
+
     receivedStroke.destroy({ children: true });
 
     this.drawingContainer.addChild(combinedSpriteContainer);
@@ -318,4 +323,7 @@ export default DrawManager;
   fix right mouse click disrupting stroke and not pushing stroke to undo stack
 
   probably a better way to load the brushtexture for a stroke in renderReceivedStroke, i'll do it later
+
+  the lines that say "change to selected color / opacity" that's going to eventually be the color / opacity from the color picker.
+  there's also an issue right now where since it's layering so many sprites over top each other the opacity is only noticeable at really low values.
 */
