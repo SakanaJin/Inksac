@@ -10,6 +10,9 @@ import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
 import type { BrushGetDto, RoomGetDto } from "../../constants/types";
 import api from "../../config/axios";
+import { ColorSelector } from "../room-tools/color-selector";
+import { DivideBlend } from "pixi.js";
+import { Divider } from "@mantine/core";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -51,7 +54,13 @@ export function RoomLayout() {
         hideUserInfo
         overlayNavbar
         sidebarSlots={{
-          main: <BrushSidePanel onBrushSelect={onBrushSelect ?? undefined} />,
+          main: (
+            <>
+              <ColorSelector />
+              <Divider />
+              <BrushSidePanel onBrushSelect={onBrushSelect ?? undefined} />
+            </>
+          )
           // add more sidebar content here later, e.g:
           // bottom: <RoomParticipants />
         }}
