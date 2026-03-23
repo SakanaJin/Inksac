@@ -11,9 +11,26 @@ import type { FileWithPath } from "@mantine/dropzone";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
-export function AppSidebar() {
+export type SidebarSlots = {
+  /** Fills the main vertical space — replaces default nav buttons */
+  main?: React.ReactNode;
+  /** Optional content pinned above the bottom action area */
+  bottom?: React.ReactNode;
+};
+
+type AppSidebarProps = {
+  slots?: SidebarSlots;
+  hideActions?: boolean;
+  hideUserInfo?: boolean;
+};
+
+export function AppSidebar({
+  slots,
+  hideActions = false,
+  hideUserInfo = false,
+}: AppSidebarProps) {
   const { logout, user, updatePfp, defaultPfp } = useAuth();
-  const isguest = user.role === UserRole.GUEST;
+  const isGuest = user.role === UserRole.GUEST;
 
   const openLogoutModal = () =>
     modals.openConfirmModal({
@@ -23,39 +40,59 @@ export function AppSidebar() {
       confirmProps: { color: "red" },
       onConfirm: logout,
     });
+
   return (
-    <Stack p="md">
-      <AvatarOverlay
-        size="4rem"
-        src={baseurl + user.pfp_path}
-        overlay={!isguest}
-        onClick={() => {
-          !isguest
-            ? openImageUploadModal({
-                onUpload: (file: FileWithPath) => {
-                  return updatePfp(file);
-                },
-                onDefault: () => {
-                  return defaultPfp();
-                },
-              })
-            : {};
-        }}
-      >
-        <FontAwesomeIcon icon={faCamera} />
-      </AvatarOverlay>
-      <Text fw={500}>{user.username}</Text>
+    <Stack
+      p="md"
+      gap="sm"
+      style={{ overflow: "hidden", height: slots?.main ? "100%" : "auto" }}
+    >
+      {!hideUserInfo && (
+        <>
+          <AvatarOverlay
+            size="4rem"
+            src={baseurl + user.pfp_path}
+            overlay={!isGuest}
+            onClick={() => {
+              if (!isGuest) {
+                openImageUploadModal({
+                  onUpload: (file: FileWithPath) => updatePfp(file),
+                  onDefault: () => defaultPfp(),
+                });
+              }
+            }}
+          >
+            <FontAwesomeIcon icon={faCamera} />
+          </AvatarOverlay>
+          <Text fw={500}>{user.username}</Text>
+          <Divider />
+        </>
+      )}
 
-      <Divider my="sm" />
+      {slots?.main ? (
+        <Stack style={{ minHeight: 0, overflow: "hidden" }}>{slots.main}</Stack>
+      ) : (
+        <Stack style={{ flex: 1 }}>
+          <Button variant="subtle">Account Settings</Button>
+          <Button variant="subtle">Preferences</Button>
+        </Stack>
+      )}
 
-      <Button variant="subtle">Account Settings</Button>
-      <Button variant="subtle">Preferences</Button>
+      {slots?.bottom && (
+        <>
+          <Divider />
+          <Stack gap="xs">{slots.bottom}</Stack>
+        </>
+      )}
 
-      <Divider my="sm" />
-
-      <Button color="red" variant="light" onClick={openLogoutModal}>
-        Logout
-      </Button>
+      {!hideActions && (
+        <>
+          <Divider />
+          <Button color="red" variant="light" onClick={openLogoutModal}>
+            Logout
+          </Button>
+        </>
+      )}
     </Stack>
   );
 }
