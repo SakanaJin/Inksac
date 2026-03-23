@@ -4,6 +4,7 @@ import { NotFoundPage } from "../pages/not-found";
 import { RoomPage } from "../pages/room-page";
 import { routes } from "./RouteIndex";
 import { AppLayout } from "../components/layout/app-layout";
+import { RoomLayout } from "../components/layout/room-layout";
 import { RoomProvider } from "../context/rooms-context";
 
 export const RouteConfig = () => (
@@ -18,7 +19,9 @@ export const RouteConfig = () => (
       <Route path={routes.home} element={<HomePage />} />
       <Route path={routes.root} element={<Navigate to={routes.home} />} />
     </Route>
-    <Route path={routes.room} element={<RoomPage />} />
+    <Route element={<RoomLayout />}>
+      <Route path={routes.room} element={<RoomPage />} />
+    </Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes>
 );
