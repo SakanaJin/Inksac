@@ -65,7 +65,6 @@ export const BrushEditorModal = ({
       name: brush?.name ?? "",
       spacing: brush?.spacing ?? 1,
       scale: brush?.scale ?? 16,
-      opacity: brush?.opacity ?? 1,
       rotation_mode: brush?.rotation_mode ?? RotationMode.NONE,
     },
     validate: {
@@ -89,7 +88,6 @@ export const BrushEditorModal = ({
           name: values.name,
           spacing: values.spacing,
           scale: values.scale,
-          opacity: values.opacity,
           rotation_mode: values.rotation_mode,
         };
 
@@ -99,7 +97,6 @@ export const BrushEditorModal = ({
           name: values.name,
           spacing: values.spacing,
           scale: values.scale,
-          opacity: values.opacity,
           rotation_mode: values.rotation_mode,
         };
 
@@ -235,34 +232,6 @@ export const BrushEditorModal = ({
                     step={1}
                     key={form.key("scale")}
                     {...form.getInputProps("scale")}
-                  />
-                </Group>
-              </SettingBlock>
-
-              <SettingBlock label="Opacity">
-                <Group wrap="nowrap" align="center">
-                  <Slider
-                    style={{ flex: 1 }}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={form.values.opacity}
-                    onChange={(value) => form.setFieldValue("opacity", value)}
-                  />
-
-                  <NumberInput
-                    radius={0}
-                    w={90}
-                    min={0}
-                    max={100}
-                    step={1}
-                    suffix="%"
-                    value={Math.round(form.values.opacity * 100)}
-                    onChange={(v) => {
-                      if (typeof v === "number") {
-                        form.setFieldValue("opacity", v / 100);
-                      }
-                    }}
                   />
                 </Group>
               </SettingBlock>

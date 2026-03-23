@@ -14,14 +14,12 @@ class BrushCreateDto(BaseModel):
     name: str
     spacing: float
     scale: float
-    opacity: float
     rotation_mode: RotationMode
 
 class BrushUpdateDto(BaseModel):
     name: str
     spacing: float
     scale: float
-    opacity: float
     rotation_mode: RotationMode
 
 class BrushGetDto(BaseModel):
@@ -30,7 +28,6 @@ class BrushGetDto(BaseModel):
     imgurl: str
     spacing: float
     scale: float
-    opacity: float
     rotation_mode: RotationMode
     brush_type: BrushType
     owner: Optional[UserShallowDto]
@@ -42,7 +39,6 @@ class BrushShallowDto(BaseModel):
     imgurl: str
     spacing: float
     scale: float
-    opacity: float
     rotation_mode: RotationMode
     brush_type: BrushType
     in_use: bool
@@ -54,7 +50,6 @@ class Brush(Base):
     imgurl = Column(String(255), nullable=False, default=DEFAULT_BRUSH)
     spacing = Column(Float, nullable=False) # this might not be necessary
     scale = Column(Float, nullable=False)
-    opacity = Column(Float, nullable=False)
     rotation_mode = Column(Enum(RotationMode), nullable=False, default=RotationMode.FOLLOWSTROKE)
     brush_type = Column(Enum(BrushType), nullable=False, default=BrushType.USER)
 
@@ -73,7 +68,6 @@ class Brush(Base):
             imgurl=self.imgurl,
             spacing=self.spacing,
             scale=self.scale,
-            opacity=self.opacity,
             rotation_mode=self.rotation_mode,
             brush_type=self.brush_type,
             owner=owner,
@@ -88,7 +82,6 @@ class Brush(Base):
             imgurl=self.imgurl,
             spacing=self.spacing,
             scale=self.scale,
-            opacity=self.opacity,
             rotation_mode=self.rotation_mode,
             brush_type=self.brush_type,
             in_use=bool(self.rooms)
