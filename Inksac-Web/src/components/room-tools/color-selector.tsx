@@ -1,6 +1,8 @@
 import { ColorPicker } from '@mantine/core';
+import { useRoomLayout } from '../layout/room-layout';
 
 export function ColorSelector() {
+    const { color, setColor } = useRoomLayout();
     return (
         <>
         <style>{`
@@ -11,6 +13,8 @@ export function ColorSelector() {
             <ColorPicker 
                 fullWidth 
                 format='hexa'
+                value={color}
+                onChange={setColor}
                 classNames={{
                     sliders: 'sliders',
                 }}
@@ -21,5 +25,5 @@ export function ColorSelector() {
                 }}
             />
         </>
-    )
+    );
 }

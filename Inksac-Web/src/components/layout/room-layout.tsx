@@ -16,10 +16,14 @@ import { Divider } from "@mantine/core";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
+  color: string;
+  setColor: (color: string) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerBrushSelect: () => {},
+  color: '#ffffffff',
+  setColor: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -27,6 +31,7 @@ export const useRoomLayout = () => useContext(RoomLayoutContext);
 export function RoomLayout() {
   const { id } = useParams();
   const [roomName, setRoomName] = useState(`Room ${id}`);
+  const [color, setColor] = useState('#ffffffff');
 
   useEffect(() => {
     api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
@@ -46,7 +51,7 @@ export function RoomLayout() {
   );
 
   return (
-    <RoomLayoutContext.Provider value={{ registerBrushSelect }}>
+    <RoomLayoutContext.Provider value={{ registerBrushSelect, color, setColor }}>
       <AppLayout
         headerTitle={roomName}
         sidebarWidth={340}
