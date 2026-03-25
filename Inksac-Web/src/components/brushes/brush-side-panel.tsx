@@ -45,6 +45,12 @@ export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
       if (response.data.data) {
         setBrushes(response.data.data);
       }
+      
+      if (selectedBrushId === null) {
+        const defaultBrush = response.data.data[0];
+        setSelectedBrushId(defaultBrush.id);
+        onBrushSelect?.(defaultBrush);
+      }
     } finally {
       setLoading(false);
     }

@@ -82,10 +82,8 @@ class DrawManager {
 
   public setColor(color: string) {
     this.activeColor = color;
-  }
-
-  public setOpacity(opacity: number) {
-    this.activeOpacity = opacity;
+    const alpha = color.slice(-2);
+    this.activeOpacity = parseInt(alpha, 16) / 255;
   }
 
   // UNDO/REDO HANDLING

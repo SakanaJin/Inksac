@@ -31,11 +31,6 @@ export const RoomPage = () => {
   const { registerBrushSelect, color } = useRoomLayout();
   const colorRef = useRef(color);
 
-  const hexToOpacity = (hexa: string) => {
-  const alpha = hexa.slice(-2); 
-  return parseInt(alpha, 16) / 255; 
-};
-
   useEffect(() => {
     registerBrushSelect((brush) => {
       drawerRef.current?.setActiveBrush(brush);
@@ -43,8 +38,7 @@ export const RoomPage = () => {
   }, [registerBrushSelect]);
 
   useEffect(() => {
-    drawerRef.current?.setColor(color.slice(0,7));
-    drawerRef.current?.setOpacity(hexToOpacity(color));
+    drawerRef.current?.setColor(color);
   }, [color]);
 
   const messageHandlers: MessageHandlers = {
@@ -122,8 +116,7 @@ export const RoomPage = () => {
       drawerRef.current = new DrawManager(app, wsRef.current);
       await drawerRef.current.init();
 
-      drawerRef.current.setColor(colorRef.current.slice(0, 7));
-      drawerRef.current.setOpacity(hexToOpacity(colorRef.current));
+      drawerRef.current.setColor(colorRef.current);
 
       const message: WSMessage = { Mtype: WSType.READY, data: true };
       wsRef.current.send(message);
