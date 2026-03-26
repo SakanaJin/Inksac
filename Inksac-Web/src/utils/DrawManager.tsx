@@ -32,6 +32,8 @@ class DrawManager {
 
   private brushTexture: pixi.Texture | null = null;
   private activeBrush: BrushGetDto | null = null;
+  private activeColor: string = '#ffffffff';
+  private activeOpacity: number = 1;
 
   private ws: WSManager | null = null;
 
@@ -76,6 +78,12 @@ class DrawManager {
     this.brushTexture = await pixi.Assets.load<pixi.Texture>(
       baseurl + this.activeBrush.imgurl,
     );
+  }
+
+  public setColor(color: string) {
+    this.activeColor = color;
+    const alpha = color.slice(-2);
+    this.activeOpacity = parseInt(alpha, 16) / 255;
   }
 
   // UNDO/REDO HANDLING
@@ -182,8 +190,8 @@ class DrawManager {
 
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
-      brushSprite.tint = `rgb(27, 21, 32)`; //change this to selected color
-      brushSprite.alpha = 0.01; //change this to selected opacity
+      brushSprite.tint = this.activeColor;
+      brushSprite.alpha = this.activeOpacity;
       brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
 
@@ -224,8 +232,8 @@ class DrawManager {
     const strokeData: StrokeData = {
       tempid: tempid,
       points: this.strokePoints,
-      color: "rgb(143, 143, 172)", //change this to selected color
-      opacity: 0.01, //change this to selected opacity
+      color: this.activeColor,
+      opacity: this.activeOpacity,
       brushid: this.activeBrush?.id ?? 1,
     };
 

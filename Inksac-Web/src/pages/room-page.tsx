@@ -28,13 +28,18 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
-  const { registerBrushSelect } = useRoomLayout();
+  const { registerBrushSelect, color } = useRoomLayout();
+  const colorRef = useRef(color);
 
   useEffect(() => {
     registerBrushSelect((brush) => {
       drawerRef.current?.setActiveBrush(brush);
     });
   }, [registerBrushSelect]);
+
+  useEffect(() => {
+    drawerRef.current?.setColor(color);
+  }, [color]);
 
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: async (message) => {
@@ -110,6 +115,8 @@ export const RoomPage = () => {
 
       drawerRef.current = new DrawManager(app, wsRef.current);
       await drawerRef.current.init();
+
+      drawerRef.current.setColor(colorRef.current);
 
       const message: WSMessage = { Mtype: WSType.READY, data: true };
       wsRef.current.send(message);
