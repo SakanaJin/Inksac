@@ -32,13 +32,14 @@ class DrawManager {
 
   private brushTexture: pixi.Texture | null = null;
   private activeBrush: BrushGetDto | null = null;
-  private activeColor: string = '#ffffffff';
+  private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
 
   private ws: WSManager | null = null;
 
   private strokesMap: Map<stringornumber, Stroke>;
   private tempStrokes: Map<string, Stroke>;
+  private onStroke: ((brushId: number) => void) | null = null;
 
   constructor(
     pixiApp: pixi.Application,
@@ -84,6 +85,10 @@ class DrawManager {
     this.activeColor = color;
     const alpha = color.slice(-2);
     this.activeOpacity = parseInt(alpha, 16) / 255;
+  }
+
+  public setOnStroke(fn: (brushId: number) => void) {
+    this.onStroke = fn;
   }
 
   // UNDO/REDO HANDLING
@@ -238,6 +243,7 @@ class DrawManager {
     };
 
     const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
+    this.onStroke?.(this.activeBrush?.id ?? 1);
     this.ws.send(message);
   }
 
