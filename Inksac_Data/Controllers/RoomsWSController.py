@@ -62,6 +62,7 @@ async def recieve_stroke(message: WSMessage, roomid: int, userid: int, **kwargs)
             brush_id = strokeData.brushid,
             room_id = roomid,
             color = strokeData.color,
+            opacity = strokeData.opacity,
             created_at = datetime.now(),
             points = strokeData.points,
         )

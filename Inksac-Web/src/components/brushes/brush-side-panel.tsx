@@ -45,6 +45,12 @@ export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
       if (response.data.data) {
         setBrushes(response.data.data);
       }
+      
+      if (selectedBrushId === null) {
+        const defaultBrush = response.data.data[0];
+        setSelectedBrushId(defaultBrush.id);
+        onBrushSelect?.(defaultBrush);
+      }
     } finally {
       setLoading(false);
     }
@@ -144,147 +150,130 @@ export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
   }, [brushes, query]);
 
   return (
-    <Paper
-      withBorder
-      p={6}
-      radius={0}
-      h="80vh"
-      w="340px"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        flexShrink: 0,
-      }}
-    >
-      <Stack gap={6} style={{ height: "100%" }}>
-        <Group justify="space-between" align="center" gap={4}>
-          <Text fw={600}>Brushes</Text>
+    <Stack gap={6} style={{ height: "100%" }}>
+      <Group justify="space-between" align="center" gap={4}>
+        <Text fw={600}>Brushes</Text>
 
-          <Button
-            size="xs"
-            variant="light"
-            onClick={refresh}
-            loading={loading}
-            radius={0}
-          >
-            Refresh
-          </Button>
-        </Group>
-
-        <TextInput
-          placeholder="Search"
-          value={query}
-          onChange={(e) => setQuery(e.currentTarget.value)}
-          radius={0}
+        <Button
           size="xs"
-        />
+          variant="light"
+          onClick={refresh}
+          loading={loading}
+          radius={0}
+        >
+          Refresh
+        </Button>
+      </Group>
 
-        <Box style={{ flex: 1, minHeight: 0 }}>
-          <ScrollArea h="100%" type="always" scrollbarSize={6} offsetScrollbars>
-            <SimpleGrid cols={3} spacing={2}>
-              {filtered.map((brush) => {
-                const isowner = brush.owner?.id === user.id;
-                const canedit =
-                  !isguest && isowner && brush.brush_type !== BrushType.SYSTEM;
+      <TextInput
+        placeholder="Search"
+        value={query}
+        onChange={(e) => setQuery(e.currentTarget.value)}
+        radius={0}
+        size="xs"
+      />
 
-                return (
-                  <Paper
-                    key={brush.id}
-                    p={4}
-                    radius={0}
-                    onClick={() => handleBrushClick(brush)}
+      <Box style={{ flex: 1, minHeight: 0 }}>
+        <ScrollArea h="100%" type="always" scrollbarSize={6} offsetScrollbars>
+          <SimpleGrid cols={3} spacing={2}>
+            {filtered.map((brush) => {
+              const isowner = brush.owner?.id === user.id;
+              const canedit =
+                !isguest && isowner && brush.brush_type !== BrushType.SYSTEM;
+
+              return (
+                <Paper
+                  key={brush.id}
+                  p={4}
+                  radius={0}
+                  onClick={() => handleBrushClick(brush)}
+                  style={{
+                    cursor: "pointer",
+                    background:
+                      selectedBrushId === brush.id ? "#4a4848" : "#323131",
+                  }}
+                >
+                  <Box
                     style={{
-                      cursor: "pointer",
-                      background: selectedBrushId === brush.id ? "#4a4848" : "#323131",
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      overflow: "hidden",
+                      background: "rgba(0,0,0,0.06)",
                     }}
                   >
-                    <Box
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        overflow: "hidden",
-                        background: "rgba(0,0,0,0.06)",
-                      }}
-                    >
-                      <Image
-                        src={baseurl + brush.imgurl}
-                        alt={brush.name}
-                        fit="contain"
-                        radius={0}
-                        style={{ width: "100%", height: "100%" }}
-                      />
-                    </Box>
+                    <Image
+                      src={baseurl + brush.imgurl}
+                      alt={brush.name}
+                      fit="contain"
+                      radius={0}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  </Box>
 
-                    <Group justify="space-between" mt={4} gap={4} wrap="nowrap">
-                      <Text
-                        size="xs"
-                        fw={600}
-                        lineClamp={1}
-                        style={{ flex: 1 }}
-                      >
-                        {brush.name}
-                      </Text>
+                  <Group justify="space-between" mt={4} gap={4} wrap="nowrap">
+                    <Text size="xs" fw={600} lineClamp={1} style={{ flex: 1 }}>
+                      {brush.name}
+                    </Text>
 
-                      {canedit && !brush.in_use ? (
-                        <Menu withinPortal position="bottom-end" shadow="sm">
-                          <Menu.Target>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              radius={0}
-                              disabled={isguest}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              ⋮
-                            </ActionIcon>
-                          </Menu.Target>
+                    {canedit && !brush.in_use ? (
+                      <Menu withinPortal position="bottom-end" shadow="sm">
+                        <Menu.Target>
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            radius={0}
+                            disabled={isguest}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            ⋮
+                          </ActionIcon>
+                        </Menu.Target>
 
-                          <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-                            <Menu.Item onClick={() => openEditModal(brush)}>
-                              Edit
-                            </Menu.Item>
-                            <Menu.Item
-                              color="red"
-                              onClick={() => openDeleteModal(brush)}
-                            >
-                              Delete
-                            </Menu.Item>
-                          </Menu.Dropdown>
-                        </Menu>
-                      ) : null}
-                    </Group>
-                  </Paper>
-                );
-              })}
-            </SimpleGrid>
+                        <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                          <Menu.Item onClick={() => openEditModal(brush)}>
+                            Edit
+                          </Menu.Item>
+                          <Menu.Item
+                            color="red"
+                            onClick={() => openDeleteModal(brush)}
+                          >
+                            Delete
+                          </Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    ) : null}
+                  </Group>
+                </Paper>
+              );
+            })}
+          </SimpleGrid>
 
-            {!loading && filtered.length === 0 ? (
-              <Text size="xs" c="dimmed" ta="center" mt="sm">
-                No brushes found
-              </Text>
-            ) : null}
-          </ScrollArea>
-        </Box>
+          {!loading && filtered.length === 0 ? (
+            <Text size="xs" c="dimmed" ta="center" mt="sm">
+              No brushes found
+            </Text>
+          ) : null}
+        </ScrollArea>
+      </Box>
 
-        <Group
-          justify="flex-end"
-          gap={4}
-          style={{
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            paddingTop: 6,
-          }}
+      <Group
+        justify="flex-end"
+        gap={4}
+        style={{
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          paddingTop: 6,
+        }}
+      >
+        <ActionIcon
+          size="md"
+          variant="filled"
+          radius={0}
+          onClick={openCreateModal}
+          disabled={isguest}
         >
-          <ActionIcon
-            size="md"
-            variant="filled"
-            radius={0}
-            onClick={openCreateModal}
-            disabled={isguest}
-          >
-            +
-          </ActionIcon>
-        </Group>
-      </Stack>
-    </Paper>
+          +
+        </ActionIcon>
+      </Group>
+    </Stack>
   );
 }

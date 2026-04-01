@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { Button, Group, Container, Center } from "@mantine/core";
+import { Button, Group, Container } from "@mantine/core";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
 import { useNavigate, useParams } from "react-router-dom";
@@ -17,7 +17,7 @@ import {
 } from "../constants/types";
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
-import { BrushSidePanel } from "../components/brushes/brush-side-panel";
+import { useRoomLayout } from "../components/layout/room-layout";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 
@@ -28,6 +28,18 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
+  const { registerBrushSelect, color } = useRoomLayout();
+  const colorRef = useRef(color);
+
+  useEffect(() => {
+    registerBrushSelect((brush) => {
+      drawerRef.current?.setActiveBrush(brush);
+    });
+  }, [registerBrushSelect]);
+
+  useEffect(() => {
+    drawerRef.current?.setColor(color);
+  }, [color]);
 
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: async (message) => {
@@ -104,6 +116,8 @@ export const RoomPage = () => {
       drawerRef.current = new DrawManager(app, wsRef.current);
       await drawerRef.current.init();
 
+      drawerRef.current.setColor(colorRef.current);
+
       const message: WSMessage = { Mtype: WSType.READY, data: true };
       wsRef.current.send(message);
     };
@@ -128,10 +142,6 @@ export const RoomPage = () => {
   return (
     <Container size="100%" style={{ padding: "60px", overflow: "hidden" }}>
       <Group align="flex-start" wrap="nowrap" style={{ overflow: "hidden" }}>
-        <BrushSidePanel 
-          onBrushSelect={(brush) => drawerRef.current?.setActiveBrush(brush)}
-        />
-
         <div
           ref={pixiContainer}
           style={{
@@ -142,14 +152,14 @@ export const RoomPage = () => {
         />
       </Group>
 
-        <Group justify="center" mt="md">
-          <Button variant="filled" onClick={handleUndo}>
-            Undo
-          </Button>
-          <Button variant="filled" onClick={handleRedo}>
-            Redo
-          </Button>
-        </Group>
+      <Group justify="center" mt="md">
+        <Button variant="filled" onClick={handleUndo}>
+          Undo
+        </Button>
+        <Button variant="filled" onClick={handleRedo}>
+          Redo
+        </Button>
+      </Group>
     </Container>
   );
 };
