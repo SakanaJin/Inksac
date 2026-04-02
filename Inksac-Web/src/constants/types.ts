@@ -124,6 +124,8 @@ export interface BrushUpdateDto {
 export interface RoomGetDto {
   id: number;
   name: string;
+  width: number;
+  height: number;
   expiration: string;
   owner: UserShallowDto;
   user_count: number;
@@ -137,6 +139,8 @@ export interface RoomShallowDto {
 
 export interface RoomCreateDto {
   name: string;
+  width: number;
+  height: number;
 }
 
 export interface RoomUpdateDto {

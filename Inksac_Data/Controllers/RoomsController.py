@@ -38,11 +38,19 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
         raise HttpException(status_code=400, response=response)
+    if roomdto.width <= 0:
+        response.add_error("width", "width must be greater than 0")
+        raise HttpException(status_code=400, response=response)
+    if roomdto.height <= 0:
+        response.add_error("height", "height must be greater than 0")
+        raise HttpException(status_code=400, response=response)
     if bool(user.room):
         response.add_error("room", "user already has an open room")
         raise HttpException(status_code=409, response=response)
     room = Room(
         name=roomdto.name,
+        width=roomdto.width,
+        height=roomdto.height,
         expiration=round_nearest_hour(datetime.now() + timedelta(days=1)),
         owner=user
     )

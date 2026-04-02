@@ -1,4 +1,4 @@
-import { TextInput, Button, Flex } from "@mantine/core";
+import { TextInput, Button, Flex, NumberInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import type { ContextModalProps } from "@mantine/modals";
 import api from "../../config/axios";
@@ -17,10 +17,16 @@ export const RoomCreateModal = ({
   const form = useForm({
     initialValues: {
       name: "",
+      width: 2000,
+      height: 2000,
     },
     validate: {
       name: (value) =>
         value.trim().length === 0 ? "Room name cannot be empty" : null,
+      width: (value) =>
+        !value || value <= 0 ? "Width must be greater than 0" : null,
+      height: (value) =>
+        !value || value <= 0 ? "Height must be greater than 0" : null,
     },
   });
 
@@ -59,6 +65,26 @@ export const RoomCreateModal = ({
         label="Room Name"
         placeholder="Enter room name"
         {...form.getInputProps("name")}
+      />
+
+      <NumberInput
+        key={form.key("width")}
+        label="Canvas Width"
+        min={1}
+        allowDecimal={false}
+        clampBehavior="strict"
+        mt="sm"
+        {...form.getInputProps("width")}
+      />
+
+      <NumberInput
+        key={form.key("height")}
+        label="Canvas Height"
+        min={1}
+        allowDecimal={false}
+        clampBehavior="strict"
+        mt="sm"
+        {...form.getInputProps("height")}
       />
 
       <Flex justify="space-between" pt="sm">

@@ -7,6 +7,12 @@ import {
   useRef,
 } from "react";
 import { useParams } from "react-router-dom";
+import { ActionIcon, Divider, Group, Paper, Tooltip } from "@mantine/core";
+import {
+  IconArrowBackUp,
+  IconArrowForwardUp,
+  IconZoomReset,
+} from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
 import type { BrushGetDto, RoomGetDto } from "../../constants/types";
@@ -17,6 +23,10 @@ import { Divider } from "@mantine/core";
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
   setBrushInUse: (brushId: number) => void;
+  registerUndo: (fn: () => void) => void;
+  registerRedo: (fn: () => void) => void;
+  registerResetView: (fn: () => void) => void;
+  setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
   color: string;
   setColor: (color: string) => void;
 };
@@ -24,6 +34,10 @@ type RoomLayoutContextValue = {
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerBrushSelect: () => {},
   setBrushInUse: () => {},
+  registerUndo: () => {},
+  registerRedo: () => {},
+  registerResetView: () => {},
+  setHistoryState: () => {},
   color: "#ffffffff",
   setColor: () => {},
 });
@@ -34,6 +48,8 @@ export function RoomLayout() {
   const { id } = useParams();
   const [roomName, setRoomName] = useState(`Room ${id}`);
   const [color, setColor] = useState("#ffffffff");
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
 
@@ -54,17 +70,49 @@ export function RoomLayout() {
   const [onBrushSelect, setOnBrushSelect] = useState<
     ((brush: BrushGetDto) => void) | null
   >(null);
+  const [onUndo, setOnUndo] = useState<(() => void) | null>(null);
+  const [onRedo, setOnRedo] = useState<(() => void) | null>(null);
+  const [onResetView, setOnResetView] = useState<(() => void) | null>(null);
 
   const registerBrushSelect = useCallback(
     (fn: (brush: BrushGetDto) => void) => {
       setOnBrushSelect(() => fn);
     },
-    [],
+    []
+  );
+
+  const registerUndo = useCallback((fn: () => void) => {
+    setOnUndo(() => fn);
+  }, []);
+
+  const registerRedo = useCallback((fn: () => void) => {
+    setOnRedo(() => fn);
+  }, []);
+
+  const registerResetView = useCallback((fn: () => void) => {
+    setOnResetView(() => fn);
+  }, []);
+
+  const setHistoryState = useCallback(
+    (nextCanUndo: boolean, nextCanRedo: boolean) => {
+      setCanUndo(nextCanUndo);
+      setCanRedo(nextCanRedo);
+    },
+    []
   );
 
   return (
     <RoomLayoutContext.Provider
-      value={{ registerBrushSelect, setBrushInUse, color, setColor }}
+      value={{
+        registerBrushSelect,
+        setBrushInUse,
+        registerUndo,
+        registerRedo,
+        registerResetView,
+        setHistoryState,
+        color,
+        setColor,
+      }}
     >
       <AppLayout
         headerTitle={roomName}
@@ -72,6 +120,57 @@ export function RoomLayout() {
         hideActions
         hideUserInfo
         overlayNavbar
+        bottomHeight={64}
+        bottomSlot={
+          <Paper
+            radius={0}
+            withBorder
+            style={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              padding: "0 12px",
+            }}
+          >
+            <Group gap="xs" wrap="nowrap">
+              <Tooltip label="Undo">
+                <ActionIcon
+                  variant="filled"
+                  size="lg"
+                  radius={0}
+                  onClick={() => onUndo?.()}
+                  disabled={!canUndo}
+                >
+                  <IconArrowBackUp size={18} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label="Redo">
+                <ActionIcon
+                  variant="filled"
+                  size="lg"
+                  radius={0}
+                  onClick={() => onRedo?.()}
+                  disabled={!canRedo}
+                >
+                  <IconArrowForwardUp size={18} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label="Fit to viewport">
+                <ActionIcon
+                  variant="filled"
+                  size="lg"
+                  radius={0}
+                  onClick={() => onResetView?.()}
+                >
+                  <IconZoomReset size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Paper>
+        }
         sidebarSlots={{
           main: (
             <>
