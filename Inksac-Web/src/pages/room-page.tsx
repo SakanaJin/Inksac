@@ -120,6 +120,7 @@ export const RoomPage = () => {
       await wsRef.current.connect();
 
       drawerRef.current = new DrawManager(app, wsRef.current);
+      drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
       await drawerRef.current.init();
 
       drawerRef.current.setColor(colorRef.current);

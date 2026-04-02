@@ -4,6 +4,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
 } from "react";
 import { useParams } from "react-router-dom";
 import { AppLayout } from "./app-layout";
@@ -15,6 +16,7 @@ import { Divider } from "@mantine/core";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
+  setBrushInUse: (brushId: number) => void;
   color: string;
   setColor: (color: string) => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
@@ -23,7 +25,8 @@ type RoomLayoutContextValue = {
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerBrushSelect: () => {},
-  color: '#ffffffff',
+  setBrushInUse: () => {},
+  color: "#ffffffff",
   setColor: () => {},
   registerSetErase: () => {},
   setErase: () => {},
@@ -34,7 +37,17 @@ export const useRoomLayout = () => useContext(RoomLayoutContext);
 export function RoomLayout() {
   const { id } = useParams();
   const [roomName, setRoomName] = useState(`Room ${id}`);
-  const [color, setColor] = useState('#ffffffff');
+  const [color, setColor] = useState("#ffffffff");
+
+  const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
+
+  const setBrushInUse = useCallback((brushId: number) => {
+    onStrokeRef.current?.(brushId);
+  }, []);
+
+  const registerStroke = useCallback((fn: (brushId: number) => void) => {
+    onStrokeRef.current = fn;
+  }, []);
 
   const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
   const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
@@ -63,7 +76,9 @@ export function RoomLayout() {
   );
 
   return (
-    <RoomLayoutContext.Provider value={{ registerBrushSelect, registerSetErase, color, setColor, setErase }}>
+    <RoomLayoutContext.Provider
+      value={{ registerBrushSelect, registerSetErase, setBrushInUse, color, setColor }}
+    >
       <AppLayout
         headerTitle={roomName}
         sidebarWidth={340}
@@ -75,9 +90,12 @@ export function RoomLayout() {
             <>
               <ColorSelector />
               <Divider />
-              <BrushSidePanel onBrushSelect={onBrushSelect ?? undefined} />
+              <BrushSidePanel
+                onBrushSelect={onBrushSelect ?? undefined}
+                registerStroke={registerStroke}
+              />
             </>
-          )
+          ),
           // add more sidebar content here later, e.g:
           // bottom: <RoomParticipants />
         }}

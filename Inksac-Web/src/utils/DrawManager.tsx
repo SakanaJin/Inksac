@@ -30,7 +30,7 @@ class DrawManager {
 
   private brushTexture: pixi.Texture | null = null;
   private activeBrush: BrushGetDto | null = null;
-  private activeColor: string = '#ffffffff';
+  private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
   private activeErase: boolean = false;
 
@@ -38,6 +38,7 @@ class DrawManager {
 
   private strokesMap: Map<stringornumber, Stroke>;
   private tempStrokes: Map<string, Stroke>;
+  private onStroke: ((brushId: number) => void) | null = null;
 
   constructor(
     pixiApp: pixi.Application,
@@ -237,6 +238,7 @@ class DrawManager {
     };
 
     const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
+    this.onStroke?.(this.activeBrush?.id ?? 1);
     this.ws.send(message);
   }
 
