@@ -11,19 +11,22 @@ import { BrushSidePanel } from "../brushes/brush-side-panel";
 import type { BrushGetDto, RoomGetDto } from "../../constants/types";
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
-import { DivideBlend } from "pixi.js";
 import { Divider } from "@mantine/core";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
   color: string;
   setColor: (color: string) => void;
+  registerSetErase: (fn: (erase: boolean) => void) => void;
+  setErase: (erase: boolean) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerBrushSelect: () => {},
   color: '#ffffffff',
   setColor: () => {},
+  registerSetErase: () => {},
+  setErase: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -32,6 +35,15 @@ export function RoomLayout() {
   const { id } = useParams();
   const [roomName, setRoomName] = useState(`Room ${id}`);
   const [color, setColor] = useState('#ffffffff');
+
+  const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
+  const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
+    setOnSetErase(() => fn);
+  }, []);
+  const setErase = useCallback((erase: boolean) => {
+    onSetErase?.(erase);
+  }, [onSetErase]);
+
 
   useEffect(() => {
     api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
@@ -51,7 +63,7 @@ export function RoomLayout() {
   );
 
   return (
-    <RoomLayoutContext.Provider value={{ registerBrushSelect, color, setColor }}>
+    <RoomLayoutContext.Provider value={{ registerBrushSelect, registerSetErase, color, setColor, setErase }}>
       <AppLayout
         headerTitle={roomName}
         sidebarWidth={340}

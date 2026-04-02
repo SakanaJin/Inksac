@@ -1,8 +1,8 @@
-import { ColorPicker } from '@mantine/core';
+import { Button, ColorPicker, Group } from '@mantine/core';
 import { useRoomLayout } from '../layout/room-layout';
 
 export function ColorSelector() {
-    const { color, setColor } = useRoomLayout();
+    const { color, setColor, setErase } = useRoomLayout();
     return (
         <>
         <style>{`
@@ -24,6 +24,11 @@ export function ColorSelector() {
                     preview: {'--mantine-radius-sm': '0px'},
                 }}
             />
+            <Group>
+                <Button onClick={() => setErase(false)}>Brush</Button>
+                <Button onClick={() => setErase(true)}>Erase</Button>
+            </Group>
+
         </>
     );
 }

@@ -28,7 +28,7 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
-  const { registerBrushSelect, color } = useRoomLayout();
+  const { registerBrushSelect, registerSetErase, color } = useRoomLayout();
   const colorRef = useRef(color);
 
   useEffect(() => {
@@ -40,6 +40,12 @@ export const RoomPage = () => {
   useEffect(() => {
     drawerRef.current?.setColor(color);
   }, [color]);
+
+  useEffect(() => {
+  registerSetErase((erase) => {
+    drawerRef.current?.setErase(erase);
+  });
+}, [registerSetErase]);
 
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: async (message) => {
