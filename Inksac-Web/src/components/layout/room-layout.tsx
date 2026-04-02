@@ -50,9 +50,11 @@ export function RoomLayout() {
   }, []);
 
   const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
+
   const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
     setOnSetErase(() => fn);
   }, []);
+
   const setErase = useCallback((erase: boolean) => {
     onSetErase?.(erase);
   }, [onSetErase]);
@@ -77,7 +79,7 @@ export function RoomLayout() {
 
   return (
     <RoomLayoutContext.Provider
-      value={{ registerBrushSelect, registerSetErase, setBrushInUse, color, setColor }}
+      value={{ registerBrushSelect, registerSetErase, setBrushInUse, color, setColor, setErase }}
     >
       <AppLayout
         headerTitle={roomName}

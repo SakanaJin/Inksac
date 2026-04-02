@@ -28,7 +28,7 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
-  const { registerBrushSelect, registerSetErase, color } = useRoomLayout();
+  const { registerBrushSelect, registerSetErase, setBrushInUse, color } = useRoomLayout();
   const colorRef = useRef(color);
 
   useEffect(() => {

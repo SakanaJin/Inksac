@@ -84,6 +84,10 @@ class DrawManager {
     this.activeOpacity = parseInt(alpha, 16) / 255;
   }
 
+  public setOnStroke(fn: (brushId: number) => void) {
+    this.onStroke = fn;
+  }
+
   public setErase(eraser: boolean) {
     this.activeErase = eraser;
   }
