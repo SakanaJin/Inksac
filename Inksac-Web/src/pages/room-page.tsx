@@ -28,7 +28,7 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
-  const { registerBrushSelect, color } = useRoomLayout();
+  const { registerBrushSelect, setBrushInUse, color } = useRoomLayout();
   const colorRef = useRef(color);
 
   useEffect(() => {
@@ -114,6 +114,7 @@ export const RoomPage = () => {
       await wsRef.current.connect();
 
       drawerRef.current = new DrawManager(app, wsRef.current);
+      drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
       await drawerRef.current.init();
 
       drawerRef.current.setColor(colorRef.current);

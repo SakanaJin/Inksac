@@ -24,9 +24,13 @@ const baseurl = EnvVars.mediaBaseUrl;
 
 interface BrushSidePanelProps {
   onBrushSelect?: (brush: BrushGetDto) => void;
+  registerStroke?: (fn: (brushId: number) => void) => void;
 }
 
-export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
+export function BrushSidePanel({
+  onBrushSelect,
+  registerStroke,
+}: BrushSidePanelProps) {
   const { user } = useAuth();
   const isguest = user.role === UserRole.GUEST;
 
@@ -45,7 +49,7 @@ export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
       if (response.data.data) {
         setBrushes(response.data.data);
       }
-      
+
       if (selectedBrushId === null) {
         const defaultBrush = response.data.data[0];
         setSelectedBrushId(defaultBrush.id);
@@ -59,6 +63,15 @@ export function BrushSidePanel({ onBrushSelect }: BrushSidePanelProps) {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    if (!registerStroke) return;
+    registerStroke((brushId: number) => {
+      setBrushes((prev) =>
+        prev.map((b) => (b.id === brushId ? { ...b, in_use: true } : b)),
+      );
+    });
+  }, [registerStroke]);
 
   const handleBrushSubmit = (brush: BrushGetDto) => {
     setBrushes((prev) => {
