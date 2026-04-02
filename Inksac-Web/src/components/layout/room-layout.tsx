@@ -18,7 +18,6 @@ import { BrushSidePanel } from "../brushes/brush-side-panel";
 import type { BrushGetDto, RoomGetDto } from "../../constants/types";
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
-import { Divider } from "@mantine/core";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -78,7 +77,7 @@ export function RoomLayout() {
     (fn: (brush: BrushGetDto) => void) => {
       setOnBrushSelect(() => fn);
     },
-    []
+    [],
   );
 
   const registerUndo = useCallback((fn: () => void) => {
@@ -98,7 +97,7 @@ export function RoomLayout() {
       setCanUndo(nextCanUndo);
       setCanRedo(nextCanRedo);
     },
-    []
+    [],
   );
 
   return (
