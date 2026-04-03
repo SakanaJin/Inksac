@@ -40,10 +40,7 @@ class DrawManager {
   private tempStrokes: Map<string, Stroke>;
   private onStroke: ((brushId: number) => void) | null = null;
 
-  constructor(
-    pixiApp: pixi.Application,
-    wsManager: WSManager,
-  ) {
+  constructor(pixiApp: pixi.Application, wsManager: WSManager) {
     this.app = pixiApp;
     this.undoStack = [];
     this.redoStack = [];
@@ -201,7 +198,7 @@ class DrawManager {
       brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
       this.currentStroke.addChild(brushSprite);
-      if ( this.activeErase) this.currentStroke.blendMode = 'erase';
+      if (this.activeErase) this.currentStroke.blendMode = "erase";
     }
 
     this.lastPosition.set(currPosition.x, currPosition.y);
@@ -214,10 +211,12 @@ class DrawManager {
     const tempid = crypto.randomUUID();
 
     const bounds = this.currentStroke.getBounds();
-    const combinedTexture = this.app.renderer.generateTexture(this.currentStroke);
+    const combinedTexture = this.app.renderer.generateTexture(
+      this.currentStroke,
+    );
     const combinedSprite = new pixi.Sprite(combinedTexture);
     combinedSprite.position.set(bounds.x, bounds.y);
-    if (this.activeErase) combinedSprite.blendMode = 'erase';
+    if (this.activeErase) combinedSprite.blendMode = "erase";
 
     const combinedSpriteContainer = new Stroke(tempid);
     combinedSpriteContainer.addChild(combinedSprite);
@@ -237,7 +236,7 @@ class DrawManager {
       points: this.strokePoints,
       color: this.activeColor,
       opacity: this.activeOpacity,
-      // should have erase boolean
+      iseraser: this.activeErase,
       brushid: this.activeBrush?.id ?? 1,
     };
 
@@ -264,14 +263,14 @@ class DrawManager {
       brushSprite.position.set(point.x, point.y);
       brushSprite.alpha = strokeData.opacity;
       receivedStroke.addChild(brushSprite);
-      //if (strokeData.erase) receivedStroke.blendMode = 'erase';
+      if (strokeData.iseraser) receivedStroke.blendMode = "erase";
     }
 
     const bounds = receivedStroke.getBounds();
     const combinedTexture = this.app.renderer.generateTexture(receivedStroke);
     const combinedSprite = new pixi.Sprite(combinedTexture);
     combinedSprite.position.set(bounds.x, bounds.y);
-    //if (strokeData.erase) combinedSprite.blendMode = 'erase';
+    if (strokeData.iseraser) combinedSprite.blendMode = "erase";
 
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
