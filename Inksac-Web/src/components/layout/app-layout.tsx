@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 
 type AppLayoutProps = {
   headerTitle?: string;
+  headerActions?: ReactNode;
   sidebarSlots?: SidebarSlots;
   sidebarWidth?: number;
   hideActions?: boolean;
@@ -18,6 +19,7 @@ type AppLayoutProps = {
 
 export const AppLayout = ({
   headerTitle,
+  headerActions,
   sidebarSlots,
   sidebarWidth = 260,
   hideActions = false,
@@ -48,7 +50,12 @@ export const AppLayout = ({
       }
     >
       <AppShell.Header>
-        <AppHeader opened={opened} toggle={toggle} title={headerTitle} />
+        <AppHeader
+          opened={opened}
+          toggle={toggle}
+          title={headerTitle}
+          actions={headerActions}
+        />
       </AppShell.Header>
 
       <AppShell.Navbar

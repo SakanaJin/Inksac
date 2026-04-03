@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
 import { Box } from "@mantine/core";
+import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
 import { useNavigate, useParams } from "react-router-dom";
@@ -36,6 +37,7 @@ export const RoomPage = () => {
     registerUndo,
     registerRedo,
     registerResetView,
+    registerExport,
     setHistoryState,
     color,
   } = useRoomLayout();
@@ -51,7 +53,7 @@ export const RoomPage = () => {
   const refreshHistoryState = () => {
     setHistoryState(
       drawerRef.current?.canUndo() ?? false,
-      drawerRef.current?.canRedo() ?? false
+      drawerRef.current?.canRedo() ?? false,
     );
   };
 
@@ -100,8 +102,34 @@ export const RoomPage = () => {
     world.scale.set(scale);
     world.position.set(
       (viewportWidth - canvasWidth * scale) / 2,
-      (viewportHeight - canvasHeight * scale) / 2
+      (viewportHeight - canvasHeight * scale) / 2,
     );
+  };
+
+  const openExportModal = () => {
+    modals.openContextModal({
+      modal: "exportmodal",
+      title: "Download canvas",
+      centered: true,
+      innerProps: {
+        onSubmit: async ({
+          format,
+          transparentBackground,
+          scale,
+        }: {
+          format: "png" | "jpg";
+          transparentBackground: boolean;
+          scale: 1 | 2;
+        }) => {
+          if (!drawerRef.current) return;
+          await drawerRef.current.exportCanvas({
+            format,
+            transparentBackground,
+            scale,
+          });
+        },
+      },
+    });
   };
 
   useEffect(() => {
@@ -122,7 +150,17 @@ export const RoomPage = () => {
     registerResetView(() => {
       fitCanvasToViewport();
     });
-  }, [registerBrushSelect, registerUndo, registerRedo, registerResetView]);
+
+    registerExport(() => {
+      openExportModal();
+    });
+  }, [
+    registerBrushSelect,
+    registerUndo,
+    registerRedo,
+    registerResetView,
+    registerExport,
+  ]);
 
   useEffect(() => {
     drawerRef.current?.setColor(color);
@@ -228,11 +266,11 @@ export const RoomPage = () => {
       const FIT_ZOOM_MARGIN = 0.5;
       const dynamicMinZoom = Math.min(
         BASE_MIN_ZOOM,
-        getFitScale() * FIT_ZOOM_MARGIN
+        getFitScale() * FIT_ZOOM_MARGIN,
       );
       const newScale = Math.max(
         dynamicMinZoom,
-        Math.min(MAX_ZOOM, oldScale * zoomFactor)
+        Math.min(MAX_ZOOM, oldScale * zoomFactor),
       );
 
       if (newScale === oldScale) return;
@@ -243,7 +281,7 @@ export const RoomPage = () => {
       world.scale.set(newScale);
       world.position.set(
         mouseX - worldX * newScale,
-        mouseY - worldY * newScale
+        mouseY - worldY * newScale,
       );
     };
 
@@ -277,7 +315,7 @@ export const RoomPage = () => {
       const ws = new WSManager(
         wsbaseurl + `/rooms/${id}`,
         messageHandlers,
-        closeHandlers
+        closeHandlers,
       );
       wsRef.current = ws;
 
@@ -287,7 +325,7 @@ export const RoomPage = () => {
         app,
         wsRef.current,
         room.width,
-        room.height
+        room.height,
       );
 
       drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
