@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { Button, Group, Container } from "@mantine/core";
+import { Box } from "@mantine/core";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
 import { useNavigate, useParams } from "react-router-dom";
@@ -14,10 +14,12 @@ import {
   WSType,
   type StrokeGetDto,
   type WSMessage,
+  type RoomGetDto,
 } from "../constants/types";
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
 import { useRoomLayout } from "../components/layout/room-layout";
+import api from "../config/axios";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 
@@ -28,17 +30,104 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
-  const { registerBrushSelect, registerSetErase, setBrushInUse, color } = useRoomLayout();
+  const {
+    registerBrushSelect,
+    registerSetErase,
+    setBrushInUse,
+    registerUndo,
+    registerRedo,
+    registerResetView,
+    setHistoryState,
+    color,
+  } = useRoomLayout();
   const colorRef = useRef(color);
+
+  const isPanningRef = useRef(false);
+  const lastPanPosRef = useRef({ x: 0, y: 0 });
+
+  const BASE_MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 4;
+  const ZOOM_STEP = 1.1;
+
+  const refreshHistoryState = () => {
+    setHistoryState(
+      drawerRef.current?.canUndo() ?? false,
+      drawerRef.current?.canRedo() ?? false
+    );
+  };
+
+  const getFitScale = () => {
+    if (!drawerRef.current || !pixiContainer.current) return BASE_MIN_ZOOM;
+
+    const { width: canvasWidth, height: canvasHeight } =
+      drawerRef.current.getCanvasSize();
+
+    const viewportWidth = pixiContainer.current.clientWidth;
+    const viewportHeight = pixiContainer.current.clientHeight;
+
+    if (
+      viewportWidth <= 0 ||
+      viewportHeight <= 0 ||
+      canvasWidth <= 0 ||
+      canvasHeight <= 0
+    ) {
+      return BASE_MIN_ZOOM;
+    }
+
+    return Math.min(viewportWidth / canvasWidth, viewportHeight / canvasHeight);
+  };
+
+  const fitCanvasToViewport = () => {
+    if (!drawerRef.current || !pixiContainer.current) return;
+
+    const world = drawerRef.current.getWorldContainer();
+    const { width: canvasWidth, height: canvasHeight } =
+      drawerRef.current.getCanvasSize();
+
+    const viewportWidth = pixiContainer.current.clientWidth;
+    const viewportHeight = pixiContainer.current.clientHeight;
+
+    if (
+      viewportWidth <= 0 ||
+      viewportHeight <= 0 ||
+      canvasWidth <= 0 ||
+      canvasHeight <= 0
+    ) {
+      return;
+    }
+
+    const scale = getFitScale();
+
+    world.scale.set(scale);
+    world.position.set(
+      (viewportWidth - canvasWidth * scale) / 2,
+      (viewportHeight - canvasHeight * scale) / 2
+    );
+  };
 
   useEffect(() => {
     registerBrushSelect((brush) => {
       drawerRef.current?.setActiveBrush(brush);
     });
-  }, [registerBrushSelect]);
+
+    registerUndo(() => {
+      drawerRef.current?.undo();
+      refreshHistoryState();
+    });
+
+    registerRedo(() => {
+      drawerRef.current?.redo();
+      refreshHistoryState();
+    });
+
+    registerResetView(() => {
+      fitCanvasToViewport();
+    });
+  }, [registerBrushSelect, registerUndo, registerRedo, registerResetView]);
 
   useEffect(() => {
     drawerRef.current?.setColor(color);
+    colorRef.current = color;
   }, [color]);
 
   useEffect(() => {
@@ -51,21 +140,25 @@ export const RoomPage = () => {
     [WSType.STROKE]: async (message) => {
       if (drawerRef.current && message.data) {
         await drawerRef.current.receiveStroke(message.data as StrokeGetDto);
+        refreshHistoryState();
       }
     },
     [WSType.UNDO]: async (message) => {
       if (drawerRef.current && message.data) {
         await drawerRef.current.undoStroke(message.data as number);
+        refreshHistoryState();
       }
     },
     [WSType.REDO]: async (message) => {
       if (drawerRef.current && message.data) {
         await drawerRef.current.redoStroke(message.data as StrokeGetDto);
+        refreshHistoryState();
       }
     },
     [WSType.READY]: async (message) => {
       if (drawerRef.current && message.data) {
         await drawerRef.current.receiveInit(message.data as StrokeGetDto[]);
+        refreshHistoryState();
       }
     },
   };
@@ -92,38 +185,125 @@ export const RoomPage = () => {
   };
 
   useEffect(() => {
-    if (!pixiContainer.current || appRef.current) return;
+    if (!pixiContainer.current || appRef.current || !id) return;
 
-    const width = pixiContainer.current!.clientWidth;
-    const height = pixiContainer.current!.clientHeight;
+    let canvas: HTMLCanvasElement | null = null;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 1) return;
+
+      e.preventDefault();
+      isPanningRef.current = true;
+      lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanningRef.current || !drawerRef.current) return;
+
+      const world = drawerRef.current.getWorldContainer();
+      const dx = e.clientX - lastPanPosRef.current.x;
+      const dy = e.clientY - lastPanPosRef.current.y;
+
+      world.position.x += dx;
+      world.position.y += dy;
+
+      lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleMouseUp = () => {
+      isPanningRef.current = false;
+    };
+
+    const handleAuxClick = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!drawerRef.current || !pixiContainer.current) return;
+
+      e.preventDefault();
+
+      const world = drawerRef.current.getWorldContainer();
+      const rect = pixiContainer.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const oldScale = world.scale.x;
+      const zoomFactor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      const FIT_ZOOM_MARGIN = 0.5;
+      const dynamicMinZoom = Math.min(
+        BASE_MIN_ZOOM,
+        getFitScale() * FIT_ZOOM_MARGIN
+      );
+      const newScale = Math.max(
+        dynamicMinZoom,
+        Math.min(MAX_ZOOM, oldScale * zoomFactor)
+      );
+
+      if (newScale === oldScale) return;
+
+      const worldX = (mouseX - world.position.x) / oldScale;
+      const worldY = (mouseY - world.position.y) / oldScale;
+
+      world.scale.set(newScale);
+      world.position.set(
+        mouseX - worldX * newScale,
+        mouseY - worldY * newScale
+      );
+    };
 
     const initPixi = async () => {
+      const roomResponse = await api.get<RoomGetDto>(`/rooms/${id}`);
+      const room = roomResponse.data.data;
+
       const app = new pixi.Application();
       appRef.current = app;
 
       await app.init({
-        width: width,
-        height: height,
-        background: "#636363",
+        width: pixiContainer.current!.clientWidth,
+        height: pixiContainer.current!.clientHeight,
+        background: "#323232",
         resizeTo: pixiContainer.current!,
       });
 
       pixiContainer.current!.appendChild(app.canvas);
+      canvas = app.canvas;
+
+      canvas.style.display = "block";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+
+      canvas.addEventListener("mousedown", handleMouseDown);
+      canvas.addEventListener("auxclick", handleAuxClick);
+      canvas.addEventListener("wheel", handleWheel, { passive: false });
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
 
       const ws = new WSManager(
         wsbaseurl + `/rooms/${id}`,
         messageHandlers,
-        closeHandlers,
+        closeHandlers
       );
       wsRef.current = ws;
 
       await wsRef.current.connect();
 
-      drawerRef.current = new DrawManager(app, wsRef.current);
+      drawerRef.current = new DrawManager(
+        app,
+        wsRef.current,
+        room.width,
+        room.height
+      );
+
       drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
       await drawerRef.current.init();
 
       drawerRef.current.setColor(colorRef.current);
+
+      fitCanvasToViewport();
+      refreshHistoryState();
 
       const message: WSMessage = { Mtype: WSType.READY, data: true };
       wsRef.current.send(message);
@@ -132,41 +312,31 @@ export const RoomPage = () => {
     initPixi();
 
     return () => {
+      if (canvas) {
+        canvas.removeEventListener("mousedown", handleMouseDown);
+        canvas.removeEventListener("auxclick", handleAuxClick);
+        canvas.removeEventListener("wheel", handleWheel);
+      }
+
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+
       if (wsRef.current && wsRef.current.isOpen()) {
         wsRef.current.close();
       }
     };
-  }, [id]);
-
-  const handleUndo = () => {
-    drawerRef.current?.undo();
-  };
-
-  const handleRedo = () => {
-    drawerRef.current?.redo();
-  };
+  }, [id, navigate]);
 
   return (
-    <Container size="100%" style={{ padding: "60px", overflow: "hidden" }}>
-      <Group align="flex-start" wrap="nowrap" style={{ overflow: "hidden" }}>
-        <div
-          ref={pixiContainer}
-          style={{
-            flex: 1,
-            height: "80vh",
-            minWidth: 0,
-          }}
-        />
-      </Group>
-
-      <Group justify="center" mt="md">
-        <Button variant="filled" onClick={handleUndo}>
-          Undo
-        </Button>
-        <Button variant="filled" onClick={handleRedo}>
-          Redo
-        </Button>
-      </Group>
-    </Container>
+    <Box
+      ref={pixiContainer}
+      style={{
+        width: "100%",
+        height: "100%",
+        minWidth: 0,
+        minHeight: 0,
+        overflow: "hidden",
+      }}
+    />
   );
 };
