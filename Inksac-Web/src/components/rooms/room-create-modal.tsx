@@ -23,10 +23,24 @@ export const RoomCreateModal = ({
     validate: {
       name: (value) =>
         value.trim().length === 0 ? "Room name cannot be empty" : null,
-      width: (value) =>
-        !value || value <= 0 ? "Width must be greater than 0" : null,
-      height: (value) =>
-        !value || value <= 0 ? "Height must be greater than 0" : null,
+      width: (value) => {
+        if (!value || value < 256) {
+          return `Width must be at least ${256}`;
+        }
+        if (value > 8192) {
+          return `Width cannot be greater than ${8192}`;
+        }
+        return null;
+      },
+      height: (value) => {
+        if (!value || value < 256) {
+          return `Height must be at least ${256}`;
+        }
+        if (value > 8192) {
+          return `Height cannot be greater than ${8192}`;
+        }
+        return null;
+      },
     },
   });
 
@@ -70,9 +84,10 @@ export const RoomCreateModal = ({
       <NumberInput
         key={form.key("width")}
         label="Canvas Width"
-        min={1}
+        min={256}
+        max={8192}
         allowDecimal={false}
-        clampBehavior="strict"
+        clampBehavior="blur"
         mt="sm"
         {...form.getInputProps("width")}
       />
@@ -80,9 +95,10 @@ export const RoomCreateModal = ({
       <NumberInput
         key={form.key("height")}
         label="Canvas Height"
-        min={1}
+        min={256}
+        max={8192}
         allowDecimal={false}
-        clampBehavior="strict"
+        clampBehavior="blur"
         mt="sm"
         {...form.getInputProps("height")}
       />
