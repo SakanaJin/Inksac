@@ -29,6 +29,7 @@ const LOADER_MIN_DURATION_MS = 2000;
 export const RoomPage = () => {
   const drawerRef = useRef<DrawManager | null>(null);
   const pixiContainer = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<pixi.Application | null>(null);
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
@@ -43,20 +44,53 @@ export const RoomPage = () => {
     registerExport,
     setHistoryState,
     color,
+    toggleSidebar,
     strokeScale,
   } = useRoomLayout();
   const colorRef = useRef(color);
   const strokeScaleRef = useRef(strokeScale);
+  const exportModalOpenRef = useRef(false);
+
+  const [spacePanActive, setSpacePanActive] = useState(false);
 
   const [isCanvasDataReady, setIsCanvasDataReady] = useState(false);
   const [hasShownLoaderOnce, setHasShownLoaderOnce] = useState(false);
 
   const isPanningRef = useRef(false);
-  const lastPanPosRef = useRef({ x: 0, y: 0 });
+  const isSpacePressedRef = useRef(false);
+  const lastPanPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const BASE_MIN_ZOOM = 0.25;
   const MAX_ZOOM = 4;
   const ZOOM_STEP = 1.1;
+
+  const updateCursor = () => {
+    const cursor = isPanningRef.current
+      ? "grabbing"
+      : isSpacePressedRef.current
+        ? "grab"
+        : "default";
+
+    if (pixiContainer.current) {
+      pixiContainer.current.style.cursor = cursor;
+    }
+
+    if (overlayRef.current) {
+      overlayRef.current.style.cursor = cursor;
+    }
+  };
+
+  const beginPan = (clientX: number, clientY: number) => {
+    isPanningRef.current = true;
+    lastPanPosRef.current = { x: clientX, y: clientY };
+    updateCursor();
+  };
+
+  const endPan = () => {
+    isPanningRef.current = false;
+    lastPanPosRef.current = null;
+    updateCursor();
+  };
 
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
@@ -117,10 +151,17 @@ export const RoomPage = () => {
   };
 
   const openExportModal = () => {
+    if (exportModalOpenRef.current) return;
+
+    exportModalOpenRef.current = true;
+
     modals.openContextModal({
       modal: "exportmodal",
       title: "Download canvas",
       centered: true,
+      onClose: () => {
+        exportModalOpenRef.current = false;
+      },
       innerProps: {
         onSubmit: async ({
           format,
@@ -132,11 +173,16 @@ export const RoomPage = () => {
           scale: 1 | 2;
         }) => {
           if (!drawerRef.current) return;
-          await drawerRef.current.exportCanvas({
-            format,
-            transparentBackground,
-            scale,
-          });
+
+          try {
+            await drawerRef.current.exportCanvas({
+              format,
+              transparentBackground,
+              scale,
+            });
+          } finally {
+            exportModalOpenRef.current = false;
+          }
         },
       },
     });
@@ -176,10 +222,93 @@ export const RoomPage = () => {
     drawerRef.current?.setColor(color);
     colorRef.current = color;
   }, [color]);
-  
-   useEffect(() => {
-    registerSetErase((erase) => {drawerRef.current?.setErase(erase);});
+
+  useEffect(() => {
+    registerSetErase((erase) => {
+      drawerRef.current?.setErase(erase);
+    });
   }, [registerSetErase]);
+
+  useEffect(() => {
+    updateCursor();
+  }, [spacePanActive]);
+
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+
+      const tagName = target.tagName.toLowerCase();
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target.isContentEditable
+      );
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        openExportModal();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+
+        if (e.shiftKey) {
+          drawerRef.current?.redo();
+        } else {
+          drawerRef.current?.undo();
+        }
+
+        refreshHistoryState();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
+
+      if (e.code === "Space") {
+        e.preventDefault();
+
+        if (!isSpacePressedRef.current) {
+          isSpacePressedRef.current = true;
+          setSpacePanActive(true);
+          updateCursor();
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        isSpacePressedRef.current = false;
+        setSpacePanActive(false);
+        endPan();
+      }
+    };
+
+    const handleWindowBlur = () => {
+      isSpacePressedRef.current = false;
+      setSpacePanActive(false);
+      endPan();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [toggleSidebar]);
 
   useEffect(() => {
     drawerRef.current?.setStrokeScale(strokeScale);
@@ -257,12 +386,17 @@ export const RoomPage = () => {
       if (e.button !== 1) return;
 
       e.preventDefault();
-      isPanningRef.current = true;
-      lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+      beginPan(e.clientX, e.clientY);
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanningRef.current || !drawerRef.current) return;
+      if (
+        !drawerRef.current ||
+        !isPanningRef.current ||
+        !lastPanPosRef.current
+      ) {
+        return;
+      }
 
       const world = drawerRef.current.getWorldContainer();
       const dx = e.clientX - lastPanPosRef.current.x;
@@ -275,7 +409,7 @@ export const RoomPage = () => {
     };
 
     const handleMouseUp = () => {
-      isPanningRef.current = false;
+      endPan();
     };
 
     const handleAuxClick = (e: MouseEvent) => {
@@ -343,6 +477,11 @@ export const RoomPage = () => {
         canvas.style.display = "block";
         canvas.style.width = "100%";
         canvas.style.height = "100%";
+        canvas.style.display = "block";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+
+        updateCursor();
 
         canvas.addEventListener("mousedown", handleMouseDown);
         canvas.addEventListener("auxclick", handleAuxClick);
@@ -406,6 +545,10 @@ export const RoomPage = () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
 
+      if (pixiContainer.current) {
+        pixiContainer.current.style.cursor = "default";
+      }
+
       if (wsRef.current && wsRef.current.isOpen()) {
         wsRef.current.close();
       }
@@ -439,6 +582,29 @@ export const RoomPage = () => {
           visibility: canShowCanvas ? "visible" : "hidden",
         }}
       />
+
+      {canShowCanvas && spacePanActive ? (
+        <Box
+          ref={overlayRef}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            beginPan(e.clientX, e.clientY);
+          }}
+          onDragStart={(e) => {
+            e.preventDefault();
+          }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 1000,
+            background: "transparent",
+            cursor: isPanningRef.current ? "grabbing" : "grab",
+          }}
+        />
+      ) : null}
     </Box>
   );
 };
