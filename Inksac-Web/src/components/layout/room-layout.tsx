@@ -26,10 +26,11 @@ type RoomLayoutContextValue = {
   registerRedo: (fn: () => void) => void;
   registerResetView: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
-  color: string;
   setColor: (color: string) => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
   setErase: (erase: boolean) => void;
+  color: string;
+  erase: boolean;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -39,10 +40,11 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerRedo: () => {},
   registerResetView: () => {},
   setHistoryState: () => {},
-  color: "#ffffffff",
   setColor: () => {},
   registerSetErase: () => {},
   setErase: () => {},
+  color: "#ffffffff",
+  erase: false,
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -53,6 +55,7 @@ export function RoomLayout() {
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [erase, setEraseState] = useState(false);
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
 
@@ -71,6 +74,7 @@ export function RoomLayout() {
   }, []);
 
   const setErase = useCallback((erase: boolean) => {
+    setEraseState(erase);
     onSetErase?.(erase);
   }, [onSetErase]);
 
@@ -125,9 +129,10 @@ export function RoomLayout() {
         registerRedo,
         registerResetView,
         setHistoryState,
-        color,
         setColor,
         setErase,
+        color,
+        erase
       }}
     >
       <AppLayout

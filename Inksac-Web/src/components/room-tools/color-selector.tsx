@@ -1,8 +1,60 @@
-import { Button, ColorPicker, Group } from '@mantine/core';
+import { ActionIcon, ColorPicker, Group, Tooltip } from '@mantine/core';
 import { useRoomLayout } from '../layout/room-layout';
+import {
+  IconEraser,
+  IconBrush,
+  IconBrushOff,
+  IconEraserOff,
+} from "@tabler/icons-react";
+
 
 export function ColorSelector() {
-    const { color, setColor, setErase } = useRoomLayout();
+    const { color, setColor, setErase, erase } = useRoomLayout();
+
+    let eraseMode;
+    if (erase) {
+        eraseMode = (
+            <ActionIcon 
+                pos="relative" 
+                size='xl'
+                radius={0}
+                onClick={() => setErase(false)}
+            >
+                <IconBrushOff 
+                    size={18}
+                    color='white'
+                    opacity='70%'
+                    style={{ position: 'absolute', top: 3, left: 3, zIndex: 0}}
+                />
+                <IconEraser 
+                    size={27}
+                    style={{ position: 'absolute', bottom: 3, right: 3, zIndex: 1}}
+                />
+            </ActionIcon>
+        );
+    }
+    else {
+        eraseMode = (
+            <ActionIcon 
+                pos="relative" 
+                size='xl'
+                radius={0}
+                onClick={() => setErase(true)}
+            >
+                <IconEraserOff 
+                    size={18}
+                    color='white'
+                    opacity='70%'
+                    style={{ position: 'absolute', top: 3, left: 3, zIndex: 0}}
+                />
+                <IconBrush 
+                    size={27}
+                    style={{ position: 'absolute', bottom: 3, right: 3, zIndex: 1}}
+                />
+            </ActionIcon>
+        );
+    }
+
     return (
         <>
         <style>{`
@@ -15,6 +67,7 @@ export function ColorSelector() {
                 format='hexa'
                 value={color}
                 onChange={setColor}
+                mb={-10}
                 classNames={{
                     sliders: 'sliders',
                 }}
@@ -24,9 +77,10 @@ export function ColorSelector() {
                     preview: {'--mantine-radius-sm': '0px'},
                 }}
             />
-            <Group>
-                <Button onClick={() => setErase(false)}>Brush</Button>
-                <Button onClick={() => setErase(true)}>Erase</Button>
+            <Group gap={10}>
+                <Tooltip label="Erase Mode">
+                    {eraseMode}
+                </Tooltip> 
             </Group>
 
         </>

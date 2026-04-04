@@ -1,5 +1,4 @@
 import * as pixi from "pixi.js";
-//import softShape from "../../../media/user/brush/softShape.png";
 import {
   WSType,
   type BrushCoord,
@@ -25,6 +24,7 @@ class DrawManager {
   private canvasHeight: number;
 
   private baseLayer: pixi.Texture;
+  private baseSprite: pixi.Sprite;
   private drawingContainer: pixi.Container;
   private worldContainer: pixi.Container;
   private boardBackground: pixi.Graphics;
@@ -270,13 +270,15 @@ class DrawManager {
 
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
-      brushSprite.tint = this.activeColor;
-      brushSprite.alpha = this.activeOpacity;
+      // brushSprite.tint = this.activeColor;
+      // brushSprite.alpha = this.activeOpacity;
       brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
       this.currentStroke.addChild(brushSprite);
-      if (this.activeErase) this.currentStroke.blendMode = "erase";
     }
+    if (this.activeErase) this.currentStroke.blendMode = "erase";
+    this.currentStroke.alpha = this.activeOpacity
+    this.currentStroke.tint = this.activeColor;
 
     this.lastPosition.set(currPosition.x, currPosition.y);
   }
@@ -358,6 +360,8 @@ class DrawManager {
       receivedStroke.addChild(brushSprite);
       if (strokeData.iseraser) receivedStroke.blendMode = "erase";
     }
+    // receivedStroke.alpha = strokeData.opacity
+    // receivedStroke.tint = strokeData.color;
 
     const bounds = receivedStroke.getLocalBounds();
     const frame = new pixi.Rectangle(
@@ -373,7 +377,7 @@ class DrawManager {
     });
     const combinedSprite = new pixi.Sprite(combinedTexture);
     combinedSprite.position.set(frame.x, frame.y);
-	if (strokeData.iseraser) combinedSprite.blendMode = "erase";
+    if (strokeData.iseraser) combinedSprite.blendMode = "erase";
 	
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
