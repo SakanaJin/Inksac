@@ -7,7 +7,7 @@ import {
   useRef,
 } from "react";
 import { useParams } from "react-router-dom";
-import { ActionIcon, Divider, Group, Paper, Tooltip } from "@mantine/core";
+import { ActionIcon, Box, Divider, Group, Paper, Tooltip } from "@mantine/core";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
@@ -172,14 +172,36 @@ export function RoomLayout() {
         }
         sidebarSlots={{
           main: (
-            <>
-              <ColorSelector />
-              <Divider />
-              <BrushSidePanel
-                onBrushSelect={onBrushSelect ?? undefined}
-                registerStroke={registerStroke}
-              />
-            </>
+            <Box
+              style={{
+                height: "100%",
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Box style={{ flexShrink: 0 }}>
+                <ColorSelector />
+              </Box>
+
+              <Box style={{ flexShrink: 0 }}>
+                <Divider />
+              </Box>
+
+              <Box
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <BrushSidePanel
+                  onBrushSelect={onBrushSelect ?? undefined}
+                  registerStroke={registerStroke}
+                />
+              </Box>
+            </Box>
           ),
           // add more sidebar content here later, e.g:
           // bottom: <RoomParticipants />
