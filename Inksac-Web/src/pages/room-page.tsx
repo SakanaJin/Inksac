@@ -81,6 +81,34 @@ export const RoomPage = () => {
   const MAX_ZOOM = 4;
   const ZOOM_STEP = 1.1;
 
+  const updateCursor = () => {
+    const cursor = isPanningRef.current
+      ? "grabbing"
+      : isSpacePressedRef.current
+        ? "grab"
+        : "default";
+
+    if (pixiContainer.current) {
+      pixiContainer.current.style.cursor = cursor;
+    }
+
+    if (overlayRef.current) {
+      overlayRef.current.style.cursor = cursor;
+    }
+  };
+
+  const beginPan = (clientX: number, clientY: number) => {
+    isPanningRef.current = true;
+    lastPanPosRef.current = { x: clientX, y: clientY };
+    updateCursor();
+  };
+
+  const endPan = () => {
+    isPanningRef.current = false;
+    lastPanPosRef.current = null;
+    updateCursor();
+  };
+
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
   const refreshCursorScale = () => {
