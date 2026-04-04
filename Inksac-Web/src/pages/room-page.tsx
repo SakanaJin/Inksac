@@ -331,6 +331,10 @@ export const RoomPage = () => {
       drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
       await drawerRef.current.init();
 
+      if (room.imgurl) {
+        await drawerRef.current.loadBaseImage(room.imgurl);
+      }
+
       drawerRef.current.setColor(colorRef.current);
 
       fitCanvasToViewport();

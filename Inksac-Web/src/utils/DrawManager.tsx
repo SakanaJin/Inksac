@@ -25,9 +25,10 @@ class DrawManager {
   private canvasWidth: number;
   private canvasHeight: number;
 
-  private baseLayer: pixi.Texture;
+  private baseLayer: pixi.RenderTexture;
   private baseSprite: pixi.Sprite;
   private drawingContainer: pixi.Container;
+  private boardContentContainer: pixi.Container;
   private worldContainer: pixi.Container;
   private boardBackground: pixi.Graphics;
   private boardMask: pixi.Graphics;
@@ -71,7 +72,7 @@ class DrawManager {
     this.baseSprite.position.set(0, 0);
 
     this.drawingContainer = new pixi.Container();
-
+    this.boardContentContainer = new pixi.Container();
     this.worldContainer = new pixi.Container();
 
     this.boardBackground = new pixi.Graphics();
@@ -85,13 +86,13 @@ class DrawManager {
       .rect(0, 0, this.canvasWidth, this.canvasHeight)
       .fill("#ffffff");
 
+    this.boardContentContainer.addChild(this.baseSprite);
+    this.boardContentContainer.addChild(this.drawingContainer);
+    this.boardContentContainer.mask = this.boardMask;
+
     this.worldContainer.addChild(this.boardBackground);
     this.worldContainer.addChild(this.boardMask);
-    this.worldContainer.addChild(this.baseSprite);
-    this.worldContainer.addChild(this.drawingContainer);
-
-    this.baseSprite.mask = this.boardMask;
-    this.drawingContainer.mask = this.boardMask;
+    this.worldContainer.addChild(this.boardContentContainer);
 
     this.worldContainer.position.set(
       (this.app.screen.width - this.canvasWidth) / 2,
@@ -118,6 +119,23 @@ class DrawManager {
     this.brushTexture = await pixi.Assets.load<pixi.Texture>(
       baseurl + this.activeBrush.imgurl,
     );
+  }
+
+  public async loadBaseImage(imgurl: string) {
+    const texture = await pixi.Assets.load<pixi.Texture>(baseurl + imgurl);
+
+    const sprite = new pixi.Sprite(texture);
+    sprite.position.set(0, 0);
+    sprite.width = this.canvasWidth;
+    sprite.height = this.canvasHeight;
+
+    this.app.renderer.render({
+      container: sprite,
+      target: this.baseLayer,
+      clear: true,
+    });
+
+    sprite.destroy();
   }
 
   public setColor(color: string) {

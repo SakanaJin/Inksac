@@ -20,6 +20,7 @@ class RoomGetDto(BaseModel):
     name: str
     width: int
     height: int
+    imgurl: str | None
     expiration: datetime
     owner: UserShallowDto
     user_count: int
@@ -37,6 +38,7 @@ class Room(Base):
     name = Column(String(255), nullable=False)
     width = Column(Integer, nullable=False, default=2000)
     height = Column(Integer, nullable=False, default=2000)
+    imgurl = Column(String(500), nullable=True)
     expiration = Column(DateTime(timezone=True), default=round_nearest_hour(datetime.now() + timedelta(days=1)))
 
     owner_id = Column(Integer, ForeignKey("users.id"))
@@ -52,6 +54,7 @@ class Room(Base):
             name=self.name,
             width=self.width,
             height=self.height,
+            imgurl=self.imgurl,
             expiration=self.expiration,
             owner=self.owner.toShallowDto(),
             user_count=len(WSManager.rooms.get(self.id, {}))
