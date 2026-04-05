@@ -139,11 +139,19 @@ export function BrushSidePanel({
       labels: { confirm: "Delete", cancel: "Cancel" },
       confirmProps: { color: "red" },
       onConfirm: async () => {
-        const response = await api.delete<boolean>(`/brushes/${brush.id}`);
+        const deleteResponse = await api.delete<boolean>(
+          `/brushes/${brush.id}`,
+        );
 
-        if (response.data.data) {
+        if (deleteResponse.data.data) {
           setBrushes((prev) => prev.filter((item) => item.id !== brush.id));
 
+          if (selectedBrushId === brush.id) {
+            const fallback = await api.get<BrushGetDto>("/brushes/1");
+            const defaultBrush = fallback.data.data;
+            setSelectedBrushId(defaultBrush.id);
+            onBrushSelect?.(defaultBrush);
+          }
           notifications.show({
             title: "Success",
             message: "Brush deleted successfully",
