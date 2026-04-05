@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { Box, Loader } from "@mantine/core";
+import { Box } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
@@ -20,9 +20,11 @@ import {
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
 import { useRoomLayout } from "../components/layout/room-layout";
+import { RoomLoadingOverlay } from "../components/room-tools/room-loading-overlay";
 import api from "../config/axios";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
+const LOADER_MIN_DURATION_MS = 2000;
 
 export const RoomPage = () => {
   const drawerRef = useRef<DrawManager | null>(null);
@@ -42,7 +44,9 @@ export const RoomPage = () => {
     color,
   } = useRoomLayout();
   const colorRef = useRef(color);
-  const [isCanvasLoading, setIsCanvasLoading] = useState(true);
+
+  const [isCanvasDataReady, setIsCanvasDataReady] = useState(false);
+  const [hasShownLoaderOnce, setHasShownLoaderOnce] = useState(false);
 
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
@@ -50,6 +54,8 @@ export const RoomPage = () => {
   const BASE_MIN_ZOOM = 0.25;
   const MAX_ZOOM = 4;
   const ZOOM_STEP = 1.1;
+
+  const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
   const refreshHistoryState = () => {
     setHistoryState(
@@ -168,6 +174,16 @@ export const RoomPage = () => {
     colorRef.current = color;
   }, [color]);
 
+  useEffect(() => {
+    setHasShownLoaderOnce(false);
+
+    const timeout = window.setTimeout(() => {
+      setHasShownLoaderOnce(true);
+    }, LOADER_MIN_DURATION_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [id]);
+
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: async (message) => {
       if (drawerRef.current && message.data) {
@@ -192,7 +208,7 @@ export const RoomPage = () => {
         await drawerRef.current.receiveInit(message.data as StrokeGetDto[]);
         fitCanvasToViewport();
         refreshHistoryState();
-        setIsCanvasLoading(false);
+        setIsCanvasDataReady(true);
       }
     },
   };
@@ -224,7 +240,7 @@ export const RoomPage = () => {
     let canvas: HTMLCanvasElement | null = null;
     let isMounted = true;
 
-    setIsCanvasLoading(true);
+    setIsCanvasDataReady(false);
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 1) return;
@@ -398,21 +414,7 @@ export const RoomPage = () => {
         overflow: "hidden",
       }}
     >
-      {isCanvasLoading && (
-        <Box
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10,
-            background: "#323232",
-          }}
-        >
-          <Loader size="lg" />
-        </Box>
-      )}
+      {!canShowCanvas && <RoomLoadingOverlay />}
 
       <Box
         ref={pixiContainer}
@@ -422,7 +424,7 @@ export const RoomPage = () => {
           minWidth: 0,
           minHeight: 0,
           overflow: "hidden",
-          visibility: isCanvasLoading ? "hidden" : "visible",
+          visibility: canShowCanvas ? "visible" : "hidden",
         }}
       />
     </Box>
