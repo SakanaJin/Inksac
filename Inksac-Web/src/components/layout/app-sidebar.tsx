@@ -1,4 +1,4 @@
-import { Stack, Text, Button, Divider } from "@mantine/core";
+import { Stack, Text, Button, Divider, Box } from "@mantine/core";
 import { useAuth } from "../../authentication/use-auth";
 import { modals } from "@mantine/modals";
 import { EnvVars } from "../../config/env-vars";
@@ -70,7 +70,17 @@ export function AppSidebar({
       )}
 
       {slots?.main ? (
-        <Stack style={{ minHeight: 0, overflow: "hidden" }}>{slots.main}</Stack>
+        <Box
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {slots.main}
+        </Box>
       ) : (
         <Stack style={{ flex: 1 }}>
           <Button variant="subtle">Account Settings</Button>
