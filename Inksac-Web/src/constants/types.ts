@@ -126,6 +126,7 @@ export interface RoomGetDto {
   name: string;
   width: number;
   height: number;
+  imgurl: string | null;
   expiration: string;
   owner: UserShallowDto;
   user_count: number;
