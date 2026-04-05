@@ -126,18 +126,21 @@ export interface RoomGetDto {
   expiration: string;
   owner: UserShallowDto;
   user_count: number;
+  canvas_color: string;
 }
 
 export interface RoomShallowDto {
   id: number;
   name: string;
   expiration: string;
+  canvas_color: string;
 }
 
 export interface RoomCreateDto {
   name: string;
   width: number;
   height: number;
+  canvas_color: string;
 }
 
 export interface RoomUpdateDto {
