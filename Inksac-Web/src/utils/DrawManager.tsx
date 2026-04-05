@@ -22,6 +22,7 @@ class DrawManager {
 
   private canvasWidth: number;
   private canvasHeight: number;
+  private canvasColor: string;
 
   private baseLayer: pixi.RenderTexture;
   private baseSprite: pixi.Sprite;
@@ -53,6 +54,7 @@ class DrawManager {
     wsManager: WSManager,
     canvasWidth: number,
     canvasHeight: number,
+    canvasColor: string,
     maxUndoSteps: number = 10,
   ) {
     this.app = pixiApp;
@@ -62,6 +64,7 @@ class DrawManager {
 
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
+    this.canvasColor = canvasColor;
 
     this.baseLayer = pixi.RenderTexture.create({
       width: this.canvasWidth,
@@ -78,7 +81,7 @@ class DrawManager {
     this.boardBackground = new pixi.Graphics();
     this.boardBackground
       .rect(0, 0, this.canvasWidth, this.canvasHeight)
-      .fill("#636363")
+      .fill(this.canvasColor)
       .stroke({ color: "#8a8a8a", width: 2 });
 
     this.boardMask = new pixi.Graphics();
