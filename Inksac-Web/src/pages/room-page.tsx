@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Box } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
@@ -20,9 +20,11 @@ import {
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
 import { useRoomLayout } from "../components/layout/room-layout";
+import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
+const LOADER_MIN_DURATION_MS = 2000;
 
 export const RoomPage = () => {
   const drawerRef = useRef<DrawManager | null>(null);
@@ -43,12 +45,17 @@ export const RoomPage = () => {
   } = useRoomLayout();
   const colorRef = useRef(color);
 
+  const [isCanvasDataReady, setIsCanvasDataReady] = useState(false);
+  const [hasShownLoaderOnce, setHasShownLoaderOnce] = useState(false);
+
   const isPanningRef = useRef(false);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
 
   const BASE_MIN_ZOOM = 0.25;
   const MAX_ZOOM = 4;
   const ZOOM_STEP = 1.1;
+
+  const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
   const refreshHistoryState = () => {
     setHistoryState(
@@ -167,6 +174,16 @@ export const RoomPage = () => {
     colorRef.current = color;
   }, [color]);
 
+  useEffect(() => {
+    setHasShownLoaderOnce(false);
+
+    const timeout = window.setTimeout(() => {
+      setHasShownLoaderOnce(true);
+    }, LOADER_MIN_DURATION_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [id]);
+
   const messageHandlers: MessageHandlers = {
     [WSType.STROKE]: async (message) => {
       if (drawerRef.current && message.data) {
@@ -189,7 +206,9 @@ export const RoomPage = () => {
     [WSType.READY]: async (message) => {
       if (drawerRef.current && message.data) {
         await drawerRef.current.receiveInit(message.data as StrokeGetDto[]);
+        fitCanvasToViewport();
         refreshHistoryState();
+        setIsCanvasDataReady(true);
       }
     },
   };
@@ -219,6 +238,9 @@ export const RoomPage = () => {
     if (!pixiContainer.current || appRef.current || !id) return;
 
     let canvas: HTMLCanvasElement | null = null;
+    let isMounted = true;
+
+    setIsCanvasDataReady(false);
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 1) return;
@@ -286,67 +308,83 @@ export const RoomPage = () => {
     };
 
     const initPixi = async () => {
-      const roomResponse = await api.get<RoomGetDto>(`/rooms/${id}`);
-      const room = roomResponse.data.data;
+      try {
+        const roomResponse = await api.get<RoomGetDto>(`/rooms/${id}`);
+        const room = roomResponse.data.data;
 
-      const app = new pixi.Application();
-      appRef.current = app;
+        if (!isMounted || !pixiContainer.current) return;
 
-      await app.init({
-        width: pixiContainer.current!.clientWidth,
-        height: pixiContainer.current!.clientHeight,
-        background: "#323232",
-        resizeTo: pixiContainer.current!,
-      });
+        const app = new pixi.Application();
+        appRef.current = app;
 
-      pixiContainer.current!.appendChild(app.canvas);
-      canvas = app.canvas;
+        await app.init({
+          width: pixiContainer.current.clientWidth,
+          height: pixiContainer.current.clientHeight,
+          background: "#323232",
+          resizeTo: pixiContainer.current,
+        });
 
-      canvas.style.display = "block";
-      canvas.style.width = "100%";
-      canvas.style.height = "100%";
+        if (!isMounted || !pixiContainer.current) return;
 
-      canvas.addEventListener("mousedown", handleMouseDown);
-      canvas.addEventListener("auxclick", handleAuxClick);
-      canvas.addEventListener("wheel", handleWheel, { passive: false });
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+        pixiContainer.current.appendChild(app.canvas);
+        canvas = app.canvas;
 
-      const ws = new WSManager(
-        wsbaseurl + `/rooms/${id}`,
-        messageHandlers,
-        closeHandlers,
-      );
-      wsRef.current = ws;
+        canvas.style.display = "block";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
 
-      await wsRef.current.connect();
+        canvas.addEventListener("mousedown", handleMouseDown);
+        canvas.addEventListener("auxclick", handleAuxClick);
+        canvas.addEventListener("wheel", handleWheel, { passive: false });
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
 
-      drawerRef.current = new DrawManager(
-        app,
-        wsRef.current,
-        room.width,
-        room.height,
-      );
+        const ws = new WSManager(
+          wsbaseurl + `/rooms/${id}`,
+          messageHandlers,
+          closeHandlers,
+        );
+        wsRef.current = ws;
 
-      drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
-      await drawerRef.current.init();
+        await wsRef.current.connect();
 
-      if (room.imgurl) {
-        await drawerRef.current.loadBaseImage(room.imgurl);
+        if (!isMounted) return;
+
+        drawerRef.current = new DrawManager(
+          app,
+          wsRef.current,
+          room.width,
+          room.height,
+        );
+
+        drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
+        await drawerRef.current.init();
+
+        if (room.imgurl) {
+          await drawerRef.current.loadBaseImage(room.imgurl);
+        }
+
+        drawerRef.current.setColor(colorRef.current);
+        refreshHistoryState();
+
+        const message: WSMessage = { Mtype: WSType.READY, data: true };
+        wsRef.current.send(message);
+      } catch (error) {
+        console.error("Failed to initialize room", error);
+        notifications.show({
+          title: "Room",
+          message: "Failed to load room.",
+          color: "red",
+        });
+        navigate(routes.home);
       }
-
-      drawerRef.current.setColor(colorRef.current);
-
-      fitCanvasToViewport();
-      refreshHistoryState();
-
-      const message: WSMessage = { Mtype: WSType.READY, data: true };
-      wsRef.current.send(message);
     };
 
     initPixi();
 
     return () => {
+      isMounted = false;
+
       if (canvas) {
         canvas.removeEventListener("mousedown", handleMouseDown);
         canvas.removeEventListener("auxclick", handleAuxClick);
@@ -359,19 +397,36 @@ export const RoomPage = () => {
       if (wsRef.current && wsRef.current.isOpen()) {
         wsRef.current.close();
       }
+
+      appRef.current = null;
+      drawerRef.current = null;
     };
-  }, [id, navigate]);
+  }, [id, navigate, setBrushInUse]);
 
   return (
     <Box
-      ref={pixiContainer}
       style={{
+        position: "relative",
         width: "100%",
         height: "100%",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
       }}
-    />
+    >
+      {!canShowCanvas && <RoomLoadingOverlay />}
+
+      <Box
+        ref={pixiContainer}
+        style={{
+          width: "100%",
+          height: "100%",
+          minWidth: 0,
+          minHeight: 0,
+          overflow: "hidden",
+          visibility: canShowCanvas ? "visible" : "hidden",
+        }}
+      />
+    </Box>
   );
 };
