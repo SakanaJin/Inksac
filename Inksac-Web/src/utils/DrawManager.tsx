@@ -23,9 +23,10 @@ class DrawManager {
   private canvasWidth: number;
   private canvasHeight: number;
 
-  private baseLayer: pixi.Texture;
+  private baseLayer: pixi.RenderTexture;
   private baseSprite: pixi.Sprite;
   private drawingContainer: pixi.Container;
+  private boardContentContainer: pixi.Container;
   private worldContainer: pixi.Container;
   private boardBackground: pixi.Graphics;
   private boardMask: pixi.Graphics;
@@ -51,7 +52,7 @@ class DrawManager {
     wsManager: WSManager,
     canvasWidth: number,
     canvasHeight: number,
-    maxUndoSteps: number = 10
+    maxUndoSteps: number = 10,
   ) {
     this.app = pixiApp;
     this.undoStack = [];
@@ -69,6 +70,7 @@ class DrawManager {
     this.baseSprite.position.set(0, 0);
 
     this.drawingContainer = new pixi.Container();
+    this.boardContentContainer = new pixi.Container();
     this.drawingContainer.filters = [new pixi.AlphaFilter()];
     this.worldContainer = new pixi.Container();
 
@@ -83,17 +85,17 @@ class DrawManager {
       .rect(0, 0, this.canvasWidth, this.canvasHeight)
       .fill("#ffffff");
 
+    this.boardContentContainer.addChild(this.baseSprite);
+    this.boardContentContainer.addChild(this.drawingContainer);
+    this.boardContentContainer.mask = this.boardMask;
+
     this.worldContainer.addChild(this.boardBackground);
     this.worldContainer.addChild(this.boardMask);
-    this.worldContainer.addChild(this.baseSprite);
-    this.worldContainer.addChild(this.drawingContainer);
-
-    this.baseSprite.mask = this.boardMask;
-    this.drawingContainer.mask = this.boardMask;
+    this.worldContainer.addChild(this.boardContentContainer);
 
     this.worldContainer.position.set(
       (this.app.screen.width - this.canvasWidth) / 2,
-      (this.app.screen.height - this.canvasHeight) / 2
+      (this.app.screen.height - this.canvasHeight) / 2,
     );
 
     this.app.stage.addChild(this.worldContainer);
@@ -115,8 +117,25 @@ class DrawManager {
     // pixijs automatically caches textures by url
     this.activeBrush = brush;
     this.brushTexture = await pixi.Assets.load<pixi.Texture>(
-      baseurl + this.activeBrush.imgurl
+      baseurl + this.activeBrush.imgurl,
     );
+  }
+
+  public async loadBaseImage(imgurl: string) {
+    const texture = await pixi.Assets.load<pixi.Texture>(baseurl + imgurl);
+
+    const sprite = new pixi.Sprite(texture);
+    sprite.position.set(0, 0);
+    sprite.width = this.canvasWidth;
+    sprite.height = this.canvasHeight;
+
+    this.app.renderer.render({
+      container: sprite,
+      target: this.baseLayer,
+      clear: true,
+    });
+
+    sprite.destroy();
   }
 
   public setColor(color: string) {
@@ -151,9 +170,80 @@ class DrawManager {
   public setOnStroke(fn: (brushId: number) => void) {
     this.onStroke = fn;
   }
-
+  
   public setErase(eraser: boolean) {
     this.activeErase = eraser;
+  }
+
+  public async exportCanvas(options: {
+    format: "png" | "jpg";
+    transparentBackground?: boolean;
+    scale?: number;
+  }) {
+    const { format, transparentBackground = false, scale = 1 } = options;
+
+    const previousBackgroundVisible = this.boardBackground.visible;
+
+    if (format === "png" && transparentBackground) {
+      this.boardBackground.visible = false;
+    }
+
+    const exportTexture = this.app.renderer.generateTexture({
+      target: this.worldContainer,
+      frame: new pixi.Rectangle(0, 0, this.canvasWidth, this.canvasHeight),
+      resolution: scale,
+    });
+
+    try {
+      const extension = format === "jpg" ? "jpg" : "png";
+
+      const dataUrl = await this.app.renderer.extract.base64({
+        target: exportTexture,
+        format: format === "jpg" ? "jpg" : "png",
+        quality: 1,
+      });
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `canvas-export-${Date.now()}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      exportTexture.destroy(true);
+      this.boardBackground.visible = previousBackgroundVisible;
+    }
+  }
+
+  // UNDO/REDO HANDLING
+  private flattenOldestUndo() {
+    const oldest = this.undoStack.shift();
+    if (!oldest) return;
+
+    const tempContainer = new pixi.Container();
+    tempContainer.addChild(this.baseSprite);
+    tempContainer.addChild(oldest);
+
+    const newBaseLayer = pixi.RenderTexture.create({
+      width: this.canvasWidth,
+      height: this.canvasHeight,
+    });
+
+    this.app.renderer.render({
+      container: tempContainer,
+      target: newBaseLayer,
+    });
+
+    tempContainer.removeChildren();
+
+    this.baseLayer.destroy();
+    this.baseLayer = newBaseLayer;
+    this.baseSprite.texture = newBaseLayer;
+
+    this.drawingContainer.addChildAt(this.baseSprite, 0);
+
+    this.drawingContainer.removeChild(oldest);
+    oldest.destroy();
   }
 
   // UNDO/REDO HANDLING ------------------------------------------------------------------------------------
@@ -207,7 +297,7 @@ class DrawManager {
     this.drawingContainer.addChild(stroke);
     this.strokesMap.set(stroke.id, stroke);
     (this.drawingContainer.children as Stroke[]).sort(
-      (a, b) => (a.id as number) - (b.id as number)
+      (a, b) => (a.id as number) - (b.id as number),
     );
 
     const message: WSMessage = { Mtype: WSType.REDO, data: stroke.id };
@@ -301,7 +391,7 @@ class DrawManager {
       bounds.minX,
       bounds.minY,
       bounds.maxX - bounds.minX,
-      bounds.maxY - bounds.minY
+      bounds.maxY - bounds.minY,
     );
 
     const combinedTexture = this.app.renderer.generateTexture({
@@ -344,7 +434,7 @@ class DrawManager {
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
     const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(
-      baseurl + strokeData.brush.imgurl
+      baseurl + strokeData.brush.imgurl,
     );
     if (!receivedBrushTexture) return;
 
@@ -368,7 +458,7 @@ class DrawManager {
       bounds.minX,
       bounds.minY,
       bounds.maxX - bounds.minX,
-      bounds.maxY - bounds.minY
+      bounds.maxY - bounds.minY,
     );
 
     const combinedTexture = this.app.renderer.generateTexture({
@@ -413,7 +503,7 @@ class DrawManager {
     if (this.strokesMap.has(strokeData.id)) return;
     await this.renderReceivedStroke(strokeData);
     (this.drawingContainer.children as Stroke[]).sort(
-      (a, b) => (a.id as number) - (b.id as number)
+      (a, b) => (a.id as number) - (b.id as number),
     );
   }
 

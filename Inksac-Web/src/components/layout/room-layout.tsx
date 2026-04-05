@@ -7,11 +7,12 @@ import {
   useRef,
 } from "react";
 import { useParams } from "react-router-dom";
-import { ActionIcon, Divider, Group, Paper, Tooltip } from "@mantine/core";
+import { ActionIcon, Box, Divider, Group, Paper, Tooltip } from "@mantine/core";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
   IconZoomReset,
+  IconDownload,
 } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
@@ -25,6 +26,7 @@ type RoomLayoutContextValue = {
   registerUndo: (fn: () => void) => void;
   registerRedo: (fn: () => void) => void;
   registerResetView: (fn: () => void) => void;
+  registerExport: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
   setColor: (color: string) => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
@@ -39,6 +41,7 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerUndo: () => {},
   registerRedo: () => {},
   registerResetView: () => {},
+  registerExport: () => {},
   setHistoryState: () => {},
   setColor: () => {},
   registerSetErase: () => {},
@@ -91,6 +94,7 @@ export function RoomLayout() {
   const [onUndo, setOnUndo] = useState<(() => void) | null>(null);
   const [onRedo, setOnRedo] = useState<(() => void) | null>(null);
   const [onResetView, setOnResetView] = useState<(() => void) | null>(null);
+  const [onExport, setOnExport] = useState<(() => void) | null>(null);
 
   const registerBrushSelect = useCallback(
     (fn: (brush: BrushGetDto) => void) => {
@@ -111,6 +115,10 @@ export function RoomLayout() {
     setOnResetView(() => fn);
   }, []);
 
+  const registerExport = useCallback((fn: () => void) => {
+    setOnExport(() => fn);
+  }, []);
+
   const setHistoryState = useCallback(
     (nextCanUndo: boolean, nextCanRedo: boolean) => {
       setCanUndo(nextCanUndo);
@@ -128,6 +136,7 @@ export function RoomLayout() {
         registerUndo,
         registerRedo,
         registerResetView,
+        registerExport,
         setHistoryState,
         setColor,
         setErase,
@@ -137,6 +146,18 @@ export function RoomLayout() {
     >
       <AppLayout
         headerTitle={roomName}
+        headerActions={
+          <Tooltip label="Export canvas">
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              radius={0}
+              onClick={() => onExport?.()}
+            >
+              <IconDownload size={18} />
+            </ActionIcon>
+          </Tooltip>
+        }
         sidebarWidth={340}
         hideActions
         hideUserInfo
@@ -194,14 +215,36 @@ export function RoomLayout() {
         }
         sidebarSlots={{
           main: (
-            <>
-              <ColorSelector />
-              <Divider />
-              <BrushSidePanel
-                onBrushSelect={onBrushSelect ?? undefined}
-                registerStroke={registerStroke}
-              />
-            </>
+            <Box
+              style={{
+                height: "100%",
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Box style={{ flexShrink: 0 }}>
+                <ColorSelector />
+              </Box>
+
+              <Box style={{ flexShrink: 0 }}>
+                <Divider />
+              </Box>
+
+              <Box
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <BrushSidePanel
+                  onBrushSelect={onBrushSelect ?? undefined}
+                  registerStroke={registerStroke}
+                />
+              </Box>
+            </Box>
           ),
           // add more sidebar content here later, e.g:
           // bottom: <RoomParticipants />

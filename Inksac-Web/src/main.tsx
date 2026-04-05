@@ -14,6 +14,7 @@ import { RoomCreateModal } from "./components/rooms/room-create-modal";
 import { RoomDeleteModal } from "./components/rooms/room-delete-modal.tsx";
 import { RoomUpdateModal } from "./components/rooms/room-update-modal.tsx";
 import { BrushEditorModal } from "./components/brushes/brush-editor-modal.tsx";
+import { ExportModal } from "./components/export/export-modal.tsx";
 
 const modals = {
   usercreatemodal: UserCreateModal,
@@ -22,6 +23,7 @@ const modals = {
   roomdeletemodal: RoomDeleteModal,
   roomupdatemodal: RoomUpdateModal,
   brusheditormodal: BrushEditorModal,
+  exportmodal: ExportModal,
 };
 
 declare module "@mantine/modals" {
