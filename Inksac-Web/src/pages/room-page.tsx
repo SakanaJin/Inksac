@@ -20,7 +20,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
 import { useRoomLayout } from "../components/layout/room-layout";
-import { RoomLoadingOverlay } from "../components/room-tools/room-loading-overlay";
+import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
