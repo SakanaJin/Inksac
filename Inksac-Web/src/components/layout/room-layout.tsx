@@ -229,7 +229,7 @@ export function RoomLayout() {
               </Box>
 
               <Box style={{ flexShrink: 0 }}>
-                <Divider />
+                <Divider w='100%' mt={6} mb={6}/>
               </Box>
 
               <Box

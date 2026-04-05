@@ -215,37 +215,6 @@ class DrawManager {
     }
   }
 
-  // UNDO/REDO HANDLING
-  private flattenOldestUndo() {
-    const oldest = this.undoStack.shift();
-    if (!oldest) return;
-
-    const tempContainer = new pixi.Container();
-    tempContainer.addChild(this.baseSprite);
-    tempContainer.addChild(oldest);
-
-    const newBaseLayer = pixi.RenderTexture.create({
-      width: this.canvasWidth,
-      height: this.canvasHeight,
-    });
-
-    this.app.renderer.render({
-      container: tempContainer,
-      target: newBaseLayer,
-    });
-
-    tempContainer.removeChildren();
-
-    this.baseLayer.destroy();
-    this.baseLayer = newBaseLayer;
-    this.baseSprite.texture = newBaseLayer;
-
-    this.drawingContainer.addChildAt(this.baseSprite, 0);
-
-    this.drawingContainer.removeChild(oldest);
-    oldest.destroy();
-  }
-
   // UNDO/REDO HANDLING ------------------------------------------------------------------------------------
   // private flattenOldestUndo() {
   //   const oldest = this.undoStack.shift();
@@ -360,15 +329,13 @@ class DrawManager {
 
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
-      // brushSprite.tint = this.activeColor;
-      // brushSprite.alpha = this.activeOpacity;
+      brushSprite.tint = this.activeColor;
+      brushSprite.alpha = this.activeOpacity;
       brushSprite.setSize(this.activeBrush.scale);
       brushSprite.position.set(x, y);
       this.currentStroke.addChild(brushSprite);
     }
     if (this.activeErase) this.currentStroke.blendMode = "erase";
-    this.currentStroke.alpha = this.activeOpacity
-    this.currentStroke.tint = this.activeColor;
 
     this.lastPosition.set(currPosition.x, currPosition.y);
   }
@@ -448,10 +415,8 @@ class DrawManager {
       brushSprite.position.set(point.x, point.y);
       brushSprite.alpha = strokeData.opacity;
       receivedStroke.addChild(brushSprite);
-      if (strokeData.iseraser) receivedStroke.blendMode = "erase";
     }
-    // receivedStroke.alpha = strokeData.opacity
-    // receivedStroke.tint = strokeData.color;
+    if (strokeData.iseraser) receivedStroke.blendMode = "erase";
 
     const bounds = receivedStroke.getLocalBounds();
     const frame = new pixi.Rectangle(

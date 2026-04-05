@@ -67,7 +67,7 @@ export function ColorSelector() {
                 format='hexa'
                 value={color}
                 onChange={setColor}
-                mb={-10}
+                mb={6}
                 classNames={{
                     sliders: 'sliders',
                 }}
@@ -77,7 +77,7 @@ export function ColorSelector() {
                     preview: {'--mantine-radius-sm': '0px'},
                 }}
             />
-            <Group gap={10}>
+            <Group>
                 <Tooltip label="Erase Mode">
                     {eraseMode}
                 </Tooltip> 
