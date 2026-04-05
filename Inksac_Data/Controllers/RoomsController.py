@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+import os
+import uuid
 
-from Inksac_Data.database import get_db
+from Inksac_Data.database import get_db, MEDIA_DIR
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Controllers.AuthController import get_current_user, require_not_guest
@@ -58,7 +60,8 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         width=roomdto.width,
         height=roomdto.height,
         expiration=round_nearest_hour(datetime.now() + timedelta(days=1)),
-        owner=user
+        owner=user,
+        imgurl=None
     )
     db.add(room)
     db.commit()
@@ -79,12 +82,68 @@ def update(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     response.data = user.room.toGetDto()
     return response
 
+@router.patch("/{id}/imgurl")
+async def update_imgurl(
+    id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    response = Response()
+
+    if file.content_type not in ["image/png", "image/jpeg"]:
+        response.add_error("file", "file must be a png or jpg image")
+        raise HttpException(status_code=400, response=response)
+
+    filesize = request.headers.get("content-length")
+    if filesize and int(filesize) > 50 * 1024 * 1024: #50MB
+        response.add_error("file", "file size too large")
+        raise HttpException(status_code=413, response=response)
+
+    room = db.query(Room).filter(Room.id == id).first()
+    if not room:
+        response.add_error("id", "room not found")
+        raise HttpException(status_code=404, response=response)
+
+    if room.owner_id != user.id:
+        response.add_error("room", "you do not own this room")
+        raise HttpException(status_code=403, response=response)
+
+    extension = file.filename.split(".")[-1].lower()
+    if extension == "jpeg":
+        extension = "jpg"
+
+    filename = f"{uuid.uuid4()}.{extension}"
+    filepath = os.path.join("/user/room", filename)
+
+    os.makedirs(MEDIA_DIR / "/user/room"[1:], exist_ok=True)
+
+    if room.imgurl:
+        old_path = MEDIA_DIR / room.imgurl[1:]
+        if old_path.exists():
+            os.remove(old_path)
+
+    with open(MEDIA_DIR / filepath[1:], "wb") as f:
+        f.write(await file.read())
+
+    room.imgurl = filepath
+    db.commit()
+    response.data = room.toGetDto()
+    return response
+
 @router.delete("")
 async def delete(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     response = Response()
     if not user.room:
         response.add_error("room", "you do not own this room")
         raise HttpException(status_code=403, response=response)
+
+    if user.room.imgurl:
+        img_path = MEDIA_DIR / user.room.imgurl[1:]
+        if img_path.exists():
+            os.remove(img_path)
+
     await WSManager.disconnect_room(roomid=user.room.id)
     db.delete(user.room)
     user.has_room = False

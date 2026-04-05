@@ -12,6 +12,7 @@ import {
   IconArrowBackUp,
   IconArrowForwardUp,
   IconZoomReset,
+  IconDownload,
 } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
@@ -25,6 +26,7 @@ type RoomLayoutContextValue = {
   registerUndo: (fn: () => void) => void;
   registerRedo: (fn: () => void) => void;
   registerResetView: (fn: () => void) => void;
+  registerExport: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
   color: string;
   setColor: (color: string) => void;
@@ -36,6 +38,7 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerUndo: () => {},
   registerRedo: () => {},
   registerResetView: () => {},
+  registerExport: () => {},
   setHistoryState: () => {},
   color: "#ffffffff",
   setColor: () => {},
@@ -72,6 +75,7 @@ export function RoomLayout() {
   const [onUndo, setOnUndo] = useState<(() => void) | null>(null);
   const [onRedo, setOnRedo] = useState<(() => void) | null>(null);
   const [onResetView, setOnResetView] = useState<(() => void) | null>(null);
+  const [onExport, setOnExport] = useState<(() => void) | null>(null);
 
   const registerBrushSelect = useCallback(
     (fn: (brush: BrushGetDto) => void) => {
@@ -92,6 +96,10 @@ export function RoomLayout() {
     setOnResetView(() => fn);
   }, []);
 
+  const registerExport = useCallback((fn: () => void) => {
+    setOnExport(() => fn);
+  }, []);
+
   const setHistoryState = useCallback(
     (nextCanUndo: boolean, nextCanRedo: boolean) => {
       setCanUndo(nextCanUndo);
@@ -108,6 +116,7 @@ export function RoomLayout() {
         registerUndo,
         registerRedo,
         registerResetView,
+        registerExport,
         setHistoryState,
         color,
         setColor,
@@ -115,6 +124,18 @@ export function RoomLayout() {
     >
       <AppLayout
         headerTitle={roomName}
+        headerActions={
+          <Tooltip label="Export canvas">
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              radius={0}
+              onClick={() => onExport?.()}
+            >
+              <IconDownload size={18} />
+            </ActionIcon>
+          </Tooltip>
+        }
         sidebarWidth={340}
         hideActions
         hideUserInfo
