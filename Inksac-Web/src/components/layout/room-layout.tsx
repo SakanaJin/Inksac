@@ -61,7 +61,6 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerSetErase: () => {},
   setErase: () => {},
   color: "#ffffffff",
-  setColor: () => {},
   toggleSidebar: () => {},
   erase: false,
   strokeScale: 16,
@@ -200,6 +199,9 @@ export function RoomLayout() {
                   </div>
                   <div>Ctrl+Z - Undo</div>
                   <div>Ctrl+Shift+Z - Redo</div>
+                  <div>E - Toggle eraser</div>
+                  <div>[ - Decrease brush size</div>
+                  <div>] - Increase brush size</div>
                   <div>Ctrl+S - Open export modal</div>
                   <div>Tab - Toggle brush panel</div>
                   <div>Space+Left Click - Pan canvas</div>
