@@ -860,7 +860,7 @@ export const RoomPage = () => {
             style={{
               position: "absolute",
               inset: 0,
-              border: "1px solid white",
+              border: `1px solid ${erase ? "#ff8383" : "white"}`,
               borderRadius: "50%",
               boxShadow: "0 0 0 1px black",
             }}
