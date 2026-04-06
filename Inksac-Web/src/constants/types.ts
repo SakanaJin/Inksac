@@ -151,6 +151,7 @@ export interface StrokeGetDto {
   tempid: string | null;
   color: string;
   opacity: number;
+  iseraser: boolean;
   scale: number;
   created_at: string;
   points: BrushCoord[];
@@ -162,6 +163,7 @@ export interface StrokeGetDto {
 export interface StrokeCreateDto {
   color: string;
   opacity: number;
+  iseraser: boolean;
   scale: number;
   points: BrushCoord[];
 }
@@ -184,6 +186,7 @@ export interface StrokeData {
   points: BrushCoord[];
   color: string;
   opacity: number;
+  iseraser: boolean;
   scale: number;
   brushid: number;
 }

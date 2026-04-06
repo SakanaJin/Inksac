@@ -38,9 +38,12 @@ type RoomLayoutContextValue = {
   registerResetView: (fn: () => void) => void;
   registerExport: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
-  color: string;
   strokeScale: number;
   setColor: (color: string) => void;
+  registerSetErase: (fn: (erase: boolean) => void) => void;
+  setErase: (erase: boolean) => void;
+  color: string;
+  erase: boolean;
   setStrokeScale: (strokeScale: number) => void;
 };
 
@@ -52,7 +55,11 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerResetView: () => {},
   registerExport: () => {},
   setHistoryState: () => {},
+  setColor: () => {},
+  registerSetErase: () => {},
+  setErase: () => {},
   color: "#ffffffff",
+  erase: false,
   strokeScale: 16,
   setColor: () => {},
   setStrokeScale: () => {},
@@ -66,6 +73,7 @@ export function RoomLayout() {
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [erase, setEraseState] = useState(false);
   const [strokeScale, setStrokeScale] = useState(16);
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
@@ -77,6 +85,18 @@ export function RoomLayout() {
   const registerStroke = useCallback((fn: (brushId: number) => void) => {
     onStrokeRef.current = fn;
   }, []);
+
+  const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
+
+  const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
+    setOnSetErase(() => fn);
+  }, []);
+
+  const setErase = useCallback((erase: boolean) => {
+    setEraseState(erase);
+    onSetErase?.(erase);
+  }, [onSetErase]);
+
 
   useEffect(() => {
     api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
@@ -127,15 +147,18 @@ export function RoomLayout() {
     <RoomLayoutContext.Provider
       value={{
         registerBrushSelect,
+        registerSetErase,
         setBrushInUse,
         registerUndo,
         registerRedo,
         registerResetView,
         registerExport,
         setHistoryState,
-        color,
         strokeScale,
         setColor,
+        setErase,
+        color,
+        erase
         setStrokeScale,
       }}
     >
@@ -224,7 +247,7 @@ export function RoomLayout() {
               </Box>
 
               <Box style={{ flexShrink: 0 }} mt={7} mb={7}>
-                <Divider />
+                <Divider w='100%' mt={6} mb={6}/>
                 <Text size="sm" fw={600}>
                   Diameter
                 </Text>

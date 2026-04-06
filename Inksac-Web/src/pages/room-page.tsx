@@ -35,6 +35,7 @@ export const RoomPage = () => {
   const navigate = useNavigate();
   const {
     registerBrushSelect,
+    registerSetErase,
     setBrushInUse,
     registerUndo,
     registerRedo,
@@ -175,6 +176,10 @@ export const RoomPage = () => {
     drawerRef.current?.setColor(color);
     colorRef.current = color;
   }, [color]);
+  
+   useEffect(() => {
+    registerSetErase((erase) => {drawerRef.current?.setErase(erase);});
+  }, [registerSetErase]);
 
   useEffect(() => {
     drawerRef.current?.setStrokeScale(strokeScale);
