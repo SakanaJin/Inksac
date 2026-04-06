@@ -58,7 +58,6 @@ def create(brushdto: BrushCreateDto, db: Session = Depends(get_db), user: User =
     brush = Brush(
         name=brushdto.name,
         spacing=brushdto.spacing,
-        scale=brushdto.scale,
         rotation_mode=brushdto.rotation_mode,
         owner=user,
     )
@@ -83,7 +82,6 @@ def update(brushdto: BrushUpdateDto, id: int, db: Session = Depends(get_db), use
         raise HttpException(status_code=409, response=response)
     brush.name = brushdto.name
     brush.spacing = brushdto.spacing
-    brush.scale = brushdto.scale
     brush.rotation_mode = brushdto.rotation_mode
     db.commit()
     response.data = brush.toGetDto()

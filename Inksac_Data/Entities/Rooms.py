@@ -12,10 +12,15 @@ def round_nearest_hour(time: datetime) -> datetime:
 
 class RoomCreateUpdateDto(BaseModel):
     name: str
+    width: int
+    height: int
 
 class RoomGetDto(BaseModel):
     id: int
     name: str
+    width: int
+    height: int
+    imgurl: str | None
     expiration: datetime
     owner: UserShallowDto
     user_count: int
@@ -23,12 +28,17 @@ class RoomGetDto(BaseModel):
 class RoomShallowDto(BaseModel):
     id: int
     name: str
+    width: int
+    height: int
     expiration: datetime
 
 class Room(Base):
     __tablename__ = "rooms"
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
+    width = Column(Integer, nullable=False, default=2000)
+    height = Column(Integer, nullable=False, default=2000)
+    imgurl = Column(String(500), nullable=True)
     expiration = Column(DateTime(timezone=True), default=round_nearest_hour(datetime.now() + timedelta(days=1)))
 
     owner_id = Column(Integer, ForeignKey("users.id"))
@@ -42,6 +52,9 @@ class Room(Base):
         roomdto = RoomGetDto(
             id=self.id,
             name=self.name,
+            width=self.width,
+            height=self.height,
+            imgurl=self.imgurl,
             expiration=self.expiration,
             owner=self.owner.toShallowDto(),
             user_count=len(WSManager.rooms.get(self.id, {}))
@@ -52,6 +65,8 @@ class Room(Base):
         roomdto = RoomShallowDto(
             id=self.id,
             name=self.name,
+            width=self.width,
+            height=self.height,
             expiration=self.expiration
         )
         return roomdto

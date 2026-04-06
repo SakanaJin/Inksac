@@ -64,7 +64,6 @@ export const BrushEditorModal = ({
     initialValues: {
       name: brush?.name ?? "",
       spacing: brush?.spacing ?? 1,
-      scale: brush?.scale ?? 16,
       rotation_mode: brush?.rotation_mode ?? RotationMode.NONE,
     },
     validate: {
@@ -87,7 +86,6 @@ export const BrushEditorModal = ({
         const dto: BrushUpdateDto = {
           name: values.name,
           spacing: values.spacing,
-          scale: values.scale,
           rotation_mode: values.rotation_mode,
         };
 
@@ -96,7 +94,6 @@ export const BrushEditorModal = ({
         const dto: BrushCreateDto = {
           name: values.name,
           spacing: values.spacing,
-          scale: values.scale,
           rotation_mode: values.rotation_mode,
         };
 
@@ -212,28 +209,6 @@ export const BrushEditorModal = ({
                   key={form.key("name")}
                   {...form.getInputProps("name")}
                 />
-              </SettingBlock>
-
-              <SettingBlock label="Diameter">
-                <Group wrap="nowrap" align="center">
-                  <Slider
-                    style={{ flex: 1 }}
-                    min={1}
-                    max={256}
-                    step={1}
-                    value={form.values.scale}
-                    onChange={(value) => form.setFieldValue("scale", value)}
-                  />
-                  <NumberInput
-                    radius={0}
-                    w={90}
-                    min={1}
-                    max={256}
-                    step={1}
-                    key={form.key("scale")}
-                    {...form.getInputProps("scale")}
-                  />
-                </Group>
               </SettingBlock>
 
               <SettingBlock label="Spacing">

@@ -13,13 +13,11 @@ DEFAULT_BRUSH = "/user/brush/softShape.png"
 class BrushCreateDto(BaseModel):
     name: str
     spacing: float
-    scale: float
     rotation_mode: RotationMode
 
 class BrushUpdateDto(BaseModel):
     name: str
     spacing: float
-    scale: float
     rotation_mode: RotationMode
 
 class BrushGetDto(BaseModel):
@@ -27,7 +25,6 @@ class BrushGetDto(BaseModel):
     name: str
     imgurl: str
     spacing: float
-    scale: float
     rotation_mode: RotationMode
     brush_type: BrushType
     owner: Optional[UserShallowDto]
@@ -38,7 +35,6 @@ class BrushShallowDto(BaseModel):
     name: str
     imgurl: str
     spacing: float
-    scale: float
     rotation_mode: RotationMode
     brush_type: BrushType
     in_use: bool
@@ -49,7 +45,6 @@ class Brush(Base):
     name = Column(String(255), nullable=False)
     imgurl = Column(String(255), nullable=False, default=DEFAULT_BRUSH)
     spacing = Column(Float, nullable=False) # this might not be necessary
-    scale = Column(Float, nullable=False)
     rotation_mode = Column(Enum(RotationMode), nullable=False, default=RotationMode.FOLLOWSTROKE)
     brush_type = Column(Enum(BrushType), nullable=False, default=BrushType.USER)
 
@@ -67,7 +62,6 @@ class Brush(Base):
             name=self.name,
             imgurl=self.imgurl,
             spacing=self.spacing,
-            scale=self.scale,
             rotation_mode=self.rotation_mode,
             brush_type=self.brush_type,
             owner=owner,
@@ -81,7 +75,6 @@ class Brush(Base):
             name=self.name,
             imgurl=self.imgurl,
             spacing=self.spacing,
-            scale=self.scale,
             rotation_mode=self.rotation_mode,
             brush_type=self.brush_type,
             in_use=bool(self.rooms)

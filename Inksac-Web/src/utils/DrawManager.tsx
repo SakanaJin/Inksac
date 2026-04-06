@@ -1,5 +1,4 @@
 import * as pixi from "pixi.js";
-//import softShape from "../../../media/user/brush/softShape.png";
 import {
   WSType,
   type BrushCoord,
@@ -19,12 +18,18 @@ class DrawManager {
   private app: pixi.Application;
   private undoStack: Stroke[];
   private redoStack: Stroke[];
-  private maxUndoSteps: number;
   private lastPosition: pixi.Point;
 
-  private baseLayer: pixi.Texture;
+  private canvasWidth: number;
+  private canvasHeight: number;
+
+  private baseLayer: pixi.RenderTexture;
   private baseSprite: pixi.Sprite;
   private drawingContainer: pixi.Container;
+  private boardContentContainer: pixi.Container;
+  private worldContainer: pixi.Container;
+  private boardBackground: pixi.Graphics;
+  private boardMask: pixi.Graphics;
 
   private currentStroke: pixi.Container | null = null;
   private isDrawing = false;
@@ -34,6 +39,8 @@ class DrawManager {
   private activeBrush: BrushGetDto | null = null;
   private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
+  private activeErase: boolean = false;
+  private strokeScale: number = 16;
 
   private ws: WSManager | null = null;
 
@@ -44,28 +51,62 @@ class DrawManager {
   constructor(
     pixiApp: pixi.Application,
     wsManager: WSManager,
+    canvasWidth: number,
+    canvasHeight: number,
     maxUndoSteps: number = 10,
   ) {
     this.app = pixiApp;
     this.undoStack = [];
     this.redoStack = [];
-    this.maxUndoSteps = maxUndoSteps;
     this.lastPosition = new pixi.Point();
 
+    this.canvasWidth = canvasWidth;
+    this.canvasHeight = canvasHeight;
+
     this.baseLayer = pixi.RenderTexture.create({
-      width: this.app.screen.width,
-      height: this.app.screen.height,
+      width: this.canvasWidth,
+      height: this.canvasHeight,
     });
     this.baseSprite = new pixi.Sprite(this.baseLayer);
-    this.drawingContainer = new pixi.Container();
+    this.baseSprite.position.set(0, 0);
 
-    this.app.stage.addChild(this.drawingContainer);
+    this.drawingContainer = new pixi.Container();
+    this.boardContentContainer = new pixi.Container();
+    this.drawingContainer.filters = [new pixi.AlphaFilter()];
+    this.worldContainer = new pixi.Container();
+
+    this.boardBackground = new pixi.Graphics();
+    this.boardBackground
+      .rect(0, 0, this.canvasWidth, this.canvasHeight)
+      .fill("#636363")
+      .stroke({ color: "#8a8a8a", width: 2 });
+
+    this.boardMask = new pixi.Graphics();
+    this.boardMask
+      .rect(0, 0, this.canvasWidth, this.canvasHeight)
+      .fill("#ffffff");
+
+    this.boardContentContainer.addChild(this.baseSprite);
+    this.boardContentContainer.addChild(this.drawingContainer);
+    this.boardContentContainer.mask = this.boardMask;
+
+    this.worldContainer.addChild(this.boardBackground);
+    this.worldContainer.addChild(this.boardMask);
+    this.worldContainer.addChild(this.boardContentContainer);
+
+    this.worldContainer.position.set(
+      (this.app.screen.width - this.canvasWidth) / 2,
+      (this.app.screen.height - this.canvasHeight) / 2,
+    );
+
+    this.app.stage.addChild(this.worldContainer);
     this.initMouseEvents();
 
     this.ws = wsManager;
 
     this.strokesMap = new Map<number, Stroke>();
     this.tempStrokes = new Map<string, Stroke>();
+    this.initMouseEvents();
   }
 
   async init() {
@@ -81,46 +122,135 @@ class DrawManager {
     );
   }
 
+  public async loadBaseImage(imgurl: string) {
+    const texture = await pixi.Assets.load<pixi.Texture>(baseurl + imgurl);
+
+    const sprite = new pixi.Sprite(texture);
+    sprite.position.set(0, 0);
+    sprite.width = this.canvasWidth;
+    sprite.height = this.canvasHeight;
+
+    this.app.renderer.render({
+      container: sprite,
+      target: this.baseLayer,
+      clear: true,
+    });
+
+    sprite.destroy();
+  }
+
   public setColor(color: string) {
     this.activeColor = color;
     const alpha = color.slice(-2);
     this.activeOpacity = parseInt(alpha, 16) / 255;
   }
 
+  public setStrokeScale(strokeScale: number) {
+    this.strokeScale =
+      strokeScale <= 512 && strokeScale >= 1 ? strokeScale : 16;
+  }
+
+  public getWorldContainer() {
+    return this.worldContainer;
+  }
+
+  public getCanvasSize() {
+    return {
+      width: this.canvasWidth,
+      height: this.canvasHeight,
+    };
+  }
+
+  public canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  public canRedo() {
+    return this.redoStack.length > 0;
+  }
+
+  private isInsideBoard(x: number, y: number) {
+    return x >= 0 && x <= this.canvasWidth && y >= 0 && y <= this.canvasHeight;
+  }
+
   public setOnStroke(fn: (brushId: number) => void) {
     this.onStroke = fn;
   }
 
-  // UNDO/REDO HANDLING
-  private flattenOldestUndo() {
-    const oldest = this.undoStack.shift();
-    if (!oldest) return;
-
-    const tempContainer = new pixi.Container();
-    tempContainer.addChild(this.baseSprite);
-    tempContainer.addChild(oldest);
-
-    const newBaseLayer = pixi.RenderTexture.create({
-      width: this.app.screen.width,
-      height: this.app.screen.height,
-    });
-
-    this.app.renderer.render({
-      container: tempContainer,
-      target: newBaseLayer,
-    });
-
-    tempContainer.removeChildren();
-
-    this.baseLayer.destroy();
-    this.baseLayer = newBaseLayer;
-    this.baseSprite.texture = newBaseLayer;
-
-    this.drawingContainer.addChildAt(this.baseSprite, 0);
-
-    this.drawingContainer.removeChild(oldest);
-    oldest.destroy();
+  public setErase(eraser: boolean) {
+    this.activeErase = eraser;
   }
+
+  public async exportCanvas(options: {
+    format: "png" | "jpg";
+    transparentBackground?: boolean;
+    scale?: number;
+  }) {
+    const { format, transparentBackground = false, scale = 1 } = options;
+
+    const previousBackgroundVisible = this.boardBackground.visible;
+
+    if (format === "png" && transparentBackground) {
+      this.boardBackground.visible = false;
+    }
+
+    const exportTexture = this.app.renderer.generateTexture({
+      target: this.worldContainer,
+      frame: new pixi.Rectangle(0, 0, this.canvasWidth, this.canvasHeight),
+      resolution: scale,
+    });
+
+    try {
+      const extension = format === "jpg" ? "jpg" : "png";
+
+      const dataUrl = await this.app.renderer.extract.base64({
+        target: exportTexture,
+        format: format === "jpg" ? "jpg" : "png",
+        quality: 1,
+      });
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `canvas-export-${Date.now()}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      exportTexture.destroy(true);
+      this.boardBackground.visible = previousBackgroundVisible;
+    }
+  }
+
+  // UNDO/REDO HANDLING ------------------------------------------------------------------------------------
+  // private flattenOldestUndo() {
+  //   const oldest = this.undoStack.shift();
+  //   if (!oldest) return;
+
+  //   const tempContainer = new pixi.Container();
+  //   tempContainer.addChild(this.baseSprite);
+  //   tempContainer.addChild(oldest);
+
+  //   const newBaseLayer = pixi.RenderTexture.create({
+  //     width: this.app.screen.width,
+  //     height: this.app.screen.height,
+  //   });
+
+  //   this.app.renderer.render({
+  //     container: tempContainer,
+  //     target: newBaseLayer,
+  //   });
+
+  //   tempContainer.removeChildren();
+
+  //   this.baseLayer.destroy();
+  //   this.baseLayer = newBaseLayer;
+  //   this.baseSprite.texture = newBaseLayer;
+
+  //   this.drawingContainer.addChildAt(this.baseSprite, 0);
+
+  //   this.drawingContainer.removeChild(oldest);
+  //   oldest.destroy();
+  // }
 
   public undo() {
     if (this.undoStack.length === 0) return;
@@ -149,7 +279,7 @@ class DrawManager {
     this.ws.send(message);
   }
 
-  // POINTER EVENTS
+  // POINTER EVENTS ----------------------------------------------------------------------------------------
   private initMouseEvents() {
     this.app.stage.eventMode = "static";
     this.app.stage.hitArea = this.app.screen;
@@ -157,39 +287,49 @@ class DrawManager {
     this.app.stage.on("pointerdown", (event) => this.onMouseDown(event));
     this.app.stage.on("pointermove", (event) => this.onMouseMove(event));
     this.app.stage.on("pointerup", () => this.onMouseUp());
+    this.app.stage.on("pointerupoutside", () => this.onMouseUp());
     this.app.stage.on("pointerleave", () => this.onMouseUp());
     this.app.stage.on("rightdown", () => this.onMouseUp());
   }
 
   private onMouseDown(event: pixi.FederatedPointerEvent) {
+    if (event.button !== 0) return;
+
+    const localPosition = this.worldContainer.toLocal(event.global);
+
+    if (!this.isInsideBoard(localPosition.x, localPosition.y)) return;
+
     this.isDrawing = true;
-    this.lastPosition.set(event.global.x, event.global.y);
+    this.lastPosition.set(localPosition.x, localPosition.y);
     this.strokePoints = [];
 
     this.currentStroke = new pixi.Container();
     this.drawingContainer.addChild(this.currentStroke);
   }
 
-  // this is what actually "draws" the brush stroke, prob make a brush class to handle width, opacity, shape, etc
+  // this is what actually "draws" the brush stroke
   private onMouseMove(event: pixi.FederatedPointerEvent) {
     if (
       this.isDrawing == false ||
       this.currentStroke == null ||
-      this.brushTexture == null
+      this.brushTexture == null ||
+      this.activeBrush == null
     )
       return;
 
-    const currPosition = event.global;
+    const currPosition = this.worldContainer.toLocal(event.global);
     const dx = currPosition.x - this.lastPosition.x;
     const dy = currPosition.y - this.lastPosition.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     const gap = 1;
-    const numStamps = Math.ceil(distance / gap);
+    const numStamps = Math.max(1, Math.ceil(distance / gap));
 
     for (let i = 0; i <= numStamps; i++) {
       const t = i / numStamps;
       const x = this.lastPosition.x + dx * t;
       const y = this.lastPosition.y + dy * t;
+
+      if (!this.isInsideBoard(x, y)) continue;
 
       this.strokePoints.push({ x, y });
 
@@ -197,11 +337,11 @@ class DrawManager {
       brushSprite.anchor.set(0.5);
       brushSprite.tint = this.activeColor;
       brushSprite.alpha = this.activeOpacity;
-      brushSprite.setSize(this.activeBrush.scale);
+      brushSprite.setSize(this.strokeScale);
       brushSprite.position.set(x, y);
-
       this.currentStroke.addChild(brushSprite);
     }
+    if (this.activeErase) this.currentStroke.blendMode = "erase";
 
     this.lastPosition.set(currPosition.x, currPosition.y);
   }
@@ -209,15 +349,31 @@ class DrawManager {
   private onMouseUp() {
     if (this.isDrawing == false || this.currentStroke == null) return;
 
+    if (this.currentStroke.children.length === 0) {
+      this.isDrawing = false;
+      this.currentStroke.destroy({ children: true });
+      this.currentStroke = null;
+      return;
+    }
+
     this.isDrawing = false;
     const tempid = crypto.randomUUID();
 
-    const bounds = this.currentStroke.getBounds();
-    const combinedTexture = this.app.renderer.generateTexture(
-      this.currentStroke,
+    const bounds = this.currentStroke.getLocalBounds();
+    const frame = new pixi.Rectangle(
+      bounds.minX,
+      bounds.minY,
+      bounds.maxX - bounds.minX,
+      bounds.maxY - bounds.minY,
     );
+
+    const combinedTexture = this.app.renderer.generateTexture({
+      target: this.currentStroke,
+      frame,
+    });
     const combinedSprite = new pixi.Sprite(combinedTexture);
-    combinedSprite.position.set(bounds.x, bounds.y);
+    combinedSprite.position.set(frame.x, frame.y);
+    if (this.activeErase) combinedSprite.blendMode = "erase";
 
     const combinedSpriteContainer = new Stroke(tempid);
     combinedSpriteContainer.addChild(combinedSprite);
@@ -226,12 +382,10 @@ class DrawManager {
     this.currentStroke.destroy({ children: true });
     this.currentStroke = null;
 
-    this.redoStack = [];
-    // this.undoStack.push(combinedSpriteContainer);
-    // if (this.undoStack.length > this.maxUndoSteps) {
-    //   this.flattenOldestUndo();
-    // }
+    this.undoStack.push(combinedSpriteContainer);
 
+    this.drawingContainer.addChild(combinedSpriteContainer);
+    this.redoStack = [];
     this.tempStrokes.set(tempid, combinedSpriteContainer);
 
     const strokeData: StrokeData = {
@@ -239,6 +393,8 @@ class DrawManager {
       points: this.strokePoints,
       color: this.activeColor,
       opacity: this.activeOpacity,
+      iseraser: this.activeErase,
+      scale: this.strokeScale,
       brushid: this.activeBrush?.id ?? 1,
     };
 
@@ -247,8 +403,8 @@ class DrawManager {
     this.ws.send(message);
   }
 
-  // RECEIVING STROKE FUNCTIONS
-  // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer, redo/undo kinda busted for multiple people rn
+  // RECEIVING STROKE FUNCTIONS ----------------------------------------------------------------------------
+  // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
     const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(
       baseurl + strokeData.brush.imgurl,
@@ -261,16 +417,28 @@ class DrawManager {
 
       brushSprite.anchor.set(0.5);
       brushSprite.tint = strokeData.color;
-      brushSprite.setSize(strokeData.brush.scale);
+      brushSprite.setSize(strokeData.scale);
       brushSprite.position.set(point.x, point.y);
       brushSprite.alpha = strokeData.opacity;
       receivedStroke.addChild(brushSprite);
     }
+    if (strokeData.iseraser) receivedStroke.blendMode = "erase";
 
-    const bounds = receivedStroke.getBounds();
-    const combinedTexture = this.app.renderer.generateTexture(receivedStroke);
+    const bounds = receivedStroke.getLocalBounds();
+    const frame = new pixi.Rectangle(
+      bounds.minX,
+      bounds.minY,
+      bounds.maxX - bounds.minX,
+      bounds.maxY - bounds.minY,
+    );
+
+    const combinedTexture = this.app.renderer.generateTexture({
+      target: receivedStroke,
+      frame,
+    });
     const combinedSprite = new pixi.Sprite(combinedTexture);
-    combinedSprite.position.set(bounds.x, bounds.y);
+    combinedSprite.position.set(frame.x, frame.y);
+    if (strokeData.iseraser) combinedSprite.blendMode = "erase";
 
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
@@ -279,23 +447,15 @@ class DrawManager {
     receivedStroke.destroy({ children: true });
 
     this.drawingContainer.addChild(combinedSpriteContainer);
-    // return combinedSpriteContainer;
-    // this.undoStack.push(combinedSpriteContainer);
-    // if (this.undoStack.length > this.maxUndoSteps) {
-    //   this.flattenOldestUndo();
-    // }
   }
 
   public async receiveStroke(strokeData: StrokeGetDto) {
     if (this.tempStrokes.has(strokeData.tempid)) {
-      const stroke = this.tempStrokes.get(strokeData.tempid);
+      const stroke = this.tempStrokes.get(strokeData.tempid)!;
       this.tempStrokes.delete(strokeData.tempid);
       stroke.id = strokeData.id;
       this.strokesMap.set(strokeData.id, stroke);
       this.undoStack.push(stroke);
-      if (this.undoStack.length > this.maxUndoSteps) {
-        //this.flattenOldestUndo();
-      }
       return;
     }
     if (this.strokesMap.has(strokeData.id)) return;
@@ -304,7 +464,7 @@ class DrawManager {
 
   public async undoStroke(id: number) {
     if (!this.strokesMap.has(id)) return;
-    const stroke = this.strokesMap.get(id);
+    const stroke = this.strokesMap.get(id)!;
     this.drawingContainer.removeChild(stroke);
     stroke.destroy();
     this.strokesMap.delete(id);
@@ -322,8 +482,6 @@ class DrawManager {
     if (strokeDatalist.length === 0) return;
     for (const strokeData of strokeDatalist) {
       await this.renderReceivedStroke(strokeData);
-      // const stroke = this.renderReceivedStroke(strokeData);
-      // this.strokesMap.set(stroke.id, stroke);
     }
   }
 }
