@@ -41,6 +41,7 @@ class DrawManager {
   private activeBrush: BrushGetDto | null = null;
   private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
+  private strokeScale: number = 16;
 
   private ws: WSManager | null = null;
 
@@ -142,6 +143,11 @@ class DrawManager {
     this.activeColor = color;
     const alpha = color.slice(-2);
     this.activeOpacity = parseInt(alpha, 16) / 255;
+  }
+
+  public setStrokeScale(strokeScale: number) {
+    this.strokeScale =
+      strokeScale <= 512 && strokeScale >= 1 ? strokeScale : 16;
   }
 
   public getWorldContainer() {
@@ -327,7 +333,7 @@ class DrawManager {
       brushSprite.anchor.set(0.5);
       brushSprite.tint = this.activeColor;
       brushSprite.alpha = this.activeOpacity;
-      brushSprite.setSize(this.activeBrush.scale);
+      brushSprite.setSize(this.strokeScale);
       brushSprite.position.set(x, y);
 
       this.currentStroke.addChild(brushSprite);
@@ -384,6 +390,7 @@ class DrawManager {
       points: this.strokePoints,
       color: this.activeColor,
       opacity: this.activeOpacity,
+      scale: this.strokeScale,
       brushid: this.activeBrush?.id ?? 1,
     };
 
@@ -406,7 +413,7 @@ class DrawManager {
 
       brushSprite.anchor.set(0.5);
       brushSprite.tint = strokeData.color;
-      brushSprite.setSize(strokeData.brush.scale);
+      brushSprite.setSize(strokeData.scale);
       brushSprite.position.set(point.x, point.y);
       brushSprite.alpha = strokeData.opacity;
       receivedStroke.addChild(brushSprite);

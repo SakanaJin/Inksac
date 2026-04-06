@@ -42,8 +42,10 @@ export const RoomPage = () => {
     registerExport,
     setHistoryState,
     color,
+    strokeScale,
   } = useRoomLayout();
   const colorRef = useRef(color);
+  const strokeScaleRef = useRef(strokeScale);
 
   const [isCanvasDataReady, setIsCanvasDataReady] = useState(false);
   const [hasShownLoaderOnce, setHasShownLoaderOnce] = useState(false);
@@ -173,6 +175,10 @@ export const RoomPage = () => {
     drawerRef.current?.setColor(color);
     colorRef.current = color;
   }, [color]);
+
+  useEffect(() => {
+    drawerRef.current?.setStrokeScale(strokeScale);
+  }, [strokeScale]);
 
   useEffect(() => {
     setHasShownLoaderOnce(false);
@@ -365,6 +371,7 @@ export const RoomPage = () => {
         }
 
         drawerRef.current.setColor(colorRef.current);
+        drawerRef.current.setStrokeScale(strokeScaleRef.current);
         refreshHistoryState();
 
         const message: WSMessage = { Mtype: WSType.READY, data: true };

@@ -114,7 +114,6 @@ def seed_brushes():
             brush = Brush(
                 name=seed_brush['name'],
                 spacing=seed_brush['spacing'],
-                scale=seed_brush['scale'],
                 rotation_mode=seed_brush['rotation_mode'],
                 brush_type=BrushType.SYSTEM,
                 imgurl=seed_brush['imgurl']

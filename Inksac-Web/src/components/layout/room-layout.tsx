@@ -7,7 +7,17 @@ import {
   useRef,
 } from "react";
 import { useParams } from "react-router-dom";
-import { ActionIcon, Box, Divider, Group, Paper, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Box,
+  Divider,
+  Group,
+  NumberInput,
+  Paper,
+  Slider,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
@@ -29,7 +39,9 @@ type RoomLayoutContextValue = {
   registerExport: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
   color: string;
+  strokeScale: number;
   setColor: (color: string) => void;
+  setStrokeScale: (strokeScale: number) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -41,7 +53,9 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerExport: () => {},
   setHistoryState: () => {},
   color: "#ffffffff",
+  strokeScale: 16,
   setColor: () => {},
+  setStrokeScale: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -52,6 +66,7 @@ export function RoomLayout() {
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [strokeScale, setStrokeScale] = useState(16);
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
 
@@ -119,7 +134,9 @@ export function RoomLayout() {
         registerExport,
         setHistoryState,
         color,
+        strokeScale,
         setColor,
+        setStrokeScale,
       }}
     >
       <AppLayout
@@ -206,8 +223,30 @@ export function RoomLayout() {
                 <ColorSelector />
               </Box>
 
-              <Box style={{ flexShrink: 0 }}>
+              <Box style={{ flexShrink: 0 }} mt={7} mb={7}>
                 <Divider />
+                <Text size="sm" fw={600}>
+                  Diameter
+                </Text>
+                <Group wrap="nowrap" align="center">
+                  <Slider
+                    style={{ flex: 1 }}
+                    min={1}
+                    max={512}
+                    step={1}
+                    value={strokeScale}
+                    onChange={setStrokeScale}
+                  />
+                  <NumberInput
+                    radius={0}
+                    w={90}
+                    min={1}
+                    max={512}
+                    step={1}
+                    value={strokeScale}
+                    onChange={(value) => setStrokeScale(value as number)}
+                  />
+                </Group>
               </Box>
 
               <Box
