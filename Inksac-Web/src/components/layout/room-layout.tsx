@@ -28,8 +28,11 @@ type RoomLayoutContextValue = {
   registerResetView: (fn: () => void) => void;
   registerExport: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
-  color: string;
   setColor: (color: string) => void;
+  registerSetErase: (fn: (erase: boolean) => void) => void;
+  setErase: (erase: boolean) => void;
+  color: string;
+  erase: boolean;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -40,8 +43,11 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerResetView: () => {},
   registerExport: () => {},
   setHistoryState: () => {},
-  color: "#ffffffff",
   setColor: () => {},
+  registerSetErase: () => {},
+  setErase: () => {},
+  color: "#ffffffff",
+  erase: false,
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -52,6 +58,7 @@ export function RoomLayout() {
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [erase, setEraseState] = useState(false);
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
 
@@ -62,6 +69,18 @@ export function RoomLayout() {
   const registerStroke = useCallback((fn: (brushId: number) => void) => {
     onStrokeRef.current = fn;
   }, []);
+
+  const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
+
+  const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
+    setOnSetErase(() => fn);
+  }, []);
+
+  const setErase = useCallback((erase: boolean) => {
+    setEraseState(erase);
+    onSetErase?.(erase);
+  }, [onSetErase]);
+
 
   useEffect(() => {
     api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
@@ -112,14 +131,17 @@ export function RoomLayout() {
     <RoomLayoutContext.Provider
       value={{
         registerBrushSelect,
+        registerSetErase,
         setBrushInUse,
         registerUndo,
         registerRedo,
         registerResetView,
         registerExport,
         setHistoryState,
-        color,
         setColor,
+        setErase,
+        color,
+        erase
       }}
     >
       <AppLayout
@@ -207,7 +229,7 @@ export function RoomLayout() {
               </Box>
 
               <Box style={{ flexShrink: 0 }}>
-                <Divider />
+                <Divider w='100%' mt={6} mb={6}/>
               </Box>
 
               <Box
