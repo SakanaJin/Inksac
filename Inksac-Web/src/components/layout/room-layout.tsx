@@ -61,7 +61,6 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   color: "#ffffffff",
   erase: false,
   strokeScale: 16,
-  setColor: () => {},
   setStrokeScale: () => {},
 });
 
@@ -86,17 +85,21 @@ export function RoomLayout() {
     onStrokeRef.current = fn;
   }, []);
 
-  const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
+  const [onSetErase, setOnSetErase] = useState<
+    ((erase: boolean) => void) | null
+  >(null);
 
   const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
     setOnSetErase(() => fn);
   }, []);
 
-  const setErase = useCallback((erase: boolean) => {
-    setEraseState(erase);
-    onSetErase?.(erase);
-  }, [onSetErase]);
-
+  const setErase = useCallback(
+    (erase: boolean) => {
+      setEraseState(erase);
+      onSetErase?.(erase);
+    },
+    [onSetErase],
+  );
 
   useEffect(() => {
     api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
@@ -158,7 +161,7 @@ export function RoomLayout() {
         setColor,
         setErase,
         color,
-        erase
+        erase,
         setStrokeScale,
       }}
     >
@@ -247,7 +250,7 @@ export function RoomLayout() {
               </Box>
 
               <Box style={{ flexShrink: 0 }} mt={7} mb={7}>
-                <Divider w='100%' mt={6} mb={6}/>
+                <Divider w="100%" />
                 <Text size="sm" fw={600}>
                   Diameter
                 </Text>
@@ -270,6 +273,7 @@ export function RoomLayout() {
                     onChange={(value) => setStrokeScale(value as number)}
                   />
                 </Group>
+                <Divider w="100%" mt={7} mb={7} />
               </Box>
 
               <Box
