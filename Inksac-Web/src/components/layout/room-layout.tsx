@@ -7,7 +7,17 @@ import {
   useRef,
 } from "react";
 import { useParams } from "react-router-dom";
-import { ActionIcon, Box, Divider, Group, Paper, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Box,
+  Divider,
+  Group,
+  NumberInput,
+  Paper,
+  Slider,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
@@ -28,11 +38,13 @@ type RoomLayoutContextValue = {
   registerResetView: (fn: () => void) => void;
   registerExport: (fn: () => void) => void;
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
+  strokeScale: number;
   setColor: (color: string) => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
   setErase: (erase: boolean) => void;
   color: string;
   erase: boolean;
+  setStrokeScale: (strokeScale: number) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -48,6 +60,8 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setErase: () => {},
   color: "#ffffffff",
   erase: false,
+  strokeScale: 16,
+  setStrokeScale: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -59,6 +73,7 @@ export function RoomLayout() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [erase, setEraseState] = useState(false);
+  const [strokeScale, setStrokeScale] = useState(16);
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
 
@@ -70,17 +85,21 @@ export function RoomLayout() {
     onStrokeRef.current = fn;
   }, []);
 
-  const [onSetErase, setOnSetErase] = useState<((erase: boolean) => void) | null>(null);
+  const [onSetErase, setOnSetErase] = useState<
+    ((erase: boolean) => void) | null
+  >(null);
 
   const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
     setOnSetErase(() => fn);
   }, []);
 
-  const setErase = useCallback((erase: boolean) => {
-    setEraseState(erase);
-    onSetErase?.(erase);
-  }, [onSetErase]);
-
+  const setErase = useCallback(
+    (erase: boolean) => {
+      setEraseState(erase);
+      onSetErase?.(erase);
+    },
+    [onSetErase],
+  );
 
   useEffect(() => {
     api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
@@ -138,10 +157,12 @@ export function RoomLayout() {
         registerResetView,
         registerExport,
         setHistoryState,
+        strokeScale,
         setColor,
         setErase,
         color,
-        erase
+        erase,
+        setStrokeScale,
       }}
     >
       <AppLayout
@@ -228,8 +249,31 @@ export function RoomLayout() {
                 <ColorSelector />
               </Box>
 
-              <Box style={{ flexShrink: 0 }}>
-                <Divider w='100%' mt={6} mb={6}/>
+              <Box style={{ flexShrink: 0 }} mt={7} mb={7}>
+                <Divider w="100%" />
+                <Text size="sm" fw={600}>
+                  Diameter
+                </Text>
+                <Group wrap="nowrap" align="center">
+                  <Slider
+                    style={{ flex: 1 }}
+                    min={1}
+                    max={512}
+                    step={1}
+                    value={strokeScale}
+                    onChange={setStrokeScale}
+                  />
+                  <NumberInput
+                    radius={0}
+                    w={90}
+                    min={1}
+                    max={512}
+                    step={1}
+                    value={strokeScale}
+                    onChange={(value) => setStrokeScale(value as number)}
+                  />
+                </Group>
+                <Divider w="100%" mt={7} mb={7} />
               </Box>
 
               <Box

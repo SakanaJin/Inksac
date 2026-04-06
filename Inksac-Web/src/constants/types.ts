@@ -87,7 +87,6 @@ export interface BrushGetDto {
   name: string;
   imgurl: string;
   spacing: number;
-  scale: number;
   rotation_mode: RotationMode;
   brush_type: BrushType;
   owner: UserShallowDto;
@@ -99,7 +98,6 @@ export interface BrushShallowDto {
   name: string;
   imgurl: string;
   spacing: number;
-  scale: number;
   rotation_mode: RotationMode;
   brush_type: BrushType;
   in_use: boolean;
@@ -108,14 +106,12 @@ export interface BrushShallowDto {
 export interface BrushCreateDto {
   name: string;
   spacing: number;
-  scale: number;
   rotation_mode: RotationMode;
 }
 
 export interface BrushUpdateDto {
   name: string;
   spacing: number;
-  scale: number;
   rotation_mode: RotationMode;
 }
 
@@ -156,6 +152,7 @@ export interface StrokeGetDto {
   color: string;
   opacity: number;
   iseraser: boolean;
+  scale: number;
   created_at: string;
   points: BrushCoord[];
   creator_id: number;
@@ -167,6 +164,7 @@ export interface StrokeCreateDto {
   color: string;
   opacity: number;
   iseraser: boolean;
+  scale: number;
   points: BrushCoord[];
 }
 
@@ -189,5 +187,6 @@ export interface StrokeData {
   color: string;
   opacity: number;
   iseraser: boolean;
+  scale: number;
   brushid: number;
 }

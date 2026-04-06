@@ -15,6 +15,7 @@ class StrokeGetDto(BaseModel):
     color: str
     opacity: float
     iseraser: bool
+    scale: int
     created_at: datetime
     points: List[Point]
     creator_id: int
@@ -25,6 +26,7 @@ class StrokeCreateDto(BaseModel):
     color: str
     opacity: float
     iseraser: bool
+    scale: int
     points: List[Point]
 
 class StrokeData(BaseModel):
@@ -32,6 +34,7 @@ class StrokeData(BaseModel):
     points: List[Point]
     color: str
     opacity: float
+    scale: int
     brushid: int
     iseraser: bool
 
@@ -44,6 +47,7 @@ class Stroke(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.now(), nullable=False)
     deleted = Column(Boolean, default=False)
     iseraser = Column(Boolean, default=False)
+    scale = Column(Integer, nullable=False)
 
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
@@ -60,6 +64,7 @@ class Stroke(Base):
             color=self.color,
             opacity=self.opacity,
             iseraser=self.iseraser,
+            scale=self.scale,
             created_at=self.created_at,
             points=self.points,
             creator_id=self.creator_id,

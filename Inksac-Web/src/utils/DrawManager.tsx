@@ -40,6 +40,7 @@ class DrawManager {
   private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
   private activeErase: boolean = false;
+  private strokeScale: number = 16;
 
   private ws: WSManager | null = null;
 
@@ -144,6 +145,11 @@ class DrawManager {
     this.activeOpacity = parseInt(alpha, 16) / 255;
   }
 
+  public setStrokeScale(strokeScale: number) {
+    this.strokeScale =
+      strokeScale <= 512 && strokeScale >= 1 ? strokeScale : 16;
+  }
+
   public getWorldContainer() {
     return this.worldContainer;
   }
@@ -170,7 +176,7 @@ class DrawManager {
   public setOnStroke(fn: (brushId: number) => void) {
     this.onStroke = fn;
   }
-  
+
   public setErase(eraser: boolean) {
     this.activeErase = eraser;
   }
@@ -331,7 +337,7 @@ class DrawManager {
       brushSprite.anchor.set(0.5);
       brushSprite.tint = this.activeColor;
       brushSprite.alpha = this.activeOpacity;
-      brushSprite.setSize(this.activeBrush.scale);
+      brushSprite.setSize(this.strokeScale);
       brushSprite.position.set(x, y);
       this.currentStroke.addChild(brushSprite);
     }
@@ -367,8 +373,7 @@ class DrawManager {
     });
     const combinedSprite = new pixi.Sprite(combinedTexture);
     combinedSprite.position.set(frame.x, frame.y);
-	if (this.activeErase) combinedSprite.blendMode = "erase";
-
+    if (this.activeErase) combinedSprite.blendMode = "erase";
 
     const combinedSpriteContainer = new Stroke(tempid);
     combinedSpriteContainer.addChild(combinedSprite);
@@ -389,6 +394,7 @@ class DrawManager {
       color: this.activeColor,
       opacity: this.activeOpacity,
       iseraser: this.activeErase,
+      scale: this.strokeScale,
       brushid: this.activeBrush?.id ?? 1,
     };
 
@@ -411,7 +417,7 @@ class DrawManager {
 
       brushSprite.anchor.set(0.5);
       brushSprite.tint = strokeData.color;
-      brushSprite.setSize(strokeData.brush.scale);
+      brushSprite.setSize(strokeData.scale);
       brushSprite.position.set(point.x, point.y);
       brushSprite.alpha = strokeData.opacity;
       receivedStroke.addChild(brushSprite);
@@ -433,7 +439,7 @@ class DrawManager {
     const combinedSprite = new pixi.Sprite(combinedTexture);
     combinedSprite.position.set(frame.x, frame.y);
     if (strokeData.iseraser) combinedSprite.blendMode = "erase";
-	
+
     const combinedSpriteContainer = new Stroke(strokeData.id);
     combinedSpriteContainer.addChild(combinedSprite);
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
