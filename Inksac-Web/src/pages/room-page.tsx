@@ -44,6 +44,9 @@ export const RoomPage = () => {
     setHistoryState,
     color,
     strokeScale,
+    setUsers,
+    addUser,
+    removeUser,
   } = useRoomLayout();
   const colorRef = useRef(color);
   const strokeScaleRef = useRef(strokeScale);
@@ -176,9 +179,11 @@ export const RoomPage = () => {
     drawerRef.current?.setColor(color);
     colorRef.current = color;
   }, [color]);
-  
-   useEffect(() => {
-    registerSetErase((erase) => {drawerRef.current?.setErase(erase);});
+
+  useEffect(() => {
+    registerSetErase((erase) => {
+      drawerRef.current?.setErase(erase);
+    });
   }, [registerSetErase]);
 
   useEffect(() => {
@@ -221,6 +226,15 @@ export const RoomPage = () => {
         refreshHistoryState();
         setIsCanvasDataReady(true);
       }
+    },
+    [WSType.INITUSERS]: async (message) => {
+      setUsers(message.data);
+    },
+    [WSType.USERJOIN]: async (message) => {
+      addUser(message.data);
+    },
+    [WSType.USERLEAVE]: async (message) => {
+      removeUser(message.data);
     },
   };
 

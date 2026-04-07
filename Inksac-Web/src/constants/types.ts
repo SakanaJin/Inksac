@@ -18,6 +18,9 @@ export enum WSType {
   READY = "ready",
   UNDO = "undo",
   REDO = "redo",
+  INITUSERS = "initusers",
+  USERJOIN = "userjoin",
+  USERLEAVE = "userleave",
 }
 
 export interface WSMessage {

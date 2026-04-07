@@ -16,6 +16,8 @@ router = APIRouter(prefix="/ws/rooms", tags=["RoomsWS"])
 @router.websocket("/{roomid}")
 async def room_websocket(websocket: WebSocket, roomid: int, user: User = Depends(get_current_user)):
     await WSManager.connect(roomid=roomid, userid=user.id, websocket=websocket)
+    joinmessage = WSMessage(Mtype=WSMTypes.USERJOIN, data=user.toGetDto())
+    await WSManager.broadcast(roomid=roomid, message=joinmessage, excludeuserid=user.id)
     try:
         while True:
             m = await websocket.receive_json()
@@ -32,9 +34,13 @@ async def room_websocket(websocket: WebSocket, roomid: int, user: User = Depends
     except WebSocketDisconnect as e:
         if e.code != WSCodes.FORCE_DC:
             WSManager.disconnect(roomid=roomid, userid=user.id)
+        leavemessage = WSMessage(Mtype=WSMTypes.USERLEAVE, data=user.id)
+        await WSManager.broadcast(roomid=roomid, message=leavemessage)
     except WebSocketException as e:
         if e.code != WSCodes.POLICY_VIOLATION:
             WSManager.disconnect(roomid=roomid, userid=user.id)
+            leavemessage = WSMessage(Mtype=WSMTypes.USERLEAVE, data=user.id)
+            await WSManager.broadcast(roomid=roomid, message=leavemessage, excludeuserid=user.id)
  
 @WSMHandler.register(WSMTypes.READY)
 async def onReady(message: WSMessage, roomid: int, websocket: WebSocket, **kwargs):
@@ -48,6 +54,13 @@ async def onReady(message: WSMessage, roomid: int, websocket: WebSocket, **kwarg
         ).scalars().all()
         newMessage = WSMessage(Mtype=message.Mtype, data=[stroke.toGetDto() for stroke in strokes])
         await websocket.send_json(newMessage.model_dump(mode="json"))
+        userids = [id for id in WSManager.rooms[roomid].keys()]
+        usersinroom = db.execute(
+            select(User)
+            .where(User.id.in_(userids))
+        ).scalars().all()
+        newerMessage = WSMessage(Mtype=WSMTypes.INITUSERS, data=[user.toGetDto() for user in usersinroom])
+        await websocket.send_json(newerMessage.model_dump(mode="json"))
 
 @WSMHandler.register(WSMTypes.STROKE)
 async def recieve_stroke(message: WSMessage, roomid: int, userid: int, **kwargs):
