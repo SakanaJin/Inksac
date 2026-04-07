@@ -315,11 +315,6 @@ export const RoomPage = () => {
   }, [color]);
 
   useEffect(() => {
-    registerSetErase((nextErase) => {
-      drawerRef.current?.setErase(nextErase);
-    });
-
-  useEffect(() => {
     registerSetErase((erase) => {
       drawerRef.current?.setErase(erase);
     });
