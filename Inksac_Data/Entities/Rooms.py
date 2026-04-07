@@ -16,6 +16,9 @@ class RoomCreateUpdateDto(BaseModel):
     height: int
     canvas_color: str
 
+class RoomRenameDto(BaseModel):
+    name: str
+
 class RoomGetDto(BaseModel):
     id: int
     name: str
