@@ -73,8 +73,8 @@ export const RoomCreateModal = ({
   const form = useForm({
     initialValues: {
       name: innerProps.defaultRoomName,
-      width: 2000,
-      height: 2000,
+      width: 1920,
+      height: 1080,
       canvas_color: "#f0f0f0",
     },
     validate: {

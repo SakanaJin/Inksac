@@ -97,18 +97,6 @@ export const RoomPage = () => {
     }
   };
 
-  const beginPan = (clientX: number, clientY: number) => {
-    isPanningRef.current = true;
-    lastPanPosRef.current = { x: clientX, y: clientY };
-    updateCursor();
-  };
-
-  const endPan = () => {
-    isPanningRef.current = false;
-    lastPanPosRef.current = null;
-    updateCursor();
-  };
-
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
   const refreshCursorScale = () => {
@@ -738,6 +726,7 @@ export const RoomPage = () => {
           wsRef.current,
           room.width,
           room.height,
+          room.canvas_color,
         );
 
         drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
