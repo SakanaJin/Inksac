@@ -78,17 +78,11 @@ def update(roomdto: RoomRenameDto, db: Session = Depends(get_db), user: User = D
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
         raise HttpException(status_code=400, response=response)
-    if len(roomdto.canvas_color) == 0:
-        response.add_error("canvas_color", "canvas color cannot be empty")
-        raise HttpException(status_code=400, response=response)
     if not user.room:
         response.add_error("room", "you do not own this room")
         raise HttpException(status_code=403, response=response)
 
     user.room.name = roomdto.name
-    user.room.width = roomdto.width
-    user.room.height = roomdto.height
-    user.room.canvas_color = roomdto.canvas_color
 
     db.commit()
     response.data = user.room.toGetDto()
