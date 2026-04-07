@@ -455,7 +455,6 @@ class DrawManager {
       this.tempStrokes.delete(strokeData.tempid);
       stroke.id = strokeData.id;
       this.strokesMap.set(strokeData.id, stroke);
-      this.undoStack.push(stroke);
       return;
     }
     if (this.strokesMap.has(strokeData.id)) return;
