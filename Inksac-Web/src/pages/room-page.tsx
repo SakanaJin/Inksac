@@ -52,6 +52,9 @@ export const RoomPage = () => {
     setStrokeScale,
     erase,
     setErase,
+    setUsers,
+    addUser,
+    removeUser,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
@@ -312,8 +315,8 @@ export const RoomPage = () => {
   }, [color]);
 
   useEffect(() => {
-    registerSetErase((nextErase) => {
-      drawerRef.current?.setErase(nextErase);
+    registerSetErase((erase) => {
+      drawerRef.current?.setErase(erase);
     });
   }, [registerSetErase]);
 
@@ -472,6 +475,15 @@ export const RoomPage = () => {
         refreshHistoryState();
         setIsCanvasDataReady(true);
       }
+    },
+    [WSType.INITUSERS]: async (message) => {
+      setUsers(message.data);
+    },
+    [WSType.USERJOIN]: async (message) => {
+      addUser(message.data);
+    },
+    [WSType.USERLEAVE]: async (message) => {
+      removeUser(message.data);
     },
   };
 

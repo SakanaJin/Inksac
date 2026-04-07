@@ -9,6 +9,7 @@ import {
 import { useParams } from "react-router-dom";
 import {
   ActionIcon,
+  Avatar,
   Box,
   Divider,
   Group,
@@ -27,9 +28,17 @@ import {
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
-import type { BrushGetDto, RoomGetDto } from "../../constants/types";
+import {
+  type UserGetDto,
+  type BrushGetDto,
+  type RoomGetDto,
+} from "../../constants/types";
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
+import { EnvVars } from "../../config/env-vars";
+import { UserAvatars } from "../room-tools/UserAvatars";
+
+const baseurl = EnvVars.mediaBaseUrl;
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -47,6 +56,9 @@ type RoomLayoutContextValue = {
   color: string;
   erase: boolean;
   setStrokeScale: (strokeScale: number) => void;
+  setUsers: (users: UserGetDto[]) => void;
+  addUser: (user: UserGetDto) => void;
+  removeUser: (userid: number) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -65,6 +77,9 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   erase: false,
   strokeScale: 16,
   setStrokeScale: () => {},
+  setUsers: () => {},
+  addUser: () => {},
+  removeUser: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -78,6 +93,18 @@ export function RoomLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [erase, setEraseState] = useState(false);
   const [strokeScale, setStrokeScale] = useState(16);
+  const [users, setUsers] = useState<UserGetDto[]>([]);
+
+  const addUser = (user: UserGetDto) => {
+    setUsers((users) => {
+      if (users.some((u) => u.id === user.id)) return users;
+      return [...users, user];
+    });
+  };
+
+  const removeUser = (userid: number) => {
+    setUsers((users) => users.filter((user) => user.id !== userid));
+  };
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
 
@@ -172,6 +199,9 @@ export function RoomLayout() {
         color,
         erase,
         setStrokeScale,
+        setUsers,
+        addUser,
+        removeUser,
       }}
     >
       <AppLayout
@@ -232,6 +262,7 @@ export function RoomLayout() {
             }}
           >
             <Group gap="xs" wrap="nowrap">
+              <UserAvatars users={users} />
               <Tooltip label="Undo">
                 <ActionIcon
                   variant="filled"
