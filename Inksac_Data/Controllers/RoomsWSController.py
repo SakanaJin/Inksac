@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
@@ -7,9 +7,16 @@ from datetime import datetime
 from Inksac_Data.Common.WSManager import WSManager, WSMHandler, WSMTypes, WSMessage, WSCodes
 from Inksac_Data.database import db_session
 from Inksac_Data.Entities.Users import User
-from Inksac_Data.Entities.Strokes import StrokeData, Stroke
+from Inksac_Data.Entities.Strokes import StrokeData, Stroke, StrokeGetDto
+from Inksac_Data.Entities.Layers import Layer, LayerGetDto
 from Inksac_Data.Entities.UsedBrushes import UsedBrushes
 from Inksac_Data.Controllers.AuthController import get_current_user
+
+
+class ReadyDataDto(BaseModel):
+    layers: list[LayerGetDto]
+    strokes: list[StrokeGetDto]
+
 
 router = APIRouter(prefix="/ws/rooms", tags=["RoomsWS"])
 
@@ -47,13 +54,44 @@ async def onReady(message: WSMessage, roomid: int, websocket: WebSocket, **kwarg
     if not message.data:
         return
     with db_session() as db:
+        layers = db.execute(
+            select(Layer)
+            .where(Layer.room_id == roomid)
+            .order_by(Layer.position.asc(), Layer.id.asc())
+        ).scalars().all()
+
+        if len(layers) == 0:
+            default_layer = Layer(
+                name="Layer 1",
+                position=0,
+                room_id=roomid,
+                locked=False,
+                opacity=1.0,
+            )
+            db.add(default_layer)
+            db.commit()
+
+            layers = db.execute(
+                select(Layer)
+                .where(Layer.room_id == roomid)
+                .order_by(Layer.position.asc(), Layer.id.asc())
+            ).scalars().all()
+
         strokes = db.execute(
             select(Stroke)
             .where(Stroke.room_id == roomid)
             .where(Stroke.deleted == False)
+            .order_by(Stroke.created_at.asc(), Stroke.id.asc())
         ).scalars().all()
-        newMessage = WSMessage(Mtype=message.Mtype, data=[stroke.toGetDto() for stroke in strokes])
+
+        readyData = ReadyDataDto(
+            layers=[layer.toGetDto() for layer in layers],
+            strokes=[stroke.toGetDto() for stroke in strokes],
+        )
+
+        newMessage = WSMessage(Mtype=message.Mtype, data=readyData.model_dump(mode="json"))
         await websocket.send_json(newMessage.model_dump(mode="json"))
+
         userids = [id for id in WSManager.rooms[roomid].keys()]
         usersinroom = db.execute(
             select(User)
@@ -67,19 +105,32 @@ async def recieve_stroke(message: WSMessage, roomid: int, userid: int, **kwargs)
     try:
         strokeData = StrokeData.model_validate(message.data)
     except ValidationError:
-        return #change this later maybe
-    #maybe add check for the brush ? 
+        return  # change this later maybe
+
     with db_session() as db:
+        layer = db.execute(
+            select(Layer)
+            .where(Layer.id == strokeData.layerid)
+            .where(Layer.room_id == roomid)
+        ).scalar_one_or_none()
+
+        if not layer:
+            return
+
+        if layer.locked:
+            return
+
         stroke = Stroke(
-            creator_id = userid,
-            brush_id = strokeData.brushid,
-            room_id = roomid,
-            color = strokeData.color,
-            opacity = strokeData.opacity,
-            iseraser = strokeData.iseraser,
-            scale = strokeData.scale,
-            created_at = datetime.now(),
-            points = strokeData.points,
+            creator_id=userid,
+            brush_id=strokeData.brushid,
+            room_id=roomid,
+            layer_id=strokeData.layerid,
+            color=strokeData.color,
+            opacity=strokeData.opacity,
+            iseraser=strokeData.iseraser,
+            scale=strokeData.scale,
+            created_at=datetime.now(),
+            points=strokeData.points,
         )
         try:
             usedBrush = UsedBrushes(
@@ -92,7 +143,12 @@ async def recieve_stroke(message: WSMessage, roomid: int, userid: int, **kwargs)
             db.rollback()
         db.add(stroke)
         db.commit()
-        newMessage = WSMessage(Mtype=message.Mtype, data=stroke.toGetDto(tempid=strokeData.tempid))
+        db.refresh(stroke)
+
+        newMessage = WSMessage(
+            Mtype=message.Mtype,
+            data=stroke.toGetDto(tempid=strokeData.tempid)
+        )
         await WSManager.broadcast(roomid=roomid, message=newMessage)
 
 @WSMHandler.register(WSMTypes.UNDO)
@@ -102,7 +158,7 @@ async def undo_stroke(message: WSMessage, roomid: int, **kwargs):
     strokeid = message.data
     with db_session() as db:
         stroke = db.get(Stroke, strokeid)
-        if not stroke:
+        if not stroke or stroke.room_id != roomid:
             return #change this later maybe idk
         stroke.deleted = True
         db.commit()
@@ -118,14 +174,15 @@ async def redo_stroke(message: WSMessage, roomid: int, **kwargs):
         stroke = db.execute(
             select(Stroke)
             .where(Stroke.id == strokeid)
+            .where(Stroke.room_id == roomid)
             .where(Stroke.deleted == True)
         ).scalar_one_or_none()
         if not stroke:
             return
         stroke.deleted = False
         db.commit()
-        newMessage = WSMessage(Mtype=message.Mtype, data=stroke.toGetDto())
-        await WSManager.broadcast(roomid=roomid, message=newMessage)
+    newMessage = WSMessage(Mtype=message.Mtype, data=strokeid)
+    await WSManager.broadcast(roomid=roomid, message=newMessage)
 
 @WSMHandler.register("not-found")
 async def notfound():

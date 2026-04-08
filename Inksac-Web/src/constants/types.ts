@@ -21,6 +21,7 @@ export enum WSType {
   INITUSERS = "initusers",
   USERJOIN = "userjoin",
   USERLEAVE = "userleave",
+  LAYERS_SYNC = "layers_sync",
 }
 
 export interface WSMessage {
@@ -147,6 +148,40 @@ export interface RoomUpdateDto {
   name: string;
 }
 
+// layer types ------------------------------------------------------------------------------------
+
+export interface LayerGetDto {
+  id: number;
+  name: string;
+  locked: boolean;
+  position: number;
+  room_id: number;
+  opacity: number;
+}
+
+export interface LayerUpdateDto {
+  name?: string;
+  locked?: boolean;
+  opacity?: number;
+}
+
+export interface LayerCreateDto {
+  name: string;
+}
+
+export interface LayerReorderDto {
+  ordered_layer_ids: number[];
+}
+
+export interface ClientLayerDto extends LayerGetDto {
+  visible: boolean;
+}
+
+export interface ReadyDataDto {
+  layers: LayerGetDto[];
+  strokes: StrokeGetDto[];
+}
+
 // stroke types ---------------------------------------------------------------------------------
 
 export interface StrokeGetDto {
@@ -161,6 +196,7 @@ export interface StrokeGetDto {
   creator_id: number;
   brush: BrushShallowDto;
   room_id: number;
+  layer_id: number;
 }
 
 export interface StrokeCreateDto {
@@ -192,4 +228,5 @@ export interface StrokeData {
   iseraser: boolean;
   scale: number;
   brushid: number;
+  layerid: number;
 }
