@@ -6,7 +6,7 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ActionIcon,
   Avatar,
@@ -24,6 +24,7 @@ import {
   IconArrowForwardUp,
   IconZoomReset,
   IconDownload,
+  IconX,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
@@ -107,6 +108,7 @@ export function RoomLayout() {
   };
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
+  const navigate = useNavigate();
 
   const setBrushInUse = useCallback((brushId: number) => {
     onStrokeRef.current?.(brushId);
@@ -239,6 +241,18 @@ export function RoomLayout() {
               }
             >
               <IconKeyboard size={18} />
+            </Tooltip>
+
+            <Tooltip label="Back to home">
+              <ActionIcon
+                variant="subtle"
+                size="lg"
+                radius={0}
+                color="red"
+                onClick={() => navigate("/")}
+              >
+                <IconX size={18} />
+              </ActionIcon>
             </Tooltip>
           </Group>
         }
