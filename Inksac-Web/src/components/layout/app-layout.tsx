@@ -17,6 +17,8 @@ type AppLayoutProps = {
   bottomHeight?: number;
   opened?: boolean;
   toggle?: () => void;
+  rightPanel?: ReactNode;
+  rightPanelWidth?: number;
 };
 
 export const AppLayout = ({
@@ -31,11 +33,16 @@ export const AppLayout = ({
   bottomHeight = 64,
   opened: controlledOpened,
   toggle: controlledToggle,
+  rightPanel,
+  rightPanelWidth = 280,
 }: AppLayoutProps) => {
   const [internalOpened, { toggle: internalToggle }] = useDisclosure(false);
 
   const opened = controlledOpened ?? internalOpened;
   const toggle = controlledToggle ?? internalToggle;
+  const mainContentWidth = rightPanel
+    ? `calc(100% - ${rightPanelWidth}px)`
+    : "100%";
 
   return (
     <AppShell
@@ -93,29 +100,59 @@ export const AppLayout = ({
       >
         <Box
           style={{
-            height: bottomSlot ? `calc(100% - ${bottomHeight}px)` : "100%",
+            position: "relative",
+            width: mainContentWidth,
+            height: "100%",
             overflow: "hidden",
             minHeight: 0,
+            transition: "width 180ms ease",
           }}
         >
-          <Outlet />
-        </Box>
-
-        {bottomSlot ? (
           <Box
             style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: bottomHeight,
-              zIndex: 50,
+              height: bottomSlot ? `calc(100% - ${bottomHeight}px)` : "100%",
+              overflow: "hidden",
+              minHeight: 0,
             }}
           >
-            {bottomSlot}
+            <Outlet />
           </Box>
-        ) : null}
+
+          {bottomSlot ? (
+            <Box
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: bottomHeight,
+                zIndex: 50,
+              }}
+            >
+              {bottomSlot}
+            </Box>
+          ) : null}
+        </Box>
       </AppShell.Main>
+
+      {rightPanel ? (
+        <Box
+          style={{
+            position: "fixed",
+            top: 60,
+            right: 0,
+            width: rightPanelWidth,
+            height: "calc(100vh - 60px)",
+            borderLeft: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--mantine-color-dark-7)",
+            zIndex: 150,
+            overflow: "visible",
+            transition: "width 180ms ease",
+          }}
+        >
+          {rightPanel}
+        </Box>
+      ) : null}
     </AppShell>
   );
 };
