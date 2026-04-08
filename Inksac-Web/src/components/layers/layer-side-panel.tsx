@@ -404,7 +404,6 @@ export function LayerSidePanel({
             flexDirection: "column",
           }}
         >
-          {/* + on top */}
           <ActionIcon
             variant="subtle"
             radius={0}
@@ -418,7 +417,6 @@ export function LayerSidePanel({
             <IconPlusSmall size={12} />
           </ActionIcon>
 
-          {/* - on bottom */}
           <ActionIcon
             variant="subtle"
             radius={0}
@@ -566,6 +564,7 @@ export function LayerSidePanel({
                               </Menu.Item>
                               <Menu.Item
                                 color="red"
+                                disabled={layers.length <= 1}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDeleteLayer(layer.id);

@@ -147,26 +147,31 @@ export function RoomLayout() {
     setUsers((users) => users.filter((user) => user.id !== userid));
   };
 
-  const setLayers = useCallback((nextLayers: LayerGetDto[]) => {
-    setLayersState((prevLayers) => {
-      const merged = mergeClientLayerVisibility(nextLayers, prevLayers);
+  const setLayers = useCallback(
+    (nextLayers: LayerGetDto[] | null | undefined) => {
+      if (!Array.isArray(nextLayers)) return;
 
-      setActiveLayerIdState((prev) => {
-        if (
-          prev !== null &&
-          merged.some((layer) => layer.id === prev && layer.visible)
-        ) {
-          return prev;
-        }
+      setLayersState((prevLayers) => {
+        const merged = mergeClientLayerVisibility(nextLayers, prevLayers);
 
-        return (
-          merged.find((layer) => layer.visible)?.id ?? merged[0]?.id ?? null
-        );
+        setActiveLayerIdState((prev) => {
+          if (
+            prev !== null &&
+            merged.some((layer) => layer.id === prev && layer.visible)
+          ) {
+            return prev;
+          }
+
+          return (
+            merged.find((layer) => layer.visible)?.id ?? merged[0]?.id ?? null
+          );
+        });
+
+        return merged;
       });
-
-      return merged;
-    });
-  }, []);
+    },
+    [],
+  );
 
   const setActiveLayerId = useCallback((layerId: number | null) => {
     setActiveLayerIdState(layerId);
@@ -261,6 +266,15 @@ export function RoomLayout() {
     async (layerId: number) => {
       if (!canManageLayers) return;
 
+      if (layers.length <= 1) {
+        notifications.show({
+          title: "Error",
+          message: "You cannot delete the last layer.",
+          color: "red",
+        });
+        return;
+      }
+
       const layer = layers.find((item) => item.id === layerId);
       if (!layer) return;
 
@@ -278,6 +292,16 @@ export function RoomLayout() {
               `/layers/${layerId}`,
             );
             const nextLayers = response.data.data;
+
+            if (!Array.isArray(nextLayers)) {
+              notifications.show({
+                title: "Error",
+                message: "Could not delete layer",
+                color: "red",
+              });
+              return;
+            }
+
             setLayers(nextLayers);
 
             if (activeLayerId === layerId) {
@@ -289,10 +313,16 @@ export function RoomLayout() {
               message: "Layer deleted",
               color: "green",
             });
-          } catch {
+          } catch (error: any) {
+            const backendMessage =
+              error?.response?.data?.errors?.[0]?.message ?? "";
+
             notifications.show({
               title: "Error",
-              message: "Could not delete layer",
+              message:
+                backendMessage === "cannot delete the last layer"
+                  ? "You cannot delete the last layer."
+                  : "Could not delete layer",
               color: "red",
             });
           }
