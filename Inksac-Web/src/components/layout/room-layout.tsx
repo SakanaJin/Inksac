@@ -119,8 +119,8 @@ function mergeClientLayerVisibility(
 
 export function RoomLayout() {
   const { id } = useParams();
-  const [roomName, setRoomName] = useState(`Room ${id}`);
   const [canManageLayers, setCanManageLayers] = useState(false);
+  const [roomName, setRoomName] = useState<string | undefined>(undefined);
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
