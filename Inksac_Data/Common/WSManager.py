@@ -11,6 +11,9 @@ class WSMTypes(str, Enum):
     STROKE = "stroke"
     UNDO = "undo"
     REDO = "redo"
+    INITUSERS = "initusers"
+    USERJOIN = "userjoin"
+    USERLEAVE = "userleave"
 
 class WSCodes(IntEnum):
     NORMAL_CLOSURE = 1000
@@ -71,9 +74,11 @@ class ConnectionManager:
             await connection.close(code=WSCodes.FORCE_DC, reason="room closing")
         del self.rooms[roomid]
 
-    async def broadcast(self, roomid: int, message: WSMessage):
+    async def broadcast(self, roomid: int, message: WSMessage, excludeuserid: int=None):
         if roomid in self.rooms:
-            for connection in self.rooms[roomid].values():
+            for userid, connection in self.rooms[roomid].items():
+                if userid == excludeuserid:
+                    continue
                 await connection.send_json(message.model_dump(mode="json"))
 
     def user_in_room(self, userid: int, roomid: int) -> bool:

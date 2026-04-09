@@ -6,9 +6,10 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ActionIcon,
+  Avatar,
   Box,
   Divider,
   Group,
@@ -23,12 +24,22 @@ import {
   IconArrowForwardUp,
   IconZoomReset,
   IconDownload,
+  IconX,
 } from "@tabler/icons-react";
+import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
-import type { BrushGetDto, RoomGetDto } from "../../constants/types";
+import {
+  type UserGetDto,
+  type BrushGetDto,
+  type RoomGetDto,
+} from "../../constants/types";
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
+import { EnvVars } from "../../config/env-vars";
+import { UserAvatars } from "../room-tools/UserAvatars";
+
+const baseurl = EnvVars.mediaBaseUrl;
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -40,11 +51,15 @@ type RoomLayoutContextValue = {
   setHistoryState: (canUndo: boolean, canRedo: boolean) => void;
   strokeScale: number;
   setColor: (color: string) => void;
+  toggleSidebar: () => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
   setErase: (erase: boolean) => void;
   color: string;
   erase: boolean;
   setStrokeScale: (strokeScale: number) => void;
+  setUsers: (users: UserGetDto[]) => void;
+  addUser: (user: UserGetDto) => void;
+  removeUser: (userid: number) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -59,9 +74,13 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   registerSetErase: () => {},
   setErase: () => {},
   color: "#ffffffff",
+  toggleSidebar: () => {},
   erase: false,
   strokeScale: 16,
   setStrokeScale: () => {},
+  setUsers: () => {},
+  addUser: () => {},
+  removeUser: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -72,10 +91,24 @@ export function RoomLayout() {
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [erase, setEraseState] = useState(false);
   const [strokeScale, setStrokeScale] = useState(16);
+  const [users, setUsers] = useState<UserGetDto[]>([]);
+
+  const addUser = (user: UserGetDto) => {
+    setUsers((users) => {
+      if (users.some((u) => u.id === user.id)) return users;
+      return [...users, user];
+    });
+  };
+
+  const removeUser = (userid: number) => {
+    setUsers((users) => users.filter((user) => user.id !== userid));
+  };
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
+  const navigate = useNavigate();
 
   const setBrushInUse = useCallback((brushId: number) => {
     onStrokeRef.current?.(brushId);
@@ -146,6 +179,10 @@ export function RoomLayout() {
     [],
   );
 
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
+  }, []);
+
   return (
     <RoomLayoutContext.Provider
       value={{
@@ -159,30 +196,72 @@ export function RoomLayout() {
         setHistoryState,
         strokeScale,
         setColor,
+        toggleSidebar,
         setErase,
         color,
         erase,
         setStrokeScale,
+        setUsers,
+        addUser,
+        removeUser,
       }}
     >
       <AppLayout
         headerTitle={roomName}
         headerActions={
-          <Tooltip label="Export canvas">
-            <ActionIcon
-              variant="subtle"
-              size="lg"
-              radius={0}
-              onClick={() => onExport?.()}
+          <Group gap="xs">
+            <Tooltip label="Export canvas">
+              <ActionIcon
+                variant="subtle"
+                size="lg"
+                radius={0}
+                onClick={() => onExport?.()}
+              >
+                <IconDownload size={18} />
+              </ActionIcon>
+            </Tooltip>
+
+            <Tooltip
+              multiline
+              w={260}
+              label={
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    Keybinds:
+                  </div>
+                  <div>Ctrl+Z - Undo</div>
+                  <div>Ctrl+Shift+Z - Redo</div>
+                  <div>E - Toggle eraser</div>
+                  <div>[ - Decrease brush size</div>
+                  <div>] - Increase brush size</div>
+                  <div>Ctrl+S - Open export modal</div>
+                  <div>Tab - Toggle brush panel</div>
+                  <div>Space+Left Click - Pan canvas</div>
+                </div>
+              }
             >
-              <IconDownload size={18} />
-            </ActionIcon>
-          </Tooltip>
+              <IconKeyboard size={18} />
+            </Tooltip>
+
+            <Tooltip label="Back to home">
+              <ActionIcon
+                variant="subtle"
+                size="lg"
+                radius={0}
+                color="red"
+                onClick={() => navigate("/")}
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         }
         sidebarWidth={340}
         hideActions
         hideUserInfo
         overlayNavbar
+        opened={sidebarOpen}
+        toggle={toggleSidebar}
         bottomHeight={64}
         bottomSlot={
           <Paper
@@ -197,6 +276,7 @@ export function RoomLayout() {
             }}
           >
             <Group gap="xs" wrap="nowrap">
+              <UserAvatars users={users} />
               <Tooltip label="Undo">
                 <ActionIcon
                   variant="filled"

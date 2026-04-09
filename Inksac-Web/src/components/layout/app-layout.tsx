@@ -15,6 +15,8 @@ type AppLayoutProps = {
   overlayNavbar?: boolean;
   bottomSlot?: ReactNode;
   bottomHeight?: number;
+  opened?: boolean;
+  toggle?: () => void;
 };
 
 export const AppLayout = ({
@@ -27,8 +29,13 @@ export const AppLayout = ({
   overlayNavbar = false,
   bottomSlot,
   bottomHeight = 64,
+  opened: controlledOpened,
+  toggle: controlledToggle,
 }: AppLayoutProps) => {
-  const [opened, { toggle }] = useDisclosure(false);
+  const [internalOpened, { toggle: internalToggle }] = useDisclosure(false);
+
+  const opened = controlledOpened ?? internalOpened;
+  const toggle = controlledToggle ?? internalToggle;
 
   return (
     <AppShell
