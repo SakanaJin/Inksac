@@ -40,9 +40,11 @@ export const AppLayout = ({
 
   const opened = controlledOpened ?? internalOpened;
   const toggle = controlledToggle ?? internalToggle;
-  const mainContentWidth = rightPanel
-    ? `calc(100% - ${rightPanelWidth}px)`
-    : "100%";
+  const effectiveRightPanelWidth = rightPanel ? rightPanelWidth : 0;
+  const mainContentWidth =
+    effectiveRightPanelWidth > 0
+      ? `calc(100% - ${effectiveRightPanelWidth}px)`
+      : "100%";
 
   return (
     <AppShell
@@ -105,7 +107,7 @@ export const AppLayout = ({
             height: "100%",
             overflow: "hidden",
             minHeight: 0,
-            transition: "width 180ms ease",
+            minWidth: 0,
           }}
         >
           <Box
@@ -113,6 +115,7 @@ export const AppLayout = ({
               height: bottomSlot ? `calc(100% - ${bottomHeight}px)` : "100%",
               overflow: "hidden",
               minHeight: 0,
+              minWidth: 0,
             }}
           >
             <Outlet />
@@ -141,13 +144,19 @@ export const AppLayout = ({
             position: "fixed",
             top: 60,
             right: 0,
-            width: rightPanelWidth,
+            width: effectiveRightPanelWidth,
             height: "calc(100vh - 60px)",
-            borderLeft: "1px solid rgba(255,255,255,0.08)",
-            background: "var(--mantine-color-dark-7)",
+            borderLeft:
+              effectiveRightPanelWidth > 0
+                ? "1px solid rgba(255,255,255,0.08)"
+                : "none",
+            background:
+              effectiveRightPanelWidth > 0
+                ? "var(--mantine-color-dark-7)"
+                : "transparent",
             zIndex: 150,
             overflow: "visible",
-            transition: "width 180ms ease",
+            pointerEvents: effectiveRightPanelWidth > 0 ? "auto" : "none",
           }}
         >
           {rightPanel}

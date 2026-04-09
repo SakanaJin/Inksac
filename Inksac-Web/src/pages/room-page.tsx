@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useLayoutEffect } from "react";
 import { Box } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
@@ -35,6 +35,11 @@ export const RoomPage = () => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<pixi.Application | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const previousContainerSizeRef = useRef<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
@@ -255,6 +260,30 @@ export const RoomPage = () => {
 
     refreshCursorScale();
   };
+
+  const forceRendererResize = () => {
+    const app = appRef.current;
+    const container = pixiContainer.current;
+
+    if (!app || !container) return;
+
+    const width = Math.max(1, Math.floor(container.clientWidth));
+    const height = Math.max(1, Math.floor(container.clientHeight));
+
+    if (app.renderer.width === width && app.renderer.height === height) {
+      previousContainerSizeRef.current = { width, height };
+      return;
+    }
+
+    app.renderer.resize(width, height);
+    app.stage.hitArea = new pixi.Rectangle(0, 0, width, height);
+    previousContainerSizeRef.current = { width, height };
+    refreshCursorScale();
+  };
+
+  useLayoutEffect(() => {
+    forceRendererResize();
+  });
 
   const openExportModal = () => {
     if (exportModalOpenRef.current) return;
@@ -732,8 +761,16 @@ export const RoomPage = () => {
           setBrushInUseRef.current(brushId);
         });
 
+        forceRendererResize();
         fitCanvasToViewport();
         refreshCursorScale();
+
+        if (pixiContainer.current) {
+          previousContainerSizeRef.current = {
+            width: Math.max(1, Math.floor(pixiContainer.current.clientWidth)),
+            height: Math.max(1, Math.floor(pixiContainer.current.clientHeight)),
+          };
+        }
 
         canvas.addEventListener("mousedown", handleMouseDown);
         canvas.addEventListener("mousemove", handleMouseMove);
@@ -767,6 +804,12 @@ export const RoomPage = () => {
           true,
         );
 
+        resizeObserverRef.current = new ResizeObserver(() => {
+          forceRendererResize();
+        });
+
+        resizeObserverRef.current.observe(pixiContainer.current);
+
         ws.send({
           Mtype: WSType.READY,
           data: true,
@@ -785,6 +828,9 @@ export const RoomPage = () => {
 
     return () => {
       isMounted = false;
+
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
 
       if (canvas) {
         canvas.removeEventListener("mousedown", handleMouseDown);

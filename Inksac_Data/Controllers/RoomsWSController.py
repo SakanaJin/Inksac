@@ -181,7 +181,12 @@ async def redo_stroke(message: WSMessage, roomid: int, **kwargs):
             return
         stroke.deleted = False
         db.commit()
-    newMessage = WSMessage(Mtype=message.Mtype, data=strokeid)
+        db.refresh(stroke)
+
+        newMessage = WSMessage(
+            Mtype=message.Mtype,
+            data=stroke.toGetDto()
+        )
     await WSManager.broadcast(roomid=roomid, message=newMessage)
 
 @WSMHandler.register("not-found")

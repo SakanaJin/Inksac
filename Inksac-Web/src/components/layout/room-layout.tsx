@@ -9,7 +9,6 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ActionIcon,
-  Avatar,
   Box,
   Divider,
   Group,
@@ -43,10 +42,7 @@ import {
 } from "../../constants/types";
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
-import { EnvVars } from "../../config/env-vars";
 import { UserAvatars } from "../room-tools/UserAvatars";
-
-const baseurl = EnvVars.mediaBaseUrl;
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -607,8 +603,9 @@ export function RoomLayout() {
           <Box
             style={{
               height: "100%",
-              overflow: "visible",
               position: "relative",
+              overflow: "visible",
+              pointerEvents: "none",
             }}
           >
             <Box
@@ -618,6 +615,7 @@ export function RoomLayout() {
                 top: "50%",
                 transform: "translateY(-50%)",
                 zIndex: 200,
+                pointerEvents: "auto",
               }}
             >
               <ActionIcon
@@ -641,23 +639,32 @@ export function RoomLayout() {
             </Box>
 
             {layersPanelOpen ? (
-              <LayerSidePanel
-                layers={layers}
-                activeLayerId={activeLayerId}
-                canManageLayers={canManageLayers}
-                onSelectLayer={(layerId) => {
-                  const layer = layers.find((item) => item.id === layerId);
-                  if (!layer || !layer.visible) return;
-                  setActiveLayerId(layerId);
+              <Box
+                style={{
+                  height: "100%",
+                  width: "260px",
+                  pointerEvents: "auto",
+                  overflow: "hidden",
                 }}
-                onToggleVisibility={toggleLayerVisibility}
-                onToggleLocked={toggleLayerLocked}
-                onCreateLayer={createLayer}
-                onRenameLayer={renameLayer}
-                onDeleteLayer={deleteLayer}
-                onReorderLayers={reorderLayers}
-                onUpdateLayerOpacity={updateLayerOpacity}
-              />
+              >
+                <LayerSidePanel
+                  layers={layers}
+                  activeLayerId={activeLayerId}
+                  canManageLayers={canManageLayers}
+                  onSelectLayer={(layerId) => {
+                    const layer = layers.find((item) => item.id === layerId);
+                    if (!layer || !layer.visible) return;
+                    setActiveLayerId(layerId);
+                  }}
+                  onToggleVisibility={toggleLayerVisibility}
+                  onToggleLocked={toggleLayerLocked}
+                  onCreateLayer={createLayer}
+                  onRenameLayer={renameLayer}
+                  onDeleteLayer={deleteLayer}
+                  onReorderLayers={reorderLayers}
+                  onUpdateLayerOpacity={updateLayerOpacity}
+                />
+              </Box>
             ) : null}
           </Box>
         }
