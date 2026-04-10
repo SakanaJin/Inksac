@@ -761,7 +761,13 @@ export const RoomPage = () => {
 
         if (!isMounted) return;
 
-        const drawer = new DrawManager(app, ws, room.width, room.height);
+        const drawer = new DrawManager(
+          app,
+          ws,
+          room.width,
+          room.height,
+          room.canvas_color,
+        );
         drawerRef.current = drawer;
 
         await drawer.init();
