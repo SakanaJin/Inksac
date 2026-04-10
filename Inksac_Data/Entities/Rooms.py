@@ -53,6 +53,8 @@ class Room(Base):
 
     strokes = relationship("Stroke", back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
 
+    layers = relationship("Layer", back_populates="room", cascade="all, delete-orphan", passive_deletes=True, order_by="Layer.position")
+
     brushes = relationship("Brush", back_populates="rooms", secondary="usedbrushes")
 
     def toGetDto(self) -> RoomGetDto:
