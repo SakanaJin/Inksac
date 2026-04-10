@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useLayoutEffect } from "react";
 import { Box } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
@@ -17,6 +17,8 @@ import {
   type WSMessage,
   type RoomGetDto,
   type BrushGetDto,
+  type ReadyDataDto,
+  type LayerGetDto,
 } from "../constants/types";
 import { notifications } from "@mantine/notifications";
 import { routes } from "../routes/RouteIndex";
@@ -33,6 +35,11 @@ export const RoomPage = () => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<pixi.Application | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const previousContainerSizeRef = useRef<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
@@ -55,10 +62,16 @@ export const RoomPage = () => {
     setUsers,
     addUser,
     removeUser,
+    layers,
+    setLayers,
+    activeLayerId,
+    setActiveLayerId,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
   const strokeScaleRef = useRef(strokeScale);
+  const eraseRef = useRef(erase);
+  const setBrushInUseRef = useRef(setBrushInUse);
   const exportModalOpenRef = useRef(false);
   const browserCursorRef = useRef<React.CSSProperties["cursor"]>("default");
 
@@ -82,6 +95,14 @@ export const RoomPage = () => {
   const ZOOM_STEP = 1.1;
 
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
+
+  useEffect(() => {
+    eraseRef.current = erase;
+  }, [erase]);
+
+  useEffect(() => {
+    setBrushInUseRef.current = setBrushInUse;
+  }, [setBrushInUse]);
 
   const refreshCursorScale = () => {
     const nextScale = drawerRef.current?.getWorldContainer().scale.x ?? 1;
@@ -240,6 +261,30 @@ export const RoomPage = () => {
     refreshCursorScale();
   };
 
+  const forceRendererResize = () => {
+    const app = appRef.current;
+    const container = pixiContainer.current;
+
+    if (!app || !container) return;
+
+    const width = Math.max(1, Math.floor(container.clientWidth));
+    const height = Math.max(1, Math.floor(container.clientHeight));
+
+    if (app.renderer.width === width && app.renderer.height === height) {
+      previousContainerSizeRef.current = { width, height };
+      return;
+    }
+
+    app.renderer.resize(width, height);
+    app.stage.hitArea = new pixi.Rectangle(0, 0, width, height);
+    previousContainerSizeRef.current = { width, height };
+    refreshCursorScale();
+  };
+
+  useLayoutEffect(() => {
+    forceRendererResize();
+  });
+
   const openExportModal = () => {
     if (exportModalOpenRef.current) return;
 
@@ -315,14 +360,30 @@ export const RoomPage = () => {
   }, [color]);
 
   useEffect(() => {
-    registerSetErase((erase) => {
-      drawerRef.current?.setErase(erase);
+    registerSetErase((nextErase) => {
+      drawerRef.current?.setErase(nextErase);
     });
   }, [registerSetErase]);
 
   useEffect(() => {
     drawerRef.current?.setErase(erase);
   }, [erase]);
+
+  useEffect(() => {
+    if (activeLayerId !== null) {
+      drawerRef.current?.setActiveLayer(activeLayerId);
+    }
+  }, [activeLayerId]);
+
+  useEffect(() => {
+    if (!drawerRef.current) return;
+
+    drawerRef.current.setLayers(layers);
+
+    if (activeLayerId !== null) {
+      drawerRef.current.setActiveLayer(activeLayerId);
+    }
+  }, [layers, activeLayerId]);
 
   useEffect(() => {
     browserCursorRef.current = browserCursor;
@@ -470,11 +531,27 @@ export const RoomPage = () => {
     },
     [WSType.READY]: async (message) => {
       if (drawerRef.current && message.data) {
-        await drawerRef.current.receiveInit(message.data as StrokeGetDto[]);
+        const readyData = message.data as ReadyDataDto;
+
+        setLayers(readyData.layers);
+        setActiveLayerId(readyData.layers[0]?.id ?? null);
+
+        await drawerRef.current.receiveInit(
+          readyData.layers.map((layer) => ({
+            ...layer,
+            visible: true,
+          })),
+          readyData.strokes,
+        );
+
         fitCanvasToViewport();
         refreshHistoryState();
         setIsCanvasDataReady(true);
       }
+    },
+    [WSType.LAYERS_SYNC]: async (message) => {
+      if (!message.data) return;
+      setLayers(message.data as LayerGetDto[]);
     },
     [WSType.INITUSERS]: async (message) => {
       setUsers(message.data);
@@ -513,6 +590,7 @@ export const RoomPage = () => {
 
     let canvas: HTMLCanvasElement | null = null;
     let isMounted = true;
+    let didInitApp = false;
 
     setIsCanvasDataReady(false);
 
@@ -611,52 +689,92 @@ export const RoomPage = () => {
 
     const handleCanvasPointerDownCapture = (e: PointerEvent) => {
       updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
-      syncCanvasCursor();
 
-      window.requestAnimationFrame(() => {
-        syncCanvasCursor();
-      });
+      if (spacePanActive && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        beginPan(e.clientX, e.clientY);
+      }
     };
 
     const handleCanvasPointerUpCapture = (e: PointerEvent) => {
       updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
-      syncCanvasCursor();
 
-      window.requestAnimationFrame(() => {
-        syncCanvasCursor();
-      });
+      if (spacePanActive && isPanningRef.current && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        endPan();
+      }
     };
 
-    const initPixi = async () => {
+    const init = async () => {
       try {
-        const roomResponse = await api.get<RoomGetDto>(`/rooms/${id}`);
-        const room = roomResponse.data.data;
+        const roomRes = await api.get<RoomGetDto>(`/rooms/${id}`);
+        const room = roomRes.data.data;
 
         if (!isMounted || !pixiContainer.current) return;
 
         const app = new pixi.Application();
-        appRef.current = app;
-
         await app.init({
-          width: pixiContainer.current.clientWidth,
-          height: pixiContainer.current.clientHeight,
-          background: "#323232",
           resizeTo: pixiContainer.current,
+          backgroundAlpha: 0,
+          antialias: true,
         });
 
-        if (!isMounted || !pixiContainer.current) return;
+        if (!isMounted) {
+          app.destroy(true);
+          return;
+        }
 
-        pixiContainer.current.appendChild(app.canvas);
+        appRef.current = app;
+        didInitApp = true;
+
         canvas = app.canvas;
         canvasElementRef.current = canvas;
 
-        canvas.style.display = "block";
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
+        pixiContainer.current.appendChild(canvas);
 
-        syncCanvasCursor();
+        const ws = new WSManager(
+          `${wsbaseurl}/rooms/${id}`,
+          messageHandlers,
+          closeHandlers,
+        );
+        wsRef.current = ws;
+
+        await ws.connect();
+
+        if (!isMounted) return;
+
+        const drawer = new DrawManager(app, ws, room.width, room.height);
+        drawerRef.current = drawer;
+
+        await drawer.init();
+
+        if (room.imgurl) {
+          await drawer.loadBaseImage(room.imgurl);
+        }
+
+        drawer.setColor(colorRef.current);
+        drawer.setStrokeScale(strokeScaleRef.current);
+        drawer.setErase(eraseRef.current);
+        drawer.setOnStroke((brushId) => {
+          setBrushInUseRef.current(brushId);
+        });
+
+        forceRendererResize();
+        fitCanvasToViewport();
+        refreshCursorScale();
+
+        if (pixiContainer.current) {
+          previousContainerSizeRef.current = {
+            width: Math.max(1, Math.floor(pixiContainer.current.clientWidth)),
+            height: Math.max(1, Math.floor(pixiContainer.current.clientHeight)),
+          };
+        }
 
         canvas.addEventListener("mousedown", handleMouseDown);
+        canvas.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
         canvas.addEventListener("auxclick", handleAuxClick);
         canvas.addEventListener("wheel", handleWheel, { passive: false });
 
@@ -685,67 +803,38 @@ export const RoomPage = () => {
           handleCanvasPointerUpCapture,
           true,
         );
-        canvas.addEventListener(
-          "pointercancel",
-          handleCanvasPointerUpCapture,
-          true,
-        );
 
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
+        resizeObserverRef.current = new ResizeObserver(() => {
+          forceRendererResize();
+        });
 
-        const ws = new WSManager(
-          wsbaseurl + `/rooms/${id}`,
-          messageHandlers,
-          closeHandlers,
-        );
-        wsRef.current = ws;
+        resizeObserverRef.current.observe(pixiContainer.current);
 
-        await wsRef.current.connect();
-
-        if (!isMounted) return;
-
-        drawerRef.current = new DrawManager(
-          app,
-          wsRef.current,
-          room.width,
-          room.height,
-        );
-
-        drawerRef.current.setOnStroke((brushId) => setBrushInUse(brushId));
-        await drawerRef.current.init();
-
-        if (room.imgurl) {
-          await drawerRef.current.loadBaseImage(room.imgurl);
-        }
-
-        drawerRef.current.setColor(colorRef.current);
-        drawerRef.current.setStrokeScale(strokeScaleRef.current);
-        drawerRef.current.setErase(erase);
-        refreshCursorScale();
-        refreshHistoryState();
-        syncCanvasCursor();
-
-        const message: WSMessage = { Mtype: WSType.READY, data: true };
-        wsRef.current.send(message);
-      } catch (error) {
-        console.error("Failed to initialize room", error);
+        ws.send({
+          Mtype: WSType.READY,
+          data: true,
+        } as WSMessage);
+      } catch {
         notifications.show({
-          title: "Room",
-          message: "Failed to load room.",
+          title: "Error",
+          message: "Failed to load room",
           color: "red",
         });
         navigate(routes.home);
       }
     };
 
-    initPixi();
+    void init();
 
     return () => {
       isMounted = false;
 
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+
       if (canvas) {
         canvas.removeEventListener("mousedown", handleMouseDown);
+        canvas.removeEventListener("mousemove", handleMouseMove);
         canvas.removeEventListener("auxclick", handleAuxClick);
         canvas.removeEventListener("wheel", handleWheel);
 
@@ -774,30 +863,27 @@ export const RoomPage = () => {
           handleCanvasPointerUpCapture,
           true,
         );
-        canvas.removeEventListener(
-          "pointercancel",
-          handleCanvasPointerUpCapture,
-          true,
-        );
       }
 
-      window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
 
-      if (pixiContainer.current) {
-        pixiContainer.current.style.cursor = "default";
+      wsRef.current?.close();
+      wsRef.current = null;
+
+      drawerRef.current = null;
+
+      if (didInitApp) {
+        appRef.current?.destroy(true, {
+          children: true,
+          texture: true,
+          textureSource: true,
+        });
+        appRef.current = null;
       }
 
       canvasElementRef.current = null;
-
-      if (wsRef.current && wsRef.current.isOpen()) {
-        wsRef.current.close();
-      }
-
-      appRef.current = null;
-      drawerRef.current = null;
     };
-  }, [id, navigate, setBrushInUse]);
+  }, [id]);
 
   return (
     <Box

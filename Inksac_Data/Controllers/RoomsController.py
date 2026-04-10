@@ -10,6 +10,7 @@ from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Controllers.AuthController import get_current_user, require_not_guest
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, round_nearest_hour
+from Inksac_Data.Entities.Layers import Layer
 
 router = APIRouter(prefix="/api/rooms", tags=["Rooms"])
 
@@ -64,6 +65,17 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         imgurl=None
     )
     db.add(room)
+    db.flush()
+
+    default_layer = Layer(
+        name="Layer 1",
+        locked=False,
+        position=0,
+        opacity=1.0,
+        room_id=room.id,
+    )
+    db.add(default_layer)
+
     db.commit()
     response.data = room.toGetDto()
     return response
