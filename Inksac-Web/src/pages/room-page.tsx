@@ -36,10 +36,6 @@ export const RoomPage = () => {
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<pixi.Application | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const previousContainerSizeRef = useRef<{ width: number; height: number }>({
-    width: 0,
-    height: 0,
-  });
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
@@ -66,11 +62,39 @@ export const RoomPage = () => {
     setLayers,
     activeLayerId,
     setActiveLayerId,
+    smoothingEnabled,
+    smoothingStrength,
+    pressureEnabled,
+    pressureMinSize,
+    pressureSensitivity,
+    pressureStabilizationEnabled,
+    pressureStabilizationStrength,
+    taperInEnabled,
+    taperInDistance,
+    taperInStartSizePercent,
+    taperOutEnabled,
+    taperOutDistance,
+    taperOutEndSizePercent,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
   const strokeScaleRef = useRef(strokeScale);
   const eraseRef = useRef(erase);
+  const smoothingEnabledRef = useRef(smoothingEnabled);
+  const smoothingStrengthRef = useRef(smoothingStrength);
+  const pressureEnabledRef = useRef(pressureEnabled);
+  const pressureMinSizeRef = useRef(pressureMinSize);
+  const pressureSensitivityRef = useRef(pressureSensitivity);
+  const pressureStabilizationEnabledRef = useRef(pressureStabilizationEnabled);
+  const pressureStabilizationStrengthRef = useRef(
+    pressureStabilizationStrength,
+  );
+  const taperInEnabledRef = useRef(taperInEnabled);
+  const taperInDistanceRef = useRef(taperInDistance);
+  const taperInStartSizePercentRef = useRef(taperInStartSizePercent);
+  const taperOutEnabledRef = useRef(taperOutEnabled);
+  const taperOutDistanceRef = useRef(taperOutDistance);
+  const taperOutEndSizePercentRef = useRef(taperOutEndSizePercent);
   const setBrushInUseRef = useRef(setBrushInUse);
   const exportModalOpenRef = useRef(false);
   const browserCursorRef = useRef<React.CSSProperties["cursor"]>("default");
@@ -85,36 +109,51 @@ export const RoomPage = () => {
   const [isOverDrawableArea, setIsOverDrawableArea] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [cursorScale, setCursorScale] = useState(1);
+  const [livePointerPressure, setLivePointerPressure] = useState(1);
+  const [livePointerType, setLivePointerType] = useState("mouse");
 
   const isPanningRef = useRef(false);
   const isSpacePressedRef = useRef(false);
   const lastPanPosRef = useRef<{ x: number; y: number } | null>(null);
+  const panPointerIdRef = useRef<number | null>(null);
 
   const BASE_MIN_ZOOM = 0.25;
   const MAX_ZOOM = 4;
   const ZOOM_STEP = 1.1;
 
-  const updateCursor = () => {
-    const cursor = isPanningRef.current
-      ? "grabbing"
-      : isSpacePressedRef.current
-        ? "grab"
-        : "default";
-
-    if (pixiContainer.current) {
-      pixiContainer.current.style.cursor = cursor;
-    }
-
-    if (overlayRef.current) {
-      overlayRef.current.style.cursor = cursor;
-    }
-  };
-
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
   useEffect(() => {
     eraseRef.current = erase;
-  }, [erase]);
+    smoothingEnabledRef.current = smoothingEnabled;
+    smoothingStrengthRef.current = smoothingStrength;
+    pressureEnabledRef.current = pressureEnabled;
+    pressureMinSizeRef.current = pressureMinSize;
+    pressureSensitivityRef.current = pressureSensitivity;
+    pressureStabilizationEnabledRef.current = pressureStabilizationEnabled;
+    pressureStabilizationStrengthRef.current = pressureStabilizationStrength;
+    taperInEnabledRef.current = taperInEnabled;
+    taperInDistanceRef.current = taperInDistance;
+    taperInStartSizePercentRef.current = taperInStartSizePercent;
+    taperOutEnabledRef.current = taperOutEnabled;
+    taperOutDistanceRef.current = taperOutDistance;
+    taperOutEndSizePercentRef.current = taperOutEndSizePercent;
+  }, [
+    erase,
+    smoothingEnabled,
+    smoothingStrength,
+    pressureEnabled,
+    pressureMinSize,
+    pressureSensitivity,
+    pressureStabilizationEnabled,
+    pressureStabilizationStrength,
+    taperInEnabled,
+    taperInDistance,
+    taperInStartSizePercent,
+    taperOutEnabled,
+    taperOutDistance,
+    taperOutEndSizePercent,
+  ]);
 
   useEffect(() => {
     setBrushInUseRef.current = setBrushInUse;
@@ -125,9 +164,22 @@ export const RoomPage = () => {
     setCursorScale(nextScale);
   };
 
+  const getCursorPressureMultiplier = () => {
+    if (!pressureEnabled || livePointerType !== "pen") return 1;
+
+    const minRatio = Math.max(0, Math.min(1, pressureMinSize / 100));
+    const safePressure = Math.max(0.001, Math.min(1, livePointerPressure));
+    const t = Math.max(0, Math.min(100, pressureSensitivity)) / 100;
+    const exponent = 2.2 - t * 1.9;
+    const curvedPressure = Math.pow(safePressure, exponent);
+
+    return minRatio + (1 - minRatio) * curvedPressure;
+  };
+
   const getDisplayedCursorSize = () => {
-    const scaled = strokeScale * cursorScale;
-    return Math.max(8, scaled);
+    const baseSize = strokeScale * cursorScale;
+    const pressureAdjusted = baseSize * getCursorPressureMultiplier();
+    return Math.max(8, pressureAdjusted);
   };
 
   const getDrawableScreenRect = () => {
@@ -148,6 +200,8 @@ export const RoomPage = () => {
   const updateCursorTrackingFromClientPoint = (
     clientX: number,
     clientY: number,
+    pressure?: number,
+    pointerType?: string,
   ) => {
     if (!pixiContainer.current) return;
 
@@ -157,6 +211,14 @@ export const RoomPage = () => {
       x: clientX - rect.left,
       y: clientY - rect.top,
     });
+
+    if (typeof pressure === "number") {
+      setLivePointerPressure(pressure > 0 ? pressure : 1);
+    }
+
+    if (pointerType) {
+      setLivePointerType(pointerType);
+    }
 
     const drawableRect = getDrawableScreenRect();
 
@@ -205,8 +267,9 @@ export const RoomPage = () => {
     }
   };
 
-  const beginPan = (clientX: number, clientY: number) => {
+  const beginPan = (pointerId: number, clientX: number, clientY: number) => {
     isPanningRef.current = true;
+    panPointerIdRef.current = pointerId;
     lastPanPosRef.current = { x: clientX, y: clientY };
     browserCursorRef.current = "grabbing";
     syncCanvasCursor();
@@ -214,6 +277,7 @@ export const RoomPage = () => {
 
   const endPan = () => {
     isPanningRef.current = false;
+    panPointerIdRef.current = null;
     lastPanPosRef.current = null;
     browserCursorRef.current = isSpacePressedRef.current ? "grab" : "default";
     syncCanvasCursor();
@@ -280,20 +344,21 @@ export const RoomPage = () => {
   const forceRendererResize = () => {
     const app = appRef.current;
     const container = pixiContainer.current;
+    const canvas = canvasElementRef.current;
 
     if (!app || !container) return;
 
     const width = Math.max(1, Math.floor(container.clientWidth));
     const height = Math.max(1, Math.floor(container.clientHeight));
 
-    if (app.renderer.width === width && app.renderer.height === height) {
-      previousContainerSizeRef.current = { width, height };
-      return;
-    }
-
     app.renderer.resize(width, height);
     app.stage.hitArea = new pixi.Rectangle(0, 0, width, height);
-    previousContainerSizeRef.current = { width, height };
+
+    if (canvas) {
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    }
+
     refreshCursorScale();
   };
 
@@ -382,14 +447,45 @@ export const RoomPage = () => {
   }, [registerSetErase]);
 
   useEffect(() => {
-    drawerRef.current?.setErase(erase);
-  }, [erase]);
+    if (!drawerRef.current) return;
 
-  useEffect(() => {
-    if (activeLayerId !== null) {
-      drawerRef.current?.setActiveLayer(activeLayerId);
-    }
-  }, [activeLayerId]);
+    drawerRef.current.setErase(erase);
+    drawerRef.current.setSmoothing(smoothingEnabled, smoothingStrength);
+    drawerRef.current.setPressureSettings(
+      pressureEnabled,
+      pressureMinSize,
+      pressureSensitivity,
+    );
+    drawerRef.current.setPressureStabilization(
+      pressureStabilizationEnabled,
+      pressureStabilizationStrength,
+    );
+    drawerRef.current.setTaperIn(
+      taperInEnabled,
+      taperInDistance,
+      taperInStartSizePercent,
+    );
+    drawerRef.current.setTaperOut(
+      taperOutEnabled,
+      taperOutDistance,
+      taperOutEndSizePercent,
+    );
+  }, [
+    erase,
+    smoothingEnabled,
+    smoothingStrength,
+    pressureEnabled,
+    pressureMinSize,
+    pressureSensitivity,
+    pressureStabilizationEnabled,
+    pressureStabilizationStrength,
+    taperInEnabled,
+    taperInDistance,
+    taperInStartSizePercent,
+    taperOutEnabled,
+    taperOutDistance,
+    taperOutEndSizePercent,
+  ]);
 
   useEffect(() => {
     if (!drawerRef.current) return;
@@ -413,6 +509,11 @@ export const RoomPage = () => {
     activeBrush,
     strokeScale,
     cursorScale,
+    pressureEnabled,
+    pressureMinSize,
+    pressureSensitivity,
+    livePointerPressure,
+    livePointerType,
   ]);
 
   useEffect(() => {
@@ -610,18 +711,27 @@ export const RoomPage = () => {
 
     setIsCanvasDataReady(false);
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button !== 1) return;
+    const handleCanvasPointerDownForPan = (e: PointerEvent) => {
+      const isMiddleButton = e.button === 1;
+      const isSpacePanLeftClick = spacePanActive && e.button === 0;
+
+      if (!isMiddleButton && !isSpacePanLeftClick) return;
 
       e.preventDefault();
-      beginPan(e.clientX, e.clientY);
+
+      if (canvas?.hasPointerCapture?.(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+
+      beginPan(e.pointerId, e.clientX, e.clientY);
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleWindowPointerMoveForPan = (e: PointerEvent) => {
       if (
         !drawerRef.current ||
         !isPanningRef.current ||
-        !lastPanPosRef.current
+        !lastPanPosRef.current ||
+        panPointerIdRef.current !== e.pointerId
       ) {
         return;
       }
@@ -635,12 +745,33 @@ export const RoomPage = () => {
 
       lastPanPosRef.current = { x: e.clientX, y: e.clientY };
       refreshCursorScale();
+      updateCursorTrackingFromClientPoint(
+        e.clientX,
+        e.clientY,
+        e.pressure,
+        e.pointerType,
+      );
     };
 
-    const handleMouseUp = (e: MouseEvent) => {
-      if (!isPanningRef.current) return;
+    const handleWindowPointerUpForPan = (e: PointerEvent) => {
+      if (!isPanningRef.current || panPointerIdRef.current !== e.pointerId) {
+        return;
+      }
 
-      updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
+      updateCursorTrackingFromClientPoint(
+        e.clientX,
+        e.clientY,
+        e.pressure,
+        e.pointerType,
+      );
+      endPan();
+    };
+
+    const handleWindowPointerCancelForPan = (e: PointerEvent) => {
+      if (!isPanningRef.current || panPointerIdRef.current !== e.pointerId) {
+        return;
+      }
+
       endPan();
     };
 
@@ -688,35 +819,62 @@ export const RoomPage = () => {
 
     const handleCanvasPointerEnterCapture = (e: PointerEvent) => {
       setIsHoveringCanvas(true);
-      updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
+      updateCursorTrackingFromClientPoint(
+        e.clientX,
+        e.clientY,
+        e.pressure,
+        e.pointerType,
+      );
       syncCanvasCursor();
     };
 
     const handleCanvasPointerLeaveCapture = () => {
       setIsHoveringCanvas(false);
       setIsOverDrawableArea(false);
+      setLivePointerPressure(1);
+      setLivePointerType("mouse");
       syncCanvasCursor();
     };
 
     const handleCanvasPointerMoveCapture = (e: PointerEvent) => {
-      updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
+      updateCursorTrackingFromClientPoint(
+        e.clientX,
+        e.clientY,
+        e.pressure,
+        e.pointerType,
+      );
       syncCanvasCursor();
     };
 
     const handleCanvasPointerDownCapture = (e: PointerEvent) => {
-      updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
+      updateCursorTrackingFromClientPoint(
+        e.clientX,
+        e.clientY,
+        e.pressure,
+        e.pointerType,
+      );
 
       if (spacePanActive && e.button === 0) {
         e.preventDefault();
         e.stopPropagation();
-        beginPan(e.clientX, e.clientY);
+        beginPan(e.pointerId, e.clientX, e.clientY);
       }
     };
 
     const handleCanvasPointerUpCapture = (e: PointerEvent) => {
-      updateCursorTrackingFromClientPoint(e.clientX, e.clientY);
+      updateCursorTrackingFromClientPoint(
+        e.clientX,
+        e.clientY,
+        e.pressure,
+        e.pointerType,
+      );
 
-      if (spacePanActive && isPanningRef.current && e.button === 0) {
+      if (
+        spacePanActive &&
+        isPanningRef.current &&
+        panPointerIdRef.current === e.pointerId &&
+        e.button === 0
+      ) {
         e.preventDefault();
         e.stopPropagation();
         endPan();
@@ -779,24 +937,45 @@ export const RoomPage = () => {
         drawer.setColor(colorRef.current);
         drawer.setStrokeScale(strokeScaleRef.current);
         drawer.setErase(eraseRef.current);
+        drawer.setSmoothing(
+          smoothingEnabledRef.current,
+          smoothingStrengthRef.current,
+        );
+        drawer.setPressureSettings(
+          pressureEnabledRef.current,
+          pressureMinSizeRef.current,
+          pressureSensitivityRef.current,
+        );
+        drawer.setPressureStabilization(
+          pressureStabilizationEnabledRef.current,
+          pressureStabilizationStrengthRef.current,
+        );
+        drawer.setTaperIn(
+          taperInEnabledRef.current,
+          taperInDistanceRef.current,
+          taperInStartSizePercentRef.current,
+        );
+        drawer.setTaperOut(
+          taperOutEnabledRef.current,
+          taperOutDistanceRef.current,
+          taperOutEndSizePercentRef.current,
+        );
         drawer.setOnStroke((brushId) => {
           setBrushInUseRef.current(brushId);
+          refreshHistoryState();
         });
 
         forceRendererResize();
         fitCanvasToViewport();
         refreshCursorScale();
 
-        if (pixiContainer.current) {
-          previousContainerSizeRef.current = {
-            width: Math.max(1, Math.floor(pixiContainer.current.clientWidth)),
-            height: Math.max(1, Math.floor(pixiContainer.current.clientHeight)),
-          };
-        }
-
-        canvas.addEventListener("mousedown", handleMouseDown);
-        canvas.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
+        canvas.addEventListener("pointerdown", handleCanvasPointerDownForPan);
+        window.addEventListener("pointermove", handleWindowPointerMoveForPan);
+        window.addEventListener("pointerup", handleWindowPointerUpForPan);
+        window.addEventListener(
+          "pointercancel",
+          handleWindowPointerCancelForPan,
+        );
         canvas.addEventListener("auxclick", handleAuxClick);
         canvas.addEventListener("wheel", handleWheel, { passive: false });
 
@@ -855,8 +1034,19 @@ export const RoomPage = () => {
       resizeObserverRef.current = null;
 
       if (canvas) {
-        canvas.removeEventListener("mousedown", handleMouseDown);
-        canvas.removeEventListener("mousemove", handleMouseMove);
+        canvas.removeEventListener(
+          "pointerdown",
+          handleCanvasPointerDownForPan,
+        );
+        window.removeEventListener(
+          "pointermove",
+          handleWindowPointerMoveForPan,
+        );
+        window.removeEventListener("pointerup", handleWindowPointerUpForPan);
+        window.removeEventListener(
+          "pointercancel",
+          handleWindowPointerCancelForPan,
+        );
         canvas.removeEventListener("auxclick", handleAuxClick);
         canvas.removeEventListener("wheel", handleWheel);
 
@@ -886,8 +1076,6 @@ export const RoomPage = () => {
           true,
         );
       }
-
-      window.removeEventListener("mouseup", handleMouseUp);
 
       wsRef.current?.close();
       wsRef.current = null;
@@ -922,36 +1110,6 @@ export const RoomPage = () => {
 
       <Box
         ref={pixiContainer}
-        onMouseEnter={() => {
-          setIsHoveringCanvas(true);
-        }}
-        onMouseLeave={() => {
-          setIsHoveringCanvas(false);
-          setIsOverDrawableArea(false);
-        }}
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-
-          setCursorPos({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          });
-
-          const drawableRect = getDrawableScreenRect();
-
-          if (!drawableRect) {
-            setIsOverDrawableArea(false);
-            return;
-          }
-
-          const insideDrawableArea =
-            e.clientX >= drawableRect.left &&
-            e.clientX <= drawableRect.left + drawableRect.width &&
-            e.clientY >= drawableRect.top &&
-            e.clientY <= drawableRect.top + drawableRect.height;
-
-          setIsOverDrawableArea(insideDrawableArea);
-        }}
         style={{
           width: "100%",
           height: "100%",
@@ -1017,12 +1175,12 @@ export const RoomPage = () => {
       {canShowCanvas && spacePanActive ? (
         <Box
           ref={overlayRef}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             if (e.button !== 0) return;
 
             e.preventDefault();
             e.stopPropagation();
-            beginPan(e.clientX, e.clientY);
+            beginPan(e.pointerId, e.clientX, e.clientY);
           }}
           onDragStart={(e) => {
             e.preventDefault();

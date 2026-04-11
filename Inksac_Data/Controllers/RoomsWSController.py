@@ -130,7 +130,7 @@ async def recieve_stroke(message: WSMessage, roomid: int, userid: int, **kwargs)
             iseraser=strokeData.iseraser,
             scale=strokeData.scale,
             created_at=datetime.now(),
-            points=strokeData.points,
+            points=[point.model_dump() for point in strokeData.points],
         )
         try:
             usedBrush = UsedBrushes(
