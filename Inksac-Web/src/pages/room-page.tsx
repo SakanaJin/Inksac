@@ -94,6 +94,22 @@ export const RoomPage = () => {
   const MAX_ZOOM = 4;
   const ZOOM_STEP = 1.1;
 
+  const updateCursor = () => {
+    const cursor = isPanningRef.current
+      ? "grabbing"
+      : isSpacePressedRef.current
+        ? "grab"
+        : "default";
+
+    if (pixiContainer.current) {
+      pixiContainer.current.style.cursor = cursor;
+    }
+
+    if (overlayRef.current) {
+      overlayRef.current.style.cursor = cursor;
+    }
+  };
+
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
 
   useEffect(() => {
@@ -745,7 +761,13 @@ export const RoomPage = () => {
 
         if (!isMounted) return;
 
-        const drawer = new DrawManager(app, ws, room.width, room.height);
+        const drawer = new DrawManager(
+          app,
+          ws,
+          room.width,
+          room.height,
+          room.canvas_color,
+        );
         drawerRef.current = drawer;
 
         await drawer.init();
