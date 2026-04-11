@@ -9,8 +9,8 @@ from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Controllers.AuthController import get_current_user, require_not_guest
 from Inksac_Data.Entities.Users import User
-from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, round_nearest_hour
 from Inksac_Data.Entities.Layers import Layer
+from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, RoomRenameDto, round_nearest_hour
 
 router = APIRouter(prefix="/api/rooms", tags=["Rooms"])
 
@@ -53,6 +53,9 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     if roomdto.height > 8192:
         response.add_error("height", f"height cannot be greater than {8192}")
         raise HttpException(status_code=400, response=response)
+    if len(roomdto.canvas_color) == 0:
+        response.add_error("canvas_color", "canvas color cannot be empty")
+        raise HttpException(status_code=400, response=response)
     if bool(user.room):
         response.add_error("room", "user already has an open room")
         raise HttpException(status_code=409, response=response)
@@ -60,6 +63,7 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         name=roomdto.name,
         width=roomdto.width,
         height=roomdto.height,
+        canvas_color=roomdto.canvas_color,
         expiration=round_nearest_hour(datetime.now() + timedelta(days=1)),
         owner=user,
         imgurl=None
@@ -81,7 +85,7 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     return response
 
 @router.patch("")
-def update(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def update(roomdto: RoomRenameDto, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     response = Response()
     if len(roomdto.name) == 0:
         response.add_error("name", "name cannot be empty")
@@ -89,7 +93,9 @@ def update(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
     if not user.room:
         response.add_error("room", "you do not own this room")
         raise HttpException(status_code=403, response=response)
+
     user.room.name = roomdto.name
+
     db.commit()
     response.data = user.room.toGetDto()
     return response

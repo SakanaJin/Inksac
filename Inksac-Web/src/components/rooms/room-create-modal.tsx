@@ -7,6 +7,11 @@ import {
   Text,
   Group,
   ActionIcon,
+  ColorInput,
+  Paper,
+  Divider,
+  SimpleGrid,
+  ThemeIcon,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import type { ContextModalProps } from "@mantine/modals";
@@ -14,11 +19,12 @@ import api from "../../config/axios";
 import { type RoomGetDto, type RoomCreateDto } from "../../constants/types";
 import { useForm, type FormErrors } from "@mantine/form";
 import { useState } from "react";
-import { IconX } from "@tabler/icons-react";
+import { IconX, IconPhoto } from "@tabler/icons-react";
 import type { FileWithPath } from "@mantine/dropzone";
 
 export interface RoomCreateModalProps {
   onSuccess?: (room: RoomGetDto) => void;
+  defaultRoomName: string;
 }
 
 const getImageDimensions = (
@@ -66,9 +72,10 @@ export const RoomCreateModal = ({
 
   const form = useForm({
     initialValues: {
-      name: "",
-      width: 2000,
-      height: 2000,
+      name: innerProps.defaultRoomName,
+      width: 1920,
+      height: 1080,
+      canvas_color: "#f0f0f0",
     },
     validate: {
       name: (value) =>
@@ -91,6 +98,8 @@ export const RoomCreateModal = ({
         }
         return null;
       },
+      canvas_color: (value) =>
+        value.trim().length === 0 ? "Canvas color cannot be empty" : null,
     },
   });
 
@@ -99,7 +108,7 @@ export const RoomCreateModal = ({
 
     form.setFieldValue("width", 2000);
     form.setFieldValue("height", 2000);
-    form.setFieldValue("name", "");
+    form.setFieldValue("name", innerProps.defaultRoomName);
   };
 
   const handleFileChange = async (file: FileWithPath | null) => {
@@ -198,7 +207,7 @@ export const RoomCreateModal = ({
 
   return (
     <form onSubmit={form.onSubmit(handleSubmit)}>
-      <Stack gap="sm">
+      <Stack gap="md">
         <TextInput
           autoFocus
           key={form.key("name")}
@@ -207,67 +216,115 @@ export const RoomCreateModal = ({
           {...form.getInputProps("name")}
         />
 
-        <Button variant="outline" component="label" loading={loadingImage}>
-          Import PNG or JPG
-          <input
-            hidden
-            type="file"
-            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0] as
-                | FileWithPath
-                | undefined;
-              void handleFileChange(file ?? null);
-            }}
+        <Divider />
+
+        <Stack gap="xs">
+          <Text fw={600} size="sm">
+            Starting Image
+          </Text>
+
+          <Button variant="light" component="label" loading={loadingImage}>
+            Import PNG or JPG
+            <input
+              hidden
+              type="file"
+              accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0] as
+                  | FileWithPath
+                  | undefined;
+                void handleFileChange(file ?? null);
+              }}
+            />
+          </Button>
+
+          {selectedFile ? (
+            <Paper withBorder p="sm" radius="md">
+              <Group justify="space-between" gap="xs" wrap="nowrap">
+                <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                  <ThemeIcon variant="light" size="md">
+                    <IconPhoto size={16} />
+                  </ThemeIcon>
+                  <Stack gap={0} style={{ minWidth: 0 }}>
+                    <Text size="sm" fw={500} truncate>
+                      {selectedFile.name}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Dimensions were applied automatically
+                    </Text>
+                  </Stack>
+                </Group>
+
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  onClick={clearSelectedFile}
+                  aria-label="Remove imported image"
+                >
+                  <IconX size={16} />
+                </ActionIcon>
+              </Group>
+            </Paper>
+          ) : (
+            <></>
+          )}
+        </Stack>
+
+        <Divider />
+
+        <Stack gap="xs">
+          <Text fw={600} size="sm">
+            Canvas Setup
+          </Text>
+
+          <SimpleGrid cols={2} spacing="sm">
+            <NumberInput
+              key={form.key("width")}
+              label="Width"
+              suffix="px"
+              min={256}
+              max={8192}
+              allowDecimal={false}
+              clampBehavior="blur"
+              disabled={!!selectedFile}
+              {...form.getInputProps("width")}
+            />
+
+            <NumberInput
+              key={form.key("height")}
+              label="Height"
+              suffix="px"
+              min={256}
+              max={8192}
+              allowDecimal={false}
+              clampBehavior="blur"
+              disabled={!!selectedFile}
+              {...form.getInputProps("height")}
+            />
+          </SimpleGrid>
+
+          <ColorInput
+            key={form.key("canvas_color")}
+            label="Canvas Color"
+            placeholder="Pick canvas color"
+            swatches={[
+              "#ffffff",
+              "#f0f0f0",
+              "#808080",
+              "#2e2e2e",
+              "#000000",
+              "#fdf6e3",
+            ]}
+            {...form.getInputProps("canvas_color")}
           />
-        </Button>
+        </Stack>
 
-        {selectedFile ? (
-          <Group justify="space-between" gap="xs">
-            <Text size="sm" c="dimmed" style={{ flex: 1, minWidth: 0 }}>
-              {selectedFile.name}
-            </Text>
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              onClick={clearSelectedFile}
-              aria-label="Remove imported image"
-            >
-              <IconX size={16} />
-            </ActionIcon>
-          </Group>
-        ) : null}
-
-        <NumberInput
-          key={form.key("width")}
-          label="Canvas Width"
-          min={256}
-          max={8192}
-          allowDecimal={false}
-          clampBehavior="blur"
-          mt="sm"
-          disabled={!!selectedFile}
-          {...form.getInputProps("width")}
-        />
-
-        <NumberInput
-          key={form.key("height")}
-          label="Canvas Height"
-          min={256}
-          max={8192}
-          allowDecimal={false}
-          clampBehavior="blur"
-          mt="sm"
-          disabled={!!selectedFile}
-          {...form.getInputProps("height")}
-        />
-
-        <Flex justify="space-between" pt="sm">
-          <Button variant="outline" onClick={() => context.closeModal(id)}>
+        <Flex justify="space-between" pt="xs">
+          <Button variant="default" onClick={() => context.closeModal(id)}>
             Cancel
           </Button>
           <Button type="submit" loading={submitting || loadingImage}>
-            Create
+            Create Room
           </Button>
         </Flex>
       </Stack>

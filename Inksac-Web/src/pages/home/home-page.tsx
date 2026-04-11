@@ -92,6 +92,7 @@ export const HomePage = () => {
                 modal: "roomcreatemodal",
                 title: "Create Room",
                 innerProps: {
+                  defaultRoomName: `${user.username}'s Room`,
                   onSuccess: (createdRoom: RoomGetDto) => {
                     navigate(`/room/${createdRoom.id}`);
                   },
