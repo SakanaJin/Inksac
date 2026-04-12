@@ -9,7 +9,6 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ActionIcon,
-  Avatar,
   Box,
   Divider,
   Group,
@@ -19,27 +18,31 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
+import { modals } from "@mantine/modals";
+import { notifications } from "@mantine/notifications";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
   IconZoomReset,
   IconDownload,
+  IconChevronLeft,
+  IconChevronRight,
   IconX,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
+import { LayerSidePanel } from "../layers/layer-side-panel";
 import {
   type UserGetDto,
   type BrushGetDto,
   type RoomGetDto,
+  type LayerGetDto,
+  type ClientLayerDto,
 } from "../../constants/types";
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
-import { EnvVars } from "../../config/env-vars";
 import { UserAvatars } from "../room-tools/UserAvatars";
-
-const baseurl = EnvVars.mediaBaseUrl;
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -60,6 +63,14 @@ type RoomLayoutContextValue = {
   setUsers: (users: UserGetDto[]) => void;
   addUser: (user: UserGetDto) => void;
   removeUser: (userid: number) => void;
+  layers: ClientLayerDto[];
+  setLayers: (layers: LayerGetDto[]) => void;
+  activeLayerId: number | null;
+  setActiveLayerId: (layerId: number | null) => void;
+  updateLayerOpacity: (
+    layerId: number,
+    opacityPercent: number,
+  ) => Promise<void>;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -81,13 +92,35 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setUsers: () => {},
   addUser: () => {},
   removeUser: () => {},
+  layers: [],
+  setLayers: () => {},
+  activeLayerId: null,
+  setActiveLayerId: () => {},
+  updateLayerOpacity: async () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
 
+function mergeClientLayerVisibility(
+  incomingLayers: LayerGetDto[],
+  previousLayers: ClientLayerDto[],
+): ClientLayerDto[] {
+  const visibilityMap = new Map(
+    previousLayers.map((layer) => [layer.id, layer.visible]),
+  );
+
+  return incomingLayers
+    .map((layer) => ({
+      ...layer,
+      visible: visibilityMap.get(layer.id) ?? true,
+    }))
+    .sort((a, b) => a.position - b.position);
+}
+
 export function RoomLayout() {
   const { id } = useParams();
-  const [roomName, setRoomName] = useState(`Room ${id}`);
+  const [canManageLayers, setCanManageLayers] = useState(false);
+  const [roomName, setRoomName] = useState<string | undefined>(undefined);
   const [color, setColor] = useState("#ffffffff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -95,6 +128,9 @@ export function RoomLayout() {
   const [erase, setEraseState] = useState(false);
   const [strokeScale, setStrokeScale] = useState(16);
   const [users, setUsers] = useState<UserGetDto[]>([]);
+  const [layers, setLayersState] = useState<ClientLayerDto[]>([]);
+  const [activeLayerId, setActiveLayerIdState] = useState<number | null>(null);
+  const [layersPanelOpen, setLayersPanelOpen] = useState(true);
 
   const addUser = (user: UserGetDto) => {
     setUsers((users) => {
@@ -106,6 +142,287 @@ export function RoomLayout() {
   const removeUser = (userid: number) => {
     setUsers((users) => users.filter((user) => user.id !== userid));
   };
+
+  const setLayers = useCallback(
+    (nextLayers: LayerGetDto[] | null | undefined) => {
+      if (!Array.isArray(nextLayers)) return;
+
+      setLayersState((prevLayers) => {
+        const merged = mergeClientLayerVisibility(nextLayers, prevLayers);
+
+        setActiveLayerIdState((prev) => {
+          if (
+            prev !== null &&
+            merged.some((layer) => layer.id === prev && layer.visible)
+          ) {
+            return prev;
+          }
+
+          return (
+            merged.find((layer) => layer.visible)?.id ?? merged[0]?.id ?? null
+          );
+        });
+
+        return merged;
+      });
+    },
+    [],
+  );
+
+  const setActiveLayerId = useCallback((layerId: number | null) => {
+    setActiveLayerIdState(layerId);
+  }, []);
+
+  const createLayer = useCallback(async () => {
+    if (!id || !canManageLayers) return;
+
+    const numberedLayerValues = layers
+      .map((layer) => {
+        const match = layer.name.match(/^Layer\s+(\d+)$/i);
+        return match ? Number(match[1]) : null;
+      })
+      .filter((value): value is number => value !== null);
+
+    const nextNumber =
+      numberedLayerValues.length > 0 ? Math.max(...numberedLayerValues) + 1 : 1;
+
+    try {
+      const response = await api.post<LayerGetDto[]>(`/layers/room/${id}`, {
+        name: `Layer ${nextNumber}`,
+      });
+
+      const nextLayers = response.data.data;
+      setLayers(nextLayers);
+
+      const newestLayer =
+        [...nextLayers].sort((a, b) => b.position - a.position)[0] ?? null;
+
+      if (newestLayer) {
+        setActiveLayerIdState(newestLayer.id);
+      }
+
+      notifications.show({
+        title: "Success",
+        message: "Layer created",
+        color: "green",
+      });
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "Could not create layer",
+        color: "red",
+      });
+    }
+  }, [id, canManageLayers, layers, setLayers]);
+
+  const renameLayer = useCallback(
+    (layerId: number) => {
+      if (!canManageLayers) return;
+
+      const layer = layers.find((item) => item.id === layerId);
+      if (!layer) return;
+
+      modals.openContextModal({
+        modal: "layereditmodal",
+        title: "Edit Layer",
+        centered: true,
+        innerProps: {
+          initialName: layer.name,
+          onSubmit: async (name: string) => {
+            try {
+              const response = await api.patch<LayerGetDto[]>(
+                `/layers/${layerId}`,
+                {
+                  name,
+                },
+              );
+
+              setLayers(response.data.data);
+
+              notifications.show({
+                title: "Success",
+                message: "Layer updated",
+                color: "green",
+              });
+            } catch {
+              notifications.show({
+                title: "Error",
+                message: "Could not update layer",
+                color: "red",
+              });
+            }
+          },
+        },
+      });
+    },
+    [canManageLayers, layers, setLayers],
+  );
+
+  const deleteLayer = useCallback(
+    async (layerId: number) => {
+      if (!canManageLayers) return;
+
+      if (layers.length <= 1) {
+        notifications.show({
+          title: "Error",
+          message: "You cannot delete the last layer.",
+          color: "red",
+        });
+        return;
+      }
+
+      const layer = layers.find((item) => item.id === layerId);
+      if (!layer) return;
+
+      modals.openConfirmModal({
+        title: "Delete layer",
+        centered: true,
+        children: (
+          <Text size="sm">Are you sure you want to delete "{layer.name}"?</Text>
+        ),
+        labels: { confirm: "Delete", cancel: "Cancel" },
+        confirmProps: { color: "red" },
+        onConfirm: async () => {
+          try {
+            const response = await api.delete<LayerGetDto[]>(
+              `/layers/${layerId}`,
+            );
+            const nextLayers = response.data.data;
+
+            if (!Array.isArray(nextLayers)) {
+              notifications.show({
+                title: "Error",
+                message: "Could not delete layer",
+                color: "red",
+              });
+              return;
+            }
+
+            setLayers(nextLayers);
+
+            if (activeLayerId === layerId) {
+              setActiveLayerIdState(nextLayers[0]?.id ?? null);
+            }
+
+            notifications.show({
+              title: "Success",
+              message: "Layer deleted",
+              color: "green",
+            });
+          } catch (error: any) {
+            const backendMessage =
+              error?.response?.data?.errors?.[0]?.message ?? "";
+
+            notifications.show({
+              title: "Error",
+              message:
+                backendMessage === "cannot delete the last layer"
+                  ? "You cannot delete the last layer."
+                  : "Could not delete layer",
+              color: "red",
+            });
+          }
+        },
+      });
+    },
+    [canManageLayers, layers, activeLayerId, setLayers],
+  );
+
+  const toggleLayerVisibility = useCallback((layerId: number) => {
+    setLayersState((prevLayers) => {
+      const nextLayers = prevLayers.map((layer) =>
+        layer.id === layerId ? { ...layer, visible: !layer.visible } : layer,
+      );
+
+      setActiveLayerIdState((prevActiveLayerId) => {
+        if (prevActiveLayerId !== layerId) {
+          return prevActiveLayerId;
+        }
+
+        const updatedLayer = nextLayers.find((layer) => layer.id === layerId);
+        if (!updatedLayer) return prevActiveLayerId;
+
+        if (updatedLayer.visible) {
+          return prevActiveLayerId;
+        }
+
+        return nextLayers.find((layer) => layer.visible)?.id ?? updatedLayer.id;
+      });
+
+      return nextLayers;
+    });
+  }, []);
+
+  const toggleLayerLocked = useCallback(
+    async (layerId: number) => {
+      if (!canManageLayers) return;
+
+      const layer = layers.find((item) => item.id === layerId);
+      if (!layer) return;
+
+      try {
+        const response = await api.patch<LayerGetDto[]>(`/layers/${layerId}`, {
+          locked: !layer.locked,
+        });
+
+        setLayers(response.data.data);
+      } catch {
+        notifications.show({
+          title: "Error",
+          message: "Could not update layer lock",
+          color: "red",
+        });
+      }
+    },
+    [canManageLayers, layers, setLayers],
+  );
+
+  const reorderLayers = useCallback(
+    async (orderedLayerIds: number[]) => {
+      if (!id || !canManageLayers) return;
+
+      try {
+        const response = await api.patch<LayerGetDto[]>(
+          `/layers/room/${id}/reorder`,
+          {
+            ordered_layer_ids: orderedLayerIds,
+          },
+        );
+
+        setLayers(response.data.data);
+      } catch {
+        notifications.show({
+          title: "Error",
+          message: "Could not reorder layers",
+          color: "red",
+        });
+      }
+    },
+    [id, canManageLayers, setLayers],
+  );
+
+  const updateLayerOpacity = useCallback(
+    async (layerId: number, opacityPercent: number) => {
+      if (!canManageLayers) return;
+
+      const opacity = Math.max(0, Math.min(100, opacityPercent)) / 100;
+
+      try {
+        const response = await api.patch<LayerGetDto[]>(`/layers/${layerId}`, {
+          opacity,
+        });
+
+        setLayers(response.data.data);
+      } catch {
+        notifications.show({
+          title: "Error",
+          message: "Could not update layer opacity",
+          color: "red",
+        });
+      }
+    },
+    [canManageLayers, setLayers],
+  );
 
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
   const navigate = useNavigate();
@@ -135,8 +452,17 @@ export function RoomLayout() {
   );
 
   useEffect(() => {
-    api.get<RoomGetDto>(`/rooms/${id}`).then((res) => {
-      if (res.data.data) setRoomName(res.data.data.name);
+    if (!id) return;
+
+    void Promise.all([
+      api.get<RoomGetDto>(`/rooms/${id}`),
+      api.get<{ can_manage_layers: boolean }>(`/layers/room/${id}/permissions`),
+    ]).then(([roomRes, permissionsRes]) => {
+      if (roomRes.data.data) {
+        setRoomName(roomRes.data.data.name);
+      }
+
+      setCanManageLayers(Boolean(permissionsRes.data.data?.can_manage_layers));
     });
   }, [id]);
 
@@ -183,6 +509,10 @@ export function RoomLayout() {
     setSidebarOpen((prev) => !prev);
   }, []);
 
+  const toggleLayersPanel = useCallback(() => {
+    setLayersPanelOpen((prev) => !prev);
+  }, []);
+
   return (
     <RoomLayoutContext.Provider
       value={{
@@ -204,6 +534,11 @@ export function RoomLayout() {
         setUsers,
         addUser,
         removeUser,
+        layers,
+        setLayers,
+        activeLayerId,
+        setActiveLayerId,
+        updateLayerOpacity,
       }}
     >
       <AppLayout
@@ -240,7 +575,9 @@ export function RoomLayout() {
                 </div>
               }
             >
-              <IconKeyboard size={18} />
+              <ActionIcon variant="subtle" size="lg" radius={0} c="gray.5">
+                <IconKeyboard size={18} />
+              </ActionIcon>
             </Tooltip>
 
             <Tooltip label="Back to home">
@@ -262,6 +599,76 @@ export function RoomLayout() {
         overlayNavbar
         opened={sidebarOpen}
         toggle={toggleSidebar}
+        rightPanel={
+          <Box
+            style={{
+              height: "100%",
+              position: "relative",
+              overflow: "visible",
+              pointerEvents: "none",
+            }}
+          >
+            <Box
+              style={{
+                position: "absolute",
+                left: -18,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 200,
+                pointerEvents: "auto",
+              }}
+            >
+              <ActionIcon
+                variant="filled"
+                radius="xl"
+                size={28}
+                onClick={toggleLayersPanel}
+                style={{
+                  background: "rgba(80, 80, 80, 0.72)",
+                  backdropFilter: "blur(4px)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
+                }}
+              >
+                {layersPanelOpen ? (
+                  <IconChevronRight size={16} />
+                ) : (
+                  <IconChevronLeft size={16} />
+                )}
+              </ActionIcon>
+            </Box>
+
+            {layersPanelOpen ? (
+              <Box
+                style={{
+                  height: "100%",
+                  width: "260px",
+                  pointerEvents: "auto",
+                  overflow: "hidden",
+                }}
+              >
+                <LayerSidePanel
+                  layers={layers}
+                  activeLayerId={activeLayerId}
+                  canManageLayers={canManageLayers}
+                  onSelectLayer={(layerId) => {
+                    const layer = layers.find((item) => item.id === layerId);
+                    if (!layer || !layer.visible) return;
+                    setActiveLayerId(layerId);
+                  }}
+                  onToggleVisibility={toggleLayerVisibility}
+                  onToggleLocked={toggleLayerLocked}
+                  onCreateLayer={createLayer}
+                  onRenameLayer={renameLayer}
+                  onDeleteLayer={deleteLayer}
+                  onReorderLayers={reorderLayers}
+                  onUpdateLayerOpacity={updateLayerOpacity}
+                />
+              </Box>
+            ) : null}
+          </Box>
+        }
+        rightPanelWidth={layersPanelOpen ? 260 : 0}
         bottomHeight={64}
         bottomSlot={
           <Paper

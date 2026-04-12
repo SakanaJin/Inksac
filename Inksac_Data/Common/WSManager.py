@@ -14,6 +14,7 @@ class WSMTypes(str, Enum):
     INITUSERS = "initusers"
     USERJOIN = "userjoin"
     USERLEAVE = "userleave"
+    LAYERS_SYNC = "layers_sync"
 
 class WSCodes(IntEnum):
     NORMAL_CLOSURE = 1000

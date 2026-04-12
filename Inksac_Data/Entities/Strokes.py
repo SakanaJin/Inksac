@@ -21,6 +21,7 @@ class StrokeGetDto(BaseModel):
     creator_id: int
     brush: BrushShallowDto
     room_id: int
+    layer_id: int
 
 class StrokeCreateDto(BaseModel):
     color: str
@@ -37,6 +38,7 @@ class StrokeData(BaseModel):
     scale: int
     brushid: int
     iseraser: bool
+    layerid: int
 
 class Stroke(Base):
     __tablename__ = "strokes"
@@ -57,6 +59,9 @@ class Stroke(Base):
     room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
     room = relationship("Room", back_populates="strokes")
 
+    layer_id = Column(Integer, ForeignKey("layers.id", ondelete="CASCADE"), nullable=False)
+    layer = relationship("Layer", back_populates="strokes")
+
     def toGetDto(self, tempid: str = None) -> StrokeGetDto:
         strokedto = StrokeGetDto(
             id=self.id,
@@ -69,6 +74,7 @@ class Stroke(Base):
             points=self.points,
             creator_id=self.creator_id,
             room_id=self.room_id,
-            brush=self.brush.toShallowDto()
+            brush=self.brush.toShallowDto(),
+            layer_id=self.layer_id
         )
         return strokedto

@@ -14,6 +14,10 @@ class RoomCreateUpdateDto(BaseModel):
     name: str
     width: int
     height: int
+    canvas_color: str
+
+class RoomRenameDto(BaseModel):
+    name: str
 
 class RoomGetDto(BaseModel):
     id: int
@@ -24,6 +28,7 @@ class RoomGetDto(BaseModel):
     expiration: datetime
     owner: UserShallowDto
     user_count: int
+    canvas_color: str
 
 class RoomShallowDto(BaseModel):
     id: int
@@ -31,6 +36,7 @@ class RoomShallowDto(BaseModel):
     width: int
     height: int
     expiration: datetime
+    canvas_color: str
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -38,6 +44,7 @@ class Room(Base):
     name = Column(String(255), nullable=False)
     width = Column(Integer, nullable=False, default=2000)
     height = Column(Integer, nullable=False, default=2000)
+    canvas_color = Column(String(20), nullable=False, default="#ffffff")
     imgurl = Column(String(500), nullable=True)
     expiration = Column(DateTime(timezone=True), default=round_nearest_hour(datetime.now() + timedelta(days=1)))
 
@@ -45,6 +52,8 @@ class Room(Base):
     owner = relationship("User", back_populates="room")
 
     strokes = relationship("Stroke", back_populates="room", cascade="all, delete-orphan", passive_deletes=True)
+
+    layers = relationship("Layer", back_populates="room", cascade="all, delete-orphan", passive_deletes=True, order_by="Layer.position")
 
     brushes = relationship("Brush", back_populates="rooms", secondary="usedbrushes")
 
@@ -57,7 +66,8 @@ class Room(Base):
             imgurl=self.imgurl,
             expiration=self.expiration,
             owner=self.owner.toShallowDto(),
-            user_count=len(WSManager.rooms.get(self.id, {}))
+            user_count=len(WSManager.rooms.get(self.id, {})),
+            canvas_color=self.canvas_color
         )
         return roomdto
     
@@ -67,6 +77,7 @@ class Room(Base):
             name=self.name,
             width=self.width,
             height=self.height,
-            expiration=self.expiration
+            expiration=self.expiration,
+            canvas_color=self.canvas_color
         )
         return roomdto

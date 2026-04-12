@@ -6,6 +6,7 @@ import {
   type StrokeData,
   type StrokeGetDto,
   type BrushGetDto,
+  type ClientLayerDto,
 } from "../constants/types";
 import type { WSManager } from "../config/websocket-manager";
 import { Stroke, type stringornumber } from "./Stroke";
@@ -22,6 +23,7 @@ class DrawManager {
 
   private canvasWidth: number;
   private canvasHeight: number;
+  private canvasColor: string;
 
   private baseLayer: pixi.RenderTexture;
   private baseSprite: pixi.Sprite;
@@ -30,6 +32,12 @@ class DrawManager {
   private worldContainer: pixi.Container;
   private boardBackground: pixi.Graphics;
   private boardMask: pixi.Graphics;
+
+  private layersContainer: pixi.Container;
+  private layerContainers: Map<number, pixi.Container>;
+  private layers: ClientLayerDto[] = [];
+  private activeLayerId: number | null = null;
+  private currentStrokeLayerId: number | null = null;
 
   private currentStroke: pixi.Container | null = null;
   private isDrawing = false;
@@ -53,6 +61,7 @@ class DrawManager {
     wsManager: WSManager,
     canvasWidth: number,
     canvasHeight: number,
+    canvasColor: string,
     maxUndoSteps: number = 10,
   ) {
     this.app = pixiApp;
@@ -62,6 +71,7 @@ class DrawManager {
 
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
+    this.canvasColor = canvasColor;
 
     this.baseLayer = pixi.RenderTexture.create({
       width: this.canvasWidth,
@@ -75,10 +85,13 @@ class DrawManager {
     this.drawingContainer.filters = [new pixi.AlphaFilter()];
     this.worldContainer = new pixi.Container();
 
+    this.layersContainer = new pixi.Container();
+    this.layerContainers = new Map<number, pixi.Container>();
+
     this.boardBackground = new pixi.Graphics();
     this.boardBackground
       .rect(0, 0, this.canvasWidth, this.canvasHeight)
-      .fill("#636363")
+      .fill(this.canvasColor)
       .stroke({ color: "#8a8a8a", width: 2 });
 
     this.boardMask = new pixi.Graphics();
@@ -87,7 +100,7 @@ class DrawManager {
       .fill("#ffffff");
 
     this.boardContentContainer.addChild(this.baseSprite);
-    this.boardContentContainer.addChild(this.drawingContainer);
+    this.boardContentContainer.addChild(this.layersContainer);
     this.boardContentContainer.mask = this.boardMask;
 
     this.worldContainer.addChild(this.boardBackground);
@@ -106,7 +119,6 @@ class DrawManager {
 
     this.strokesMap = new Map<number, Stroke>();
     this.tempStrokes = new Map<string, Stroke>();
-    this.initMouseEvents();
   }
 
   async init() {
@@ -137,6 +149,65 @@ class DrawManager {
     });
 
     sprite.destroy();
+  }
+
+  public setLayers(layers: ClientLayerDto[]) {
+    const sortedLayers = [...layers].sort((a, b) => a.position - b.position);
+    const nextLayerContainers = new Map<number, pixi.Container>();
+
+    this.layers = sortedLayers;
+    this.layersContainer.removeChildren();
+
+    for (const layer of sortedLayers) {
+      const existingContainer = this.layerContainers.get(layer.id);
+      const container = existingContainer ?? new pixi.Container();
+
+      if (!existingContainer) {
+        container.filters = [new pixi.AlphaFilter()];
+      }
+
+      container.visible = layer.visible;
+
+      const alphaFilter = container.filters?.[0] as
+        | pixi.AlphaFilter
+        | undefined;
+
+      if (alphaFilter) {
+        alphaFilter.alpha = layer.opacity ?? 1;
+      }
+
+      nextLayerContainers.set(layer.id, container);
+      this.layersContainer.addChild(container);
+    }
+
+    this.layerContainers = nextLayerContainers;
+
+    if (
+      this.activeLayerId !== null &&
+      !sortedLayers.some((layer) => layer.id === this.activeLayerId)
+    ) {
+      this.activeLayerId = sortedLayers[0]?.id ?? null;
+    }
+
+    if (this.activeLayerId === null && sortedLayers.length > 0) {
+      this.activeLayerId = sortedLayers[0].id;
+    }
+  }
+
+  public setActiveLayer(layerId: number | null) {
+    this.activeLayerId = layerId;
+  }
+
+  public setLayerVisibility(layerId: number, visible: boolean) {
+    const layer = this.layers.find((item) => item.id === layerId);
+    if (layer) {
+      layer.visible = visible;
+    }
+
+    const container = this.layerContainers.get(layerId);
+    if (container) {
+      container.visible = visible;
+    }
   }
 
   public setColor(color: string) {
@@ -257,7 +328,12 @@ class DrawManager {
 
     const stroke = this.undoStack.pop()!;
     this.redoStack.push(stroke);
-    this.drawingContainer.removeChild(stroke);
+
+    const layerContainer = this.layerContainers.get(stroke.layerId);
+    if (layerContainer) {
+      layerContainer.removeChild(stroke);
+    }
+
     this.strokesMap.delete(stroke.id);
 
     const message: WSMessage = { Mtype: WSType.UNDO, data: stroke.id };
@@ -269,11 +345,16 @@ class DrawManager {
 
     const stroke = this.redoStack.pop()!;
     this.undoStack.push(stroke);
-    this.drawingContainer.addChild(stroke);
+
+    const layerContainer = this.layerContainers.get(stroke.layerId);
+    if (layerContainer) {
+      layerContainer.addChild(stroke);
+      (layerContainer.children as Stroke[]).sort(
+        (a, b) => (a.id as number) - (b.id as number),
+      );
+    }
+
     this.strokesMap.set(stroke.id, stroke);
-    (this.drawingContainer.children as Stroke[]).sort(
-      (a, b) => (a.id as number) - (b.id as number),
-    );
 
     const message: WSMessage = { Mtype: WSType.REDO, data: stroke.id };
     this.ws.send(message);
@@ -294,17 +375,30 @@ class DrawManager {
 
   private onMouseDown(event: pixi.FederatedPointerEvent) {
     if (event.button !== 0) return;
+    if (this.activeBrush == null) return;
+    if (this.activeLayerId === null) return;
+
+    const activeLayer = this.layers.find(
+      (layer) => layer.id === this.activeLayerId,
+    );
+    if (!activeLayer) return;
+    if (!activeLayer.visible) return;
+    if (activeLayer.locked) return;
 
     const localPosition = this.worldContainer.toLocal(event.global);
 
     if (!this.isInsideBoard(localPosition.x, localPosition.y)) return;
 
+    const layerContainer = this.layerContainers.get(this.activeLayerId);
+    if (!layerContainer) return;
+
     this.isDrawing = true;
     this.lastPosition.set(localPosition.x, localPosition.y);
     this.strokePoints = [];
+    this.currentStrokeLayerId = this.activeLayerId;
 
     this.currentStroke = new pixi.Container();
-    this.drawingContainer.addChild(this.currentStroke);
+    layerContainer.addChild(this.currentStroke);
   }
 
   // this is what actually "draws" the brush stroke
@@ -347,12 +441,18 @@ class DrawManager {
   }
 
   private onMouseUp() {
-    if (this.isDrawing == false || this.currentStroke == null) return;
+    if (
+      this.isDrawing == false ||
+      this.currentStroke == null ||
+      this.currentStrokeLayerId === null
+    )
+      return;
 
     if (this.currentStroke.children.length === 0) {
       this.isDrawing = false;
       this.currentStroke.destroy({ children: true });
       this.currentStroke = null;
+      this.currentStrokeLayerId = null;
       return;
     }
 
@@ -375,16 +475,26 @@ class DrawManager {
     combinedSprite.position.set(frame.x, frame.y);
     if (this.activeErase) combinedSprite.blendMode = "erase";
 
-    const combinedSpriteContainer = new Stroke(tempid);
+    const combinedSpriteContainer = new Stroke(
+      tempid,
+      this.currentStrokeLayerId,
+    );
     combinedSpriteContainer.addChild(combinedSprite);
-    this.drawingContainer.addChild(combinedSpriteContainer);
+
+    const layerContainer = this.layerContainers.get(this.currentStrokeLayerId);
+    if (!layerContainer) {
+      this.currentStroke.destroy({ children: true });
+      this.currentStroke = null;
+      this.currentStrokeLayerId = null;
+      return;
+    }
+
+    layerContainer.addChild(combinedSpriteContainer);
 
     this.currentStroke.destroy({ children: true });
     this.currentStroke = null;
 
     this.undoStack.push(combinedSpriteContainer);
-
-    this.drawingContainer.addChild(combinedSpriteContainer);
     this.redoStack = [];
     this.tempStrokes.set(tempid, combinedSpriteContainer);
 
@@ -396,16 +506,22 @@ class DrawManager {
       iseraser: this.activeErase,
       scale: this.strokeScale,
       brushid: this.activeBrush?.id ?? 1,
+      layerid: this.currentStrokeLayerId,
     };
 
     const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
     this.onStroke?.(this.activeBrush?.id ?? 1);
     this.ws.send(message);
+
+    this.currentStrokeLayerId = null;
   }
 
   // RECEIVING STROKE FUNCTIONS ----------------------------------------------------------------------------
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer
   private async renderReceivedStroke(strokeData: StrokeGetDto) {
+    const layerContainer = this.layerContainers.get(strokeData.layer_id);
+    if (!layerContainer) return;
+
     const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(
       baseurl + strokeData.brush.imgurl,
     );
@@ -440,17 +556,20 @@ class DrawManager {
     combinedSprite.position.set(frame.x, frame.y);
     if (strokeData.iseraser) combinedSprite.blendMode = "erase";
 
-    const combinedSpriteContainer = new Stroke(strokeData.id);
+    const combinedSpriteContainer = new Stroke(
+      strokeData.id,
+      strokeData.layer_id,
+    );
     combinedSpriteContainer.addChild(combinedSprite);
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
 
     receivedStroke.destroy({ children: true });
 
-    this.drawingContainer.addChild(combinedSpriteContainer);
+    layerContainer.addChild(combinedSpriteContainer);
   }
 
   public async receiveStroke(strokeData: StrokeGetDto) {
-    if (this.tempStrokes.has(strokeData.tempid)) {
+    if (strokeData.tempid && this.tempStrokes.has(strokeData.tempid)) {
       const stroke = this.tempStrokes.get(strokeData.tempid)!;
       this.tempStrokes.delete(strokeData.tempid);
       stroke.id = strokeData.id;
@@ -464,7 +583,12 @@ class DrawManager {
   public async undoStroke(id: number) {
     if (!this.strokesMap.has(id)) return;
     const stroke = this.strokesMap.get(id)!;
-    this.drawingContainer.removeChild(stroke);
+
+    const layerContainer = this.layerContainers.get(stroke.layerId);
+    if (layerContainer) {
+      layerContainer.removeChild(stroke);
+    }
+
     stroke.destroy();
     this.strokesMap.delete(id);
   }
@@ -472,12 +596,20 @@ class DrawManager {
   public async redoStroke(strokeData: StrokeGetDto) {
     if (this.strokesMap.has(strokeData.id)) return;
     await this.renderReceivedStroke(strokeData);
-    (this.drawingContainer.children as Stroke[]).sort(
-      (a, b) => (a.id as number) - (b.id as number),
-    );
+
+    const layerContainer = this.layerContainers.get(strokeData.layer_id);
+    if (layerContainer) {
+      (layerContainer.children as Stroke[]).sort(
+        (a, b) => (a.id as number) - (b.id as number),
+      );
+    }
   }
 
-  public async receiveInit(strokeDatalist: StrokeGetDto[]) {
+  public async receiveInit(
+    layers: ClientLayerDto[],
+    strokeDatalist: StrokeGetDto[],
+  ) {
+    this.setLayers(layers);
     if (strokeDatalist.length === 0) return;
     for (const strokeData of strokeDatalist) {
       await this.renderReceivedStroke(strokeData);
