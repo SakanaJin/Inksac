@@ -40,6 +40,8 @@ class DrawManager {
   private currentStrokeLayerId: number | null = null;
 
   private currentStroke: pixi.Container | null = null;
+  private erasePreviewTexture: pixi.RenderTexture | null = null;
+  private erasePreviewSprite: pixi.Sprite | null = null;
   private isDrawing = false;
   private strokePoints: BrushCoord[] = [];
 
@@ -398,7 +400,19 @@ class DrawManager {
     this.currentStrokeLayerId = this.activeLayerId;
 
     this.currentStroke = new pixi.Container();
-    layerContainer.addChild(this.currentStroke);
+
+    if (this.activeErase) {
+      this.erasePreviewTexture = pixi.RenderTexture.create({
+        width: this.canvasWidth,
+        height: this.canvasHeight,
+      });
+      this.erasePreviewSprite = new pixi.Sprite(this.erasePreviewTexture);
+      this.erasePreviewSprite. blendMode = "erase";
+      layerContainer.addChild(this.erasePreviewSprite);
+    }
+    else {
+      layerContainer.addChild(this.currentStroke);  
+    }
   }
 
   // this is what actually "draws" the brush stroke
@@ -430,13 +444,24 @@ class DrawManager {
       const brushSprite = new pixi.Sprite(this.brushTexture);
       brushSprite.anchor.set(0.5);
       brushSprite.tint = this.activeColor;
-      brushSprite.alpha = this.activeOpacity;
       brushSprite.setSize(this.strokeScale);
       brushSprite.position.set(x, y);
       this.currentStroke.addChild(brushSprite);
     }
-    if (this.activeErase) this.currentStroke.blendMode = "erase";
 
+    if (this.activeErase && this.erasePreviewTexture && this.erasePreviewSprite) {
+      this.currentStroke.filters = [new pixi.AlphaFilter({ alpha: this.activeOpacity })];
+      this.app.renderer.render({
+        container: this.currentStroke,
+        target: this.erasePreviewTexture,
+        clear: true,
+      });
+      this.currentStroke.filters = [];
+    }
+    else {
+      this.currentStroke.filters = [new pixi.AlphaFilter({alpha: this.activeOpacity})];
+    }
+    
     this.lastPosition.set(currPosition.x, currPosition.y);
   }
 
@@ -453,11 +478,34 @@ class DrawManager {
       this.currentStroke.destroy({ children: true });
       this.currentStroke = null;
       this.currentStrokeLayerId = null;
+
+      if (this.erasePreviewSprite) {
+        this.erasePreviewSprite.destroy();
+        this.erasePreviewSprite = null;
+      }
+      if (this.erasePreviewTexture) {
+        this.erasePreviewTexture.destroy(true);
+        this.erasePreviewTexture = null;
+      }
       return;
     }
 
     this.isDrawing = false;
     const tempid = crypto.randomUUID();
+
+    if (this.erasePreviewSprite) {
+      this.erasePreviewSprite.parent?.removeChild(this.erasePreviewSprite);
+      this.erasePreviewSprite.destroy();
+      this.erasePreviewSprite = null;
+    }
+    if (this.erasePreviewTexture) {
+      this.erasePreviewTexture.destroy(true);
+      this.erasePreviewTexture = null;
+    }
+
+    if (this.activeErase) {
+      this.currentStroke.filters = [new pixi.AlphaFilter({ alpha: this.activeOpacity })];
+    }
 
     const bounds = this.currentStroke.getLocalBounds();
     const frame = new pixi.Rectangle(
