@@ -1,4 +1,4 @@
-import { ActionIcon, ColorPicker, Group, Tooltip } from "@mantine/core";
+import { ActionIcon, ColorPicker, Group, NumberInput, Tooltip } from "@mantine/core";
 import { useRoomLayout } from "../layout/room-layout";
 import {
   IconEraser,
@@ -9,9 +9,11 @@ import {
 
 export function ColorSelector() {
   const { color, setColor, setErase, erase } = useRoomLayout();
+  const [r,g,b,a = 1] = color.match(/[\d.]+/g)!.map(Number);
 
   let modeTooltipLabel = "";
   let eraseMode;
+  
 
   if (erase) {
     modeTooltipLabel = "Draw mode";
@@ -66,10 +68,11 @@ export function ColorSelector() {
         `}</style>
       <ColorPicker
         fullWidth
-        format="hexa"
+        format="rgba"
         value={color}
         onChange={setColor}
         mb={6}
+        swatchesPerRow={7}
         classNames={{
           sliders: "sliders",
         }}
@@ -78,6 +81,15 @@ export function ColorSelector() {
           saturationOverlay: { borderRadius: 0 },
           preview: { "--mantine-radius-sm": "0px" },
         }}
+      />
+      <NumberInput
+        suffix="%"
+        min={0}
+        max={100}
+        clampBehavior="strict"
+        defaultValue={100}
+        value={Math.round(a * 100)}
+        radius={0}
       />
       <Group>
         <Tooltip label={modeTooltipLabel}>{eraseMode}</Tooltip>
