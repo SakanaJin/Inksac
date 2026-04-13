@@ -57,7 +57,6 @@ async def onReady(message: WSMessage, roomid: int, websocket: WebSocket, **kwarg
         layers = db.execute(
             select(Layer)
             .where(Layer.room_id == roomid)
-            .order_by(Layer.position.asc(), Layer.id.asc())
         ).scalars().all()
 
         if len(layers) == 0:
@@ -74,15 +73,15 @@ async def onReady(message: WSMessage, roomid: int, websocket: WebSocket, **kwarg
             layers = db.execute(
                 select(Layer)
                 .where(Layer.room_id == roomid)
-                .order_by(Layer.position.asc(), Layer.id.asc())
             ).scalars().all()
+        layers = sorted(layers, key=lambda layer: layer.position)
 
         strokes = db.execute(
             select(Stroke)
             .where(Stroke.room_id == roomid)
             .where(Stroke.deleted == False)
-            .order_by(Stroke.created_at.asc(), Stroke.id.asc())
         ).scalars().all()
+        strokes = sorted(strokes, key=lambda stroke: stroke.id)
 
         readyData = ReadyDataDto(
             layers=[layer.toGetDto() for layer in layers],
