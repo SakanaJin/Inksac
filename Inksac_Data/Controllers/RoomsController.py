@@ -11,6 +11,11 @@ from Inksac_Data.Controllers.AuthController import get_current_user, require_not
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Layers import Layer
 from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, RoomRenameDto, round_nearest_hour
+from Inksac_Data.Entities.AllowedUsers import AllowedUser
+
+MAXROOMS = 10
+CANVASDIMMIN = 256
+CANVASDIMMAX = 8192
 
 router = APIRouter(prefix="/api/rooms", tags=["Rooms"])
 
@@ -35,30 +40,26 @@ def get_by_id(id: int, db: Session = Depends(get_db)):
 def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: User = Depends(require_not_guest)):
     response = Response()
     roomcount = db.query(Room).count()
-    if roomcount >= 10:
+    if roomcount >= MAXROOMS:
         response.add_error("room", "too many rooms in server")
         raise HttpException(status_code=503, response=response)
-    if len(roomdto.name) == 0:
-        response.add_error("name", "name cannot be empty")
-        raise HttpException(status_code=400, response=response)
-    if roomdto.width < 256:
-        response.add_error("width", f"width must be at least {256}")
-        raise HttpException(status_code=400, response=response)
-    if roomdto.height < 256:
-        response.add_error("height", f"height must be at least {256}")
-        raise HttpException(status_code=400, response=response)
-    if roomdto.width > 8192:
-        response.add_error("width", f"width cannot be greater than {8192}")
-        raise HttpException(status_code=400, response=response)
-    if roomdto.height > 8192:
-        response.add_error("height", f"height cannot be greater than {8192}")
-        raise HttpException(status_code=400, response=response)
-    if len(roomdto.canvas_color) == 0:
-        response.add_error("canvas_color", "canvas color cannot be empty")
-        raise HttpException(status_code=400, response=response)
     if bool(user.room):
         response.add_error("room", "user already has an open room")
         raise HttpException(status_code=409, response=response)
+    if len(roomdto.name) == 0:
+        response.add_error("name", "name cannot be empty")
+    if roomdto.width < CANVASDIMMIN:
+        response.add_error("width", f"width must be at least {CANVASDIMMIN}")
+    if roomdto.height < CANVASDIMMIN:
+        response.add_error("height", f"height must be at least {CANVASDIMMIN}")
+    if roomdto.width > CANVASDIMMAX:
+        response.add_error("width", f"width cannot be greater than {CANVASDIMMAX}")
+    if roomdto.height > CANVASDIMMAX:
+        response.add_error("height", f"height cannot be greater than {CANVASDIMMAX}")
+    if len(roomdto.canvas_color) == 0:
+        response.add_error("canvas_color", "canvas color cannot be empty")
+    if response.has_errors:
+        raise HttpException(status_code=400, response=response)
     room = Room(
         name=roomdto.name,
         width=roomdto.width,
@@ -66,7 +67,8 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         canvas_color=roomdto.canvas_color,
         expiration=round_nearest_hour(datetime.now() + timedelta(days=1)),
         owner=user,
-        imgurl=None
+        imgurl=None,
+        private=roomdto.private,
     )
     db.add(room)
     db.flush()
@@ -79,6 +81,8 @@ def create(roomdto: RoomCreateUpdateDto, db: Session = Depends(get_db), user: Us
         room_id=room.id,
     )
     db.add(default_layer)
+
+    room.allowed_users.append(user)
 
     db.commit()
     response.data = room.toGetDto()
@@ -98,6 +102,43 @@ def update(roomdto: RoomRenameDto, db: Session = Depends(get_db), user: User = D
 
     db.commit()
     response.data = user.room.toGetDto()
+    return response
+
+@router.post("/{roomid}/user/{userid}")
+def allow_user(roomid: int, userid: int, db: Session = Depends(get_db), user = Depends(get_current_user)):
+    response = Response()
+    if not user.room:
+        response.add_error("room", "you do not own this room")
+        raise HttpException(status_code=403, response=response)
+    if userid in [allowed_user.id for allowed_user in user.room.allowed_users]:
+        response.add_error("user", "user already allowed")
+        raise HttpException(status_code=400, response=response)
+    allowed_user = AllowedUser(
+        roomid=roomid,
+        userid=userid
+    )
+    db.add(allowed_user)
+    db.commit()
+    response.data = True
+    return response
+
+@router.delete("/{roomid}/user/{userid}")
+async def remove_user(roomid: int, userid: int, db: Session = Depends(get_db), user = Depends(get_current_user)):
+    response = Response()
+    if not user.room:
+        response.add_error("room", "you do not own this room")
+        raise HttpException(status_code=403, response=response)
+    allowed_user = next((allowed_user for allowed_user in user.room.allowed_users if allowed_user.id == userid), None)
+    if not allowed_user:
+        response.add_error("user", "user already not allowed")
+    if userid == user.id:
+        response.add_error("user", "cannot remove owner")
+    if response.has_errors:
+        raise HttpException(status_code=400, response=response)
+    user.room.allowed_users.remove(allowed_user)
+    db.commit()
+    response.data = True
+    await WSManager.disconnect_user(roomid=roomid, userid=userid, reason="Kicked from room")
     return response
 
 @router.patch("/{id}/imgurl")

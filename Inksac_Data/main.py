@@ -24,6 +24,7 @@ from Inksac_Data.Entities.Rooms import Room
 from Inksac_Data.Entities.Strokes import Stroke
 from Inksac_Data.Entities.UsedBrushes import UsedBrushes
 from Inksac_Data.Entities.Layers import Layer
+from Inksac_Data.Entities.AllowedUsers import AllowedUser
 
 #controller routers go here
 from Inksac_Data.Controllers import (

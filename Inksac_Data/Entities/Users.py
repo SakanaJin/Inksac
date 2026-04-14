@@ -43,6 +43,7 @@ class User(Base):
     brush_count = Column(Integer, default=0)
 
     room = relationship("Room", back_populates="owner", uselist=False)
+    allowed_rooms = relationship("Room", back_populates="allowed_users", secondary="allowedusers")
     
     auth = relationship("UserAuth", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
