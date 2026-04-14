@@ -33,6 +33,7 @@ export const RoomPage = () => {
   const drawerRef = useRef<DrawManager | null>(null);
   const pixiContainer = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const eyedropperPreviewRef = useRef<HTMLDivElement>(null);
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<pixi.Application | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -50,11 +51,11 @@ export const RoomPage = () => {
     registerExport,
     setHistoryState,
     color,
+    setColor,
     toggleSidebar,
     strokeScale,
     setStrokeScale,
     erase,
-    setErase,
     setUsers,
     addUser,
     removeUser,
@@ -75,6 +76,9 @@ export const RoomPage = () => {
     taperOutEnabled,
     taperOutDistance,
     taperOutEndSizePercent,
+    shapeType,
+    activeTool,
+    setActiveTool,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
@@ -95,9 +99,17 @@ export const RoomPage = () => {
   const taperOutEnabledRef = useRef(taperOutEnabled);
   const taperOutDistanceRef = useRef(taperOutDistance);
   const taperOutEndSizePercentRef = useRef(taperOutEndSizePercent);
+  const shapeTypeRef = useRef(shapeType);
+  const activeToolRef = useRef(activeTool);
   const setBrushInUseRef = useRef(setBrushInUse);
   const exportModalOpenRef = useRef(false);
   const browserCursorRef = useRef<React.CSSProperties["cursor"]>("default");
+
+  const previousToolRef = useRef<"brush" | "eraser" | "eyedropper" | "shapes">(
+    "brush",
+  );
+  const ctrlPressedRef = useRef(false);
+  const ctrlEyedropperActiveRef = useRef(false);
 
   const [spacePanActive, setSpacePanActive] = useState(false);
 
@@ -111,6 +123,7 @@ export const RoomPage = () => {
   const [cursorScale, setCursorScale] = useState(1);
   const [livePointerPressure, setLivePointerPressure] = useState(1);
   const [livePointerType, setLivePointerType] = useState("mouse");
+  const [hoverSampleColor, setHoverSampleColor] = useState<string | null>(null);
 
   const isPanningRef = useRef(false);
   const isSpacePressedRef = useRef(false);
@@ -138,6 +151,8 @@ export const RoomPage = () => {
     taperOutEnabledRef.current = taperOutEnabled;
     taperOutDistanceRef.current = taperOutDistance;
     taperOutEndSizePercentRef.current = taperOutEndSizePercent;
+    shapeTypeRef.current = shapeType;
+    activeToolRef.current = activeTool;
   }, [
     erase,
     smoothingEnabled,
@@ -153,11 +168,39 @@ export const RoomPage = () => {
     taperOutEnabled,
     taperOutDistance,
     taperOutEndSizePercent,
+    shapeType,
+    activeTool,
   ]);
 
   useEffect(() => {
     setBrushInUseRef.current = setBrushInUse;
   }, [setBrushInUse]);
+
+  useEffect(() => {
+    if (!eyedropperPreviewRef.current) return;
+
+    eyedropperPreviewRef.current.style.display =
+      activeTool === "eyedropper" &&
+      isHoveringCanvas &&
+      isOverDrawableArea &&
+      !spacePanActive &&
+      !isPanningRef.current &&
+      hoverSampleColor
+        ? "block"
+        : "none";
+  }, [
+    activeTool,
+    isHoveringCanvas,
+    isOverDrawableArea,
+    spacePanActive,
+    hoverSampleColor,
+  ]);
+
+  useEffect(() => {
+    if (!eyedropperPreviewRef.current) return;
+    eyedropperPreviewRef.current.style.background =
+      hoverSampleColor ?? "transparent";
+  }, [hoverSampleColor]);
 
   const refreshCursorScale = () => {
     const nextScale = drawerRef.current?.getWorldContainer().scale.x ?? 1;
@@ -206,11 +249,17 @@ export const RoomPage = () => {
     if (!pixiContainer.current) return;
 
     const rect = pixiContainer.current.getBoundingClientRect();
+    const nextX = clientX - rect.left;
+    const nextY = clientY - rect.top;
 
     setCursorPos({
-      x: clientX - rect.left,
-      y: clientY - rect.top,
+      x: nextX,
+      y: nextY,
     });
+
+    if (eyedropperPreviewRef.current) {
+      eyedropperPreviewRef.current.style.transform = `translate3d(${nextX + 10}px, ${nextY - 24}px, 0)`;
+    }
 
     if (typeof pressure === "number") {
       setLivePointerPressure(pressure > 0 ? pressure : 1);
@@ -241,15 +290,22 @@ export const RoomPage = () => {
     isHoveringCanvas &&
     isOverDrawableArea &&
     !spacePanActive &&
-    !isPanningRef.current;
+    !isPanningRef.current &&
+    activeTool !== "eyedropper" &&
+    activeTool !== "shapes";
 
   const browserCursor: React.CSSProperties["cursor"] = isPanningRef.current
     ? "grabbing"
     : isSpacePressedRef.current
       ? "grab"
-      : shouldShowBrushCursor
-        ? "none"
-        : "default";
+      : canShowCanvas &&
+          isHoveringCanvas &&
+          isOverDrawableArea &&
+          activeTool === "eyedropper"
+        ? "crosshair"
+        : shouldShowBrushCursor
+          ? "none"
+          : "default";
 
   const syncCanvasCursor = () => {
     const currentCursor = browserCursorRef.current;
@@ -450,6 +506,8 @@ export const RoomPage = () => {
     if (!drawerRef.current) return;
 
     drawerRef.current.setErase(erase);
+    drawerRef.current.setActiveTool(activeTool);
+    drawerRef.current.setShapeType(shapeType);
     drawerRef.current.setSmoothing(smoothingEnabled, smoothingStrength);
     drawerRef.current.setPressureSettings(
       pressureEnabled,
@@ -472,6 +530,8 @@ export const RoomPage = () => {
     );
   }, [
     erase,
+    activeTool,
+    shapeType,
     smoothingEnabled,
     smoothingStrength,
     pressureEnabled,
@@ -506,6 +566,7 @@ export const RoomPage = () => {
     isOverDrawableArea,
     spacePanActive,
     erase,
+    activeTool,
     activeBrush,
     strokeScale,
     cursorScale,
@@ -514,6 +575,7 @@ export const RoomPage = () => {
     pressureSensitivity,
     livePointerPressure,
     livePointerType,
+    hoverSampleColor,
   ]);
 
   useEffect(() => {
@@ -557,9 +619,15 @@ export const RoomPage = () => {
         return;
       }
 
+      if (e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setActiveTool("brush");
+        return;
+      }
+
       if (e.key.toLowerCase() === "e") {
         e.preventDefault();
-        setErase(!erase);
+        setActiveTool("eraser");
         return;
       }
 
@@ -585,6 +653,20 @@ export const RoomPage = () => {
           syncCanvasCursor();
         }
       }
+
+      if (e.key === "Control") {
+        if (!ctrlPressedRef.current) {
+          ctrlPressedRef.current = true;
+
+          if (activeToolRef.current !== "eyedropper") {
+            ctrlEyedropperActiveRef.current = true;
+            previousToolRef.current = activeToolRef.current;
+            setActiveTool("eyedropper");
+          }
+        }
+
+        return;
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -593,12 +675,32 @@ export const RoomPage = () => {
         setSpacePanActive(false);
         endPan();
       }
+
+      if (e.key === "Control") {
+        ctrlPressedRef.current = false;
+
+        if (ctrlEyedropperActiveRef.current) {
+          ctrlEyedropperActiveRef.current = false;
+          setActiveTool(previousToolRef.current);
+        }
+
+        setHoverSampleColor(null);
+      }
     };
 
     const handleWindowBlur = () => {
       isSpacePressedRef.current = false;
       setSpacePanActive(false);
       endPan();
+
+      ctrlPressedRef.current = false;
+
+      if (ctrlEyedropperActiveRef.current) {
+        ctrlEyedropperActiveRef.current = false;
+        setActiveTool(previousToolRef.current);
+      }
+
+      setHoverSampleColor(null);
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -610,7 +712,7 @@ export const RoomPage = () => {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [toggleSidebar, erase, setErase, strokeScale, setStrokeScale]);
+  }, [toggleSidebar, strokeScale, setStrokeScale, setActiveTool]);
 
   useEffect(() => {
     drawerRef.current?.setStrokeScale(strokeScale);
@@ -833,6 +935,7 @@ export const RoomPage = () => {
       setIsOverDrawableArea(false);
       setLivePointerPressure(1);
       setLivePointerType("mouse");
+      setHoverSampleColor(null);
       syncCanvasCursor();
     };
 
@@ -843,6 +946,21 @@ export const RoomPage = () => {
         e.pressure,
         e.pointerType,
       );
+
+      if (activeToolRef.current === "eyedropper") {
+        void (async () => {
+          const sampledColor =
+            await drawerRef.current?.sampleColorAtClientPoint(
+              e.clientX,
+              e.clientY,
+            );
+
+          setHoverSampleColor(sampledColor ?? null);
+        })();
+      } else {
+        setHoverSampleColor(null);
+      }
+
       syncCanvasCursor();
     };
 
@@ -858,6 +976,39 @@ export const RoomPage = () => {
         e.preventDefault();
         e.stopPropagation();
         beginPan(e.pointerId, e.clientX, e.clientY);
+        return;
+      }
+
+      if (activeToolRef.current === "eyedropper" && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        void (async () => {
+          const sampledColor =
+            await drawerRef.current?.sampleColorAtClientPoint(
+              e.clientX,
+              e.clientY,
+            );
+
+          if (!sampledColor) {
+            return;
+          }
+
+          const currentAlpha = colorRef.current.slice(7, 9) || "ff";
+          const sampledRgb = sampledColor.slice(0, 7);
+          setColor(`${sampledRgb}${currentAlpha}`);
+
+          if (ctrlEyedropperActiveRef.current) {
+            ctrlEyedropperActiveRef.current = false;
+            ctrlPressedRef.current = false;
+            setActiveTool(previousToolRef.current);
+            setHoverSampleColor(null);
+          } else {
+            setActiveTool("brush");
+          }
+        })();
+
+        return;
       }
     };
 
@@ -937,6 +1088,8 @@ export const RoomPage = () => {
         drawer.setColor(colorRef.current);
         drawer.setStrokeScale(strokeScaleRef.current);
         drawer.setErase(eraseRef.current);
+        drawer.setActiveTool(activeToolRef.current);
+        drawer.setShapeType(shapeTypeRef.current);
         drawer.setSmoothing(
           smoothingEnabledRef.current,
           smoothingStrengthRef.current,
@@ -1171,6 +1324,24 @@ export const RoomPage = () => {
           />
         </Box>
       ) : null}
+
+      <Box
+        ref={eyedropperPreviewRef}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: 16,
+          height: 16,
+          background: hoverSampleColor ?? "transparent",
+          border: "1px solid white",
+          boxShadow: "0 0 0 1px black",
+          pointerEvents: "none",
+          zIndex: 10000,
+          display: "none",
+          willChange: "transform",
+        }}
+      />
 
       {canShowCanvas && spacePanActive ? (
         <Box

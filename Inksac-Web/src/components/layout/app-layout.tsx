@@ -17,6 +17,9 @@ type AppLayoutProps = {
   bottomHeight?: number;
   opened?: boolean;
   toggle?: () => void;
+  leftPanel?: ReactNode;
+  leftPanelWidth?: number;
+  leftOverlaySlot?: ReactNode;
   rightPanel?: ReactNode;
   rightPanelWidth?: number;
 };
@@ -33,6 +36,9 @@ export const AppLayout = ({
   bottomHeight = 64,
   opened: controlledOpened,
   toggle: controlledToggle,
+  leftPanel,
+  leftPanelWidth = 280,
+  leftOverlaySlot,
   rightPanel,
   rightPanelWidth = 280,
 }: AppLayoutProps) => {
@@ -40,20 +46,29 @@ export const AppLayout = ({
 
   const opened = controlledOpened ?? internalOpened;
   const toggle = controlledToggle ?? internalToggle;
+
+  const showNavbar = !leftPanel && !!sidebarSlots;
+  const effectiveLeftPanelWidth = leftPanel ? leftPanelWidth : 0;
   const effectiveRightPanelWidth = rightPanel ? rightPanelWidth : 0;
   const mainContentWidth =
-    effectiveRightPanelWidth > 0
-      ? `calc(100% - ${effectiveRightPanelWidth}px)`
+    effectiveLeftPanelWidth > 0 || effectiveRightPanelWidth > 0
+      ? `calc(100% - ${effectiveLeftPanelWidth + effectiveRightPanelWidth}px)`
       : "100%";
+  const mainContentLeft =
+    effectiveLeftPanelWidth > 0 ? effectiveLeftPanelWidth : 0;
 
   return (
     <AppShell
       header={{ height: 60 }}
-      navbar={{
-        width: sidebarWidth,
-        breakpoint: "sm",
-        collapsed: { mobile: !opened, desktop: !opened },
-      }}
+      navbar={
+        showNavbar
+          ? {
+              width: sidebarWidth,
+              breakpoint: "sm",
+              collapsed: { mobile: !opened, desktop: !opened },
+            }
+          : undefined
+      }
       padding={overlayNavbar ? 0 : "md"}
       styles={
         overlayNavbar
@@ -74,24 +89,26 @@ export const AppLayout = ({
         />
       </AppShell.Header>
 
-      <AppShell.Navbar
-        style={
-          overlayNavbar
-            ? {
-                position: "fixed",
-                zIndex: 200,
-                top: 60,
-                height: "calc(100% - 60px)",
-              }
-            : undefined
-        }
-      >
-        <AppSidebar
-          slots={sidebarSlots}
-          hideActions={hideActions}
-          hideUserInfo={hideUserInfo}
-        />
-      </AppShell.Navbar>
+      {showNavbar ? (
+        <AppShell.Navbar
+          style={
+            overlayNavbar
+              ? {
+                  position: "fixed",
+                  zIndex: 200,
+                  top: 60,
+                  height: "calc(100% - 60px)",
+                }
+              : undefined
+          }
+        >
+          <AppSidebar
+            slots={sidebarSlots}
+            hideActions={hideActions}
+            hideUserInfo={hideUserInfo}
+          />
+        </AppShell.Navbar>
+      ) : null}
 
       <AppShell.Main
         style={{
@@ -103,6 +120,7 @@ export const AppLayout = ({
         <Box
           style={{
             position: "relative",
+            left: mainContentLeft,
             width: mainContentWidth,
             height: "100%",
             overflow: "hidden",
@@ -136,7 +154,47 @@ export const AppLayout = ({
             </Box>
           ) : null}
         </Box>
+
+        {leftOverlaySlot ? (
+          <Box
+            style={{
+              position: "fixed",
+              top: 60,
+              left: 0,
+              height: "calc(100vh - 60px)",
+              zIndex: 175,
+              pointerEvents: "none",
+            }}
+          >
+            {leftOverlaySlot}
+          </Box>
+        ) : null}
       </AppShell.Main>
+
+      {leftPanel ? (
+        <Box
+          style={{
+            position: "fixed",
+            top: 60,
+            left: 0,
+            width: effectiveLeftPanelWidth,
+            height: "calc(100vh - 60px)",
+            borderRight:
+              effectiveLeftPanelWidth > 0
+                ? "1px solid rgba(255,255,255,0.08)"
+                : "none",
+            background:
+              effectiveLeftPanelWidth > 0
+                ? "var(--mantine-color-dark-7)"
+                : "transparent",
+            zIndex: 150,
+            overflow: "visible",
+            pointerEvents: effectiveLeftPanelWidth > 0 ? "auto" : "none",
+          }}
+        >
+          {leftPanel}
+        </Box>
+      ) : null}
 
       {rightPanel ? (
         <Box

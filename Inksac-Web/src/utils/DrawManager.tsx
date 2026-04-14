@@ -49,6 +49,8 @@ class DrawManager {
   private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
   private activeErase: boolean = false;
+  private activeTool: "brush" | "eraser" | "eyedropper" | "shapes" = "brush";
+  private shapeType: "line" | "rectangle" | "ellipse" = "line";
   private strokeScale: number = 16;
 
   private smoothingEnabled = false;
@@ -80,6 +82,7 @@ class DrawManager {
 
   private spacingCarry = 0;
   private pendingStartPoint: BrushCoord | null = null;
+  private shapeStartPoint: BrushCoord | null = null;
 
   private activePointerId: number | null = null;
 
@@ -302,6 +305,47 @@ class DrawManager {
 
   public setErase(eraser: boolean) {
     this.activeErase = eraser;
+  }
+
+  public setActiveTool(tool: "brush" | "eraser" | "eyedropper" | "shapes") {
+    this.activeTool = tool;
+  }
+
+  public setShapeType(shapeType: "line" | "rectangle" | "ellipse") {
+    this.shapeType = shapeType;
+  }
+
+  public async sampleColorAtClientPoint(clientX: number, clientY: number) {
+    const localPosition = this.getLocalPositionFromClient(clientX, clientY);
+    const x = Math.floor(localPosition.x);
+    const y = Math.floor(localPosition.y);
+
+    if (!this.isInsideBoard(x, y)) return null;
+
+    const exportTexture = this.app.renderer.generateTexture({
+      target: this.worldContainer,
+      frame: new pixi.Rectangle(0, 0, this.canvasWidth, this.canvasHeight),
+    });
+
+    try {
+      const extractedCanvas = this.app.renderer.extract.canvas(
+        exportTexture,
+      ) as unknown as HTMLCanvasElement;
+
+      const context = extractedCanvas.getContext("2d", {
+        willReadFrequently: true,
+      });
+      if (!context) return null;
+
+      const pixel = context.getImageData(x, y, 1, 1).data;
+      const toHex = (value: number) => value.toString(16).padStart(2, "0");
+
+      return `#${toHex(pixel[0])}${toHex(pixel[1])}${toHex(pixel[2])}${toHex(
+        pixel[3],
+      )}`;
+    } finally {
+      exportTexture.destroy(true);
+    }
   }
 
   public async exportCanvas(options: {
@@ -824,6 +868,16 @@ class DrawManager {
     return brushSprite;
   }
 
+  private createStrokeContainerFromSprite(
+    id: stringornumber,
+    layerId: number,
+    sprite: pixi.Sprite,
+  ) {
+    const stroke = new Stroke(id, layerId);
+    stroke.addChild(sprite);
+    return stroke;
+  }
+
   private getLocalPositionFromClient(clientX: number, clientY: number) {
     const rect = this.app.canvas.getBoundingClientRect();
     const globalPoint = new pixi.Point(clientX - rect.left, clientY - rect.top);
@@ -863,6 +917,8 @@ class DrawManager {
       localPosition.y,
       event.pressure,
       event.pointerType,
+      event.shiftKey,
+      event.altKey,
     );
   };
 
@@ -872,6 +928,22 @@ class DrawManager {
       event.pointerId !== this.activePointerId
     ) {
       return;
+    }
+
+    if (this.activeTool === "shapes") {
+      const localPosition = this.getLocalPositionFromClient(
+        event.clientX,
+        event.clientY,
+      );
+
+      this.continueStrokeAt(
+        localPosition.x,
+        localPosition.y,
+        event.pressure,
+        event.pointerType,
+        event.shiftKey,
+        event.altKey,
+      );
     }
 
     this.onMouseUp();
@@ -1093,11 +1165,271 @@ class DrawManager {
     this.currentStrokeDistance = segmentStartDistance + segmentLength;
   }
 
+  private clearCurrentStrokeChildren() {
+    if (!this.currentStroke) return;
+
+    for (const child of [...this.currentStroke.children]) {
+      this.currentStroke.removeChild(child);
+      child.destroy();
+    }
+  }
+
+  private getShapeSpacingPx() {
+    if (!this.activeBrush) {
+      return Math.max(1, this.strokeScale * 0.2);
+    }
+
+    return Math.max(
+      1,
+      this.getBrushSpacingPx(this.activeBrush.spacing, this.strokeScale),
+    );
+  }
+
+  private getConstrainedLineEnd(
+    start: BrushCoord,
+    end: BrushCoord,
+  ): BrushCoord {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance <= 0) {
+      return end;
+    }
+
+    const snappedAngle =
+      Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+
+    return {
+      x: start.x + Math.cos(snappedAngle) * distance,
+      y: start.y + Math.sin(snappedAngle) * distance,
+    };
+  }
+
+  private getRectangleBounds(
+    start: BrushCoord,
+    end: BrushCoord,
+    constrain: boolean,
+    fromCenter: boolean,
+  ) {
+    if (fromCenter) {
+      let halfWidth = Math.abs(end.x - start.x);
+      let halfHeight = Math.abs(end.y - start.y);
+
+      if (constrain) {
+        const size = Math.max(halfWidth, halfHeight);
+        halfWidth = size;
+        halfHeight = size;
+      }
+
+      return {
+        left: start.x - halfWidth,
+        right: start.x + halfWidth,
+        top: start.y - halfHeight,
+        bottom: start.y + halfHeight,
+      };
+    }
+
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+
+    if (constrain) {
+      const size = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = Math.sign(dx || 1) * size;
+      dy = Math.sign(dy || 1) * size;
+    }
+
+    return {
+      left: Math.min(start.x, start.x + dx),
+      right: Math.max(start.x, start.x + dx),
+      top: Math.min(start.y, start.y + dy),
+      bottom: Math.max(start.y, start.y + dy),
+    };
+  }
+
+  private buildLinePoints(start: BrushCoord, end: BrushCoord) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const spacing = this.getShapeSpacingPx();
+
+    if (distance <= 0) {
+      return [start];
+    }
+
+    const steps = Math.max(1, Math.ceil(distance / spacing));
+    const points: BrushCoord[] = [];
+
+    for (let index = 0; index <= steps; index += 1) {
+      const t = index / steps;
+      points.push({
+        x: start.x + dx * t,
+        y: start.y + dy * t,
+      });
+    }
+
+    return points;
+  }
+
+  private buildRectangleOutlinePoints(
+    start: BrushCoord,
+    end: BrushCoord,
+    constrain: boolean,
+    fromCenter: boolean,
+  ) {
+    const bounds = this.getRectangleBounds(start, end, constrain, fromCenter);
+    const topLeft = { x: bounds.left, y: bounds.top };
+    const topRight = { x: bounds.right, y: bounds.top };
+    const bottomRight = { x: bounds.right, y: bounds.bottom };
+    const bottomLeft = { x: bounds.left, y: bounds.bottom };
+
+    const points = [
+      ...this.buildLinePoints(topLeft, topRight),
+      ...this.buildLinePoints(topRight, bottomRight).slice(1),
+      ...this.buildLinePoints(bottomRight, bottomLeft).slice(1),
+      ...this.buildLinePoints(bottomLeft, topLeft).slice(1),
+    ];
+
+    return points;
+  }
+
+  private buildEllipseOutlinePoints(
+    start: BrushCoord,
+    end: BrushCoord,
+    constrain: boolean,
+    fromCenter: boolean,
+  ) {
+    const bounds = this.getRectangleBounds(start, end, constrain, fromCenter);
+    const centerX = (bounds.left + bounds.right) / 2;
+    const centerY = (bounds.top + bounds.bottom) / 2;
+    const radiusX = Math.max(0.5, (bounds.right - bounds.left) / 2);
+    const radiusY = Math.max(0.5, (bounds.bottom - bounds.top) / 2);
+    const perimeter =
+      Math.PI *
+      (3 * (radiusX + radiusY) -
+        Math.sqrt((3 * radiusX + radiusY) * (radiusX + 3 * radiusY)));
+    const spacing = this.getShapeSpacingPx();
+    const segments = Math.max(24, Math.ceil(perimeter / spacing));
+
+    const points: BrushCoord[] = [];
+
+    for (let index = 0; index <= segments; index += 1) {
+      const angle = (index / segments) * Math.PI * 2;
+      points.push({
+        x: centerX + Math.cos(angle) * radiusX,
+        y: centerY + Math.sin(angle) * radiusY,
+      });
+    }
+
+    return points;
+  }
+
+  private getShapePoints(
+    start: BrushCoord,
+    end: BrushCoord,
+    constrain: boolean,
+    fromCenter: boolean,
+  ) {
+    if (this.shapeType === "line") {
+      let adjustedEnd = end;
+
+      if (constrain) {
+        adjustedEnd = this.getConstrainedLineEnd(start, adjustedEnd);
+      }
+
+      if (fromCenter) {
+        adjustedEnd = {
+          x: start.x + (adjustedEnd.x - start.x),
+          y: start.y + (adjustedEnd.y - start.y),
+        };
+
+        const mirroredStart = {
+          x: start.x - (adjustedEnd.x - start.x),
+          y: start.y - (adjustedEnd.y - start.y),
+        };
+
+        return this.buildLinePoints(mirroredStart, adjustedEnd);
+      }
+
+      return this.buildLinePoints(start, adjustedEnd);
+    }
+
+    if (this.shapeType === "rectangle") {
+      return this.buildRectangleOutlinePoints(
+        start,
+        end,
+        constrain,
+        fromCenter,
+      );
+    }
+
+    return this.buildEllipseOutlinePoints(start, end, constrain, fromCenter);
+  }
+
+  private rebuildShapePreview(points: BrushCoord[]) {
+    if (!this.currentStroke || !this.brushTexture || !this.activeBrush) {
+      return;
+    }
+
+    this.clearCurrentStrokeChildren();
+    this.strokePoints = [];
+    this.currentStrokeDistance = 0;
+
+    let previousPoint: BrushCoord | null = null;
+
+    for (let index = 0; index < points.length; index += 1) {
+      const point = points[index];
+
+      if (previousPoint) {
+        const dx = point.x - previousPoint.x;
+        const dy = point.y - previousPoint.y;
+        this.currentStrokeDistance += Math.sqrt(dx * dx + dy * dy);
+      }
+
+      const rotation = this.getRotationForLocalDab(
+        point,
+        previousPoint,
+        this.activeBrush.rotation_mode,
+        this.activeBrush.rotation_jitter,
+        index,
+      );
+
+      this.stampCurrentBrushAtPoint(point, rotation, true, this.strokeScale, 1);
+
+      previousPoint = point;
+    }
+  }
+
+  private updateShapePreview(
+    x: number,
+    y: number,
+    constrain: boolean,
+    fromCenter: boolean,
+  ) {
+    if (!this.shapeStartPoint) return;
+
+    const points = this.getShapePoints(
+      this.shapeStartPoint,
+      { x, y },
+      constrain,
+      fromCenter,
+    );
+
+    if (points.length === 0) {
+      return;
+    }
+
+    this.rebuildShapePreview(points);
+    this.pendingStartPoint = points[0] ?? this.shapeStartPoint;
+  }
+
   private continueStrokeAt(
     x: number,
     y: number,
     pressure: number,
     pointerType: string,
+    shiftKey = false,
+    altKey = false,
   ) {
     if (
       this.isDrawing === false ||
@@ -1111,6 +1443,11 @@ class DrawManager {
     this.currentPointerPressure = pressure;
     this.currentPointerType = pointerType;
     this.rawPointerPosition = new pixi.Point(x, y);
+
+    if (this.activeTool === "shapes") {
+      this.updateShapePreview(x, y, shiftKey, altKey);
+      return;
+    }
 
     if (
       this.smoothingEnabled &&
@@ -1185,6 +1522,7 @@ class DrawManager {
 
   private onMouseDown(event: pixi.FederatedPointerEvent) {
     if (event.button !== 0) return;
+    if (this.activeTool === "eyedropper") return;
     if (this.activeBrush == null) return;
     if (this.activeLayerId === null) return;
 
@@ -1222,12 +1560,25 @@ class DrawManager {
     this.smoothedPressure = initialPressure;
 
     this.currentStroke = new pixi.Container();
-    if (this.activeErase) this.currentStroke.blendMode = "erase";
+    if (this.activeErase && this.activeTool !== "shapes") {
+      this.currentStroke.blendMode = "erase";
+    }
     layerContainer.addChild(this.currentStroke);
 
     this.attachWindowStrokeListeners();
 
     const startPoint = { x: localPosition.x, y: localPosition.y };
+    this.shapeStartPoint = startPoint;
+
+    if (this.activeTool === "shapes") {
+      this.updateShapePreview(
+        localPosition.x,
+        localPosition.y,
+        event.shiftKey,
+        event.altKey,
+      );
+      return;
+    }
 
     if (this.activeBrush.rotation_mode !== RotationMode.FOLLOWSTROKE) {
       const startRotation = this.getRotationForLocalDab(
@@ -1268,6 +1619,8 @@ class DrawManager {
       localPosition.y,
       event.pressure,
       event.pointerType,
+      event.shiftKey,
+      event.altKey,
     );
   }
 
@@ -1353,12 +1706,16 @@ class DrawManager {
       this.spacingCarry = 0;
       this.currentStrokeDistance = 0;
       this.pendingStartPoint = null;
+      this.shapeStartPoint = null;
       this.rawPointerPosition = null;
       this.smoothedPosition = null;
       return;
     }
 
-    if (this.taperInEnabled || this.taperOutEnabled) {
+    if (
+      this.activeTool !== "shapes" &&
+      (this.taperInEnabled || this.taperOutEnabled)
+    ) {
       this.rebuildCurrentStrokeWithUnifiedTaper();
     }
 
@@ -1394,6 +1751,7 @@ class DrawManager {
       this.currentStrokeLayerId = null;
       this.spacingCarry = 0;
       this.pendingStartPoint = null;
+      this.shapeStartPoint = null;
       this.rawPointerPosition = null;
       this.smoothedPosition = null;
       return;
@@ -1427,6 +1785,7 @@ class DrawManager {
     this.spacingCarry = 0;
     this.currentStrokeDistance = 0;
     this.pendingStartPoint = null;
+    this.shapeStartPoint = null;
     this.rawPointerPosition = null;
     this.smoothedPosition = null;
     this.currentPointerPressure = 1;
@@ -1436,7 +1795,7 @@ class DrawManager {
 
   // RECEIVING STROKE FUNCTIONS ----------------------------------------------------------------------------
   // this is basically just onMouseMove and onMouseUp combined, draws based on the stroke data sent from the original drawer
-  private async renderReceivedStroke(strokeData: StrokeGetDto) {
+  private async renderReceivedBrushStroke(strokeData: StrokeGetDto) {
     const layerContainer = this.layerContainers.get(strokeData.layer_id);
     if (!layerContainer) return;
 
@@ -1486,16 +1845,20 @@ class DrawManager {
     combinedSprite.position.set(frame.x, frame.y);
     if (strokeData.iseraser) combinedSprite.blendMode = "erase";
 
-    const combinedSpriteContainer = new Stroke(
+    const combinedSpriteContainer = this.createStrokeContainerFromSprite(
       strokeData.id,
       strokeData.layer_id,
+      combinedSprite,
     );
-    combinedSpriteContainer.addChild(combinedSprite);
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
 
     receivedStroke.destroy({ children: true });
 
     layerContainer.addChild(combinedSpriteContainer);
+  }
+
+  private async renderReceivedStroke(strokeData: StrokeGetDto) {
+    await this.renderReceivedBrushStroke(strokeData);
   }
 
   public async receiveStroke(strokeData: StrokeGetDto) {

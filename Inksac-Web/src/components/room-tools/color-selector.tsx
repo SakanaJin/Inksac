@@ -1,87 +1,70 @@
-import { ActionIcon, ColorPicker, Group, Tooltip } from "@mantine/core";
+import { Box, ColorPicker } from "@mantine/core";
 import { useRoomLayout } from "../layout/room-layout";
-import {
-  IconEraser,
-  IconBrush,
-  IconBrushOff,
-  IconEraserOff,
-} from "@tabler/icons-react";
 
 export function ColorSelector() {
-  const { color, setColor, setErase, erase } = useRoomLayout();
-
-  let modeTooltipLabel = "";
-  let eraseMode;
-
-  if (erase) {
-    modeTooltipLabel = "Draw mode";
-    eraseMode = (
-      <ActionIcon
-        pos="relative"
-        size="xl"
-        radius={0}
-        onClick={() => setErase(false)}
-      >
-        <IconBrushOff
-          size={18}
-          color="white"
-          opacity="70%"
-          style={{ position: "absolute", top: 3, left: 3, zIndex: 0 }}
-        />
-        <IconEraser
-          size={27}
-          style={{ position: "absolute", bottom: 3, right: 3, zIndex: 1 }}
-        />
-      </ActionIcon>
-    );
-  } else {
-    modeTooltipLabel = "Erase mode";
-    eraseMode = (
-      <ActionIcon
-        pos="relative"
-        size="xl"
-        radius={0}
-        onClick={() => setErase(true)}
-      >
-        <IconEraserOff
-          size={18}
-          color="white"
-          opacity="70%"
-          style={{ position: "absolute", top: 3, left: 3, zIndex: 0 }}
-        />
-        <IconBrush
-          size={27}
-          style={{ position: "absolute", bottom: 3, right: 3, zIndex: 1 }}
-        />
-      </ActionIcon>
-    );
-  }
+  const { color, setColor } = useRoomLayout();
 
   return (
     <>
       <style>{`
-            .sliders .mantine-ColorPicker-sliderOverlay {
-                border-radius: 0;
-            }
-        `}</style>
-      <ColorPicker
-        fullWidth
-        format="hexa"
-        value={color}
-        onChange={setColor}
-        mb={6}
-        classNames={{
-          sliders: "sliders",
+        .responsive-color-picker {
+          width: 100%;
+          height: 100%;
+          min-height: 0;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .responsive-color-picker > div {
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .responsive-color-picker .mantine-ColorPicker-wrapper {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .responsive-color-picker .mantine-ColorPicker-saturation {
+          flex: 1;
+          min-height: 80px;
+          height: auto !important;
+        }
+
+        .responsive-color-picker .mantine-ColorPicker-sliderOverlay {
+          border-radius: 0;
+        }
+      `}</style>
+
+      <Box
+        className="responsive-color-picker"
+        style={{
+          width: "100%",
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
         }}
-        styles={{
-          saturation: { height: 150 },
-          saturationOverlay: { borderRadius: 0 },
-          preview: { "--mantine-radius-sm": "0px" },
-        }}
-      />
-      <Group>
-        <Tooltip label={modeTooltipLabel}>{eraseMode}</Tooltip>
-      </Group>
+      >
+        <ColorPicker
+          fullWidth
+          format="hexa"
+          value={color}
+          onChange={setColor}
+          styles={{
+            saturationOverlay: {
+              borderRadius: 0,
+            },
+            preview: {
+              "--mantine-radius-sm": "0px",
+            },
+          }}
+        />
+      </Box>
     </>
   );
 }

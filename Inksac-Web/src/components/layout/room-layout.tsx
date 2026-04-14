@@ -15,7 +15,6 @@ import {
   Group,
   Menu,
   Modal,
-  NumberInput,
   Paper,
   Slider,
   Stack,
@@ -36,11 +35,16 @@ import {
   IconX,
   IconSettings,
   IconDots,
+  IconAdjustments,
+  IconLine,
+  IconSquare,
+  IconCircle,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
 import { LayerSidePanel } from "../layers/layer-side-panel";
+import { RoomToolToolbar } from "../room-tools/room-tool-toolbar";
 import {
   type UserGetDto,
   type BrushGetDto,
@@ -51,6 +55,9 @@ import {
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
 import { UserAvatars } from "../room-tools/UserAvatars";
+
+type ToolType = "brush" | "eraser" | "eyedropper" | "shapes";
+export type ShapeType = "line" | "rectangle" | "ellipse";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -65,6 +72,10 @@ type RoomLayoutContextValue = {
   toggleSidebar: () => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
   setErase: (erase: boolean) => void;
+  activeTool: ToolType;
+  setActiveTool: (tool: ToolType) => void;
+  shapeType: ShapeType;
+  setShapeType: (shapeType: ShapeType) => void;
   color: string;
   erase: boolean;
   setStrokeScale: (strokeScale: number) => void;
@@ -118,6 +129,10 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setColor: () => {},
   registerSetErase: () => {},
   setErase: () => {},
+  activeTool: "brush",
+  setActiveTool: () => {},
+  shapeType: "line",
+  setShapeType: () => {},
   color: "#ffffffff",
   toggleSidebar: () => {},
   erase: false,
@@ -571,6 +586,8 @@ export function RoomLayout() {
   const [canRedo, setCanRedo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [erase, setEraseState] = useState(false);
+  const [activeToolState, setActiveToolState] = useState<ToolType>("brush");
+  const [shapeType, setShapeType] = useState<ShapeType>("line");
   const [strokeScale, setStrokeScale] = useState(16);
   const [users, setUsers] = useState<UserGetDto[]>([]);
   const [layers, setLayersState] = useState<ClientLayerDto[]>([]);
@@ -598,6 +615,21 @@ export function RoomLayout() {
   const [taperOutDistance, setTaperOutDistance] = useState(32);
   const [taperOutEndSizePercent, setTaperOutEndSizePercent] = useState(5);
   const [taperModalOpen, setTaperModalOpen] = useState(false);
+
+  const leftPanelContentRef = useRef<HTMLDivElement | null>(null);
+  const brushPanelResizeStateRef = useRef<{
+    startY: number;
+    startHeight: number;
+  } | null>(null);
+  const hasInitializedBrushSplitRef = useRef(false);
+
+  const BRUSH_TOOLS_MIN_HEIGHT = 190;
+  const BRUSH_TOOLS_MAX_HEIGHT = 360;
+  const BRUSH_LIBRARY_MIN_HEIGHT = 0;
+  const BRUSH_SECTION_DIVIDER_HEIGHT = 12;
+
+  const [brushToolsHeight, setBrushToolsHeight] = useState(220);
+  const [isResizingBrushSections, setIsResizingBrushSections] = useState(false);
 
   function resetPressureDefaults() {
     setPressureEnabled(true);
@@ -934,7 +966,18 @@ export function RoomLayout() {
   const setErase = useCallback(
     (erase: boolean) => {
       setEraseState(erase);
+      setActiveToolState(erase ? "eraser" : "brush");
       onSetErase?.(erase);
+    },
+    [onSetErase],
+  );
+
+  const setActiveTool = useCallback(
+    (tool: ToolType) => {
+      setActiveToolState(tool);
+      const nextErase = tool === "eraser";
+      setEraseState(nextErase);
+      onSetErase?.(nextErase);
     },
     [onSetErase],
   );
@@ -998,6 +1041,102 @@ export function RoomLayout() {
     setLayersPanelOpen((prev) => !prev);
   }
 
+  const clampBrushToolsHeight = useCallback((nextHeight: number) => {
+    const containerHeight = leftPanelContentRef.current?.clientHeight ?? 0;
+
+    const boundedByPreset = Math.max(
+      BRUSH_TOOLS_MIN_HEIGHT,
+      Math.min(BRUSH_TOOLS_MAX_HEIGHT, nextHeight),
+    );
+
+    if (containerHeight <= 0) {
+      return boundedByPreset;
+    }
+
+    const maxHeightFromContainer = Math.max(
+      BRUSH_TOOLS_MIN_HEIGHT,
+      containerHeight - BRUSH_LIBRARY_MIN_HEIGHT - BRUSH_SECTION_DIVIDER_HEIGHT,
+    );
+
+    return Math.min(boundedByPreset, maxHeightFromContainer);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const container = leftPanelContentRef.current;
+    if (!container) return;
+
+    const syncBrushSplit = () => {
+      const height = container.clientHeight;
+      if (height <= 0) return;
+
+      if (!hasInitializedBrushSplitRef.current) {
+        hasInitializedBrushSplitRef.current = true;
+        setBrushToolsHeight(clampBrushToolsHeight(220));
+        return;
+      }
+
+      setBrushToolsHeight((prev) => clampBrushToolsHeight(prev));
+    };
+
+    syncBrushSplit();
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncBrushSplit();
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [sidebarOpen, clampBrushToolsHeight]);
+
+  useEffect(() => {
+    if (!isResizingBrushSections) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const resizeState = brushPanelResizeStateRef.current;
+      if (!resizeState) return;
+
+      const deltaY = event.clientY - resizeState.startY;
+      setBrushToolsHeight(
+        clampBrushToolsHeight(resizeState.startHeight + deltaY),
+      );
+    };
+
+    const handlePointerUp = () => {
+      brushPanelResizeStateRef.current = null;
+      setIsResizingBrushSections(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isResizingBrushSections, clampBrushToolsHeight]);
+
+  const handleBrushSectionResizeStart = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    brushPanelResizeStateRef.current = {
+      startY: event.clientY,
+      startHeight: brushToolsHeight,
+    };
+
+    setIsResizingBrushSections(true);
+  };
+
+  const leftPanelWidth = sidebarOpen ? 340 : 0;
+  const toolbarLeftOffset = sidebarOpen ? 340 + 16 : 16;
+
   return (
     <RoomLayoutContext.Provider
       value={{
@@ -1013,6 +1152,10 @@ export function RoomLayout() {
         setColor,
         toggleSidebar,
         setErase,
+        activeTool: activeToolState,
+        setActiveTool,
+        shapeType,
+        setShapeType,
         color,
         erase,
         setStrokeScale,
@@ -1546,7 +1689,9 @@ export function RoomLayout() {
                   </div>
                   <div>Ctrl+Z - Undo</div>
                   <div>Ctrl+Shift+Z - Redo</div>
-                  <div>E - Toggle eraser</div>
+                  <div>B - Brush</div>
+                  <div>E - Eraser</div>
+                  <div>Ctrl+Left Click - Eyedropper</div>
                   <div>[ - Decrease brush size</div>
                   <div>] - Increase brush size</div>
                   <div>Ctrl+S - Open export modal</div>
@@ -1573,12 +1718,137 @@ export function RoomLayout() {
             </Tooltip>
           </Group>
         }
-        sidebarWidth={340}
         hideActions
         hideUserInfo
         overlayNavbar
         opened={sidebarOpen}
         toggle={toggleSidebar}
+        leftOverlaySlot={<RoomToolToolbar leftOffset={toolbarLeftOffset} />}
+        leftPanel={
+          <Box
+            style={{
+              height: "100%",
+              position: "relative",
+              overflow: "visible",
+              pointerEvents: "none",
+            }}
+          >
+            <Box
+              style={{
+                position: "absolute",
+                right: -18,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 200,
+                pointerEvents: "auto",
+              }}
+            ></Box>
+
+            {sidebarOpen ? (
+              <Box
+                style={{
+                  height: "100%",
+                  width: "340px",
+                  pointerEvents: "auto",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  ref={leftPanelContentRef}
+                  style={{
+                    height: "100%",
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    padding: 0,
+                    gap: 0,
+                  }}
+                >
+                  <Paper
+                    radius={0}
+                    p={8}
+                    style={{
+                      height: brushToolsHeight,
+                      minHeight: BRUSH_TOOLS_MIN_HEIGHT,
+                      maxHeight: BRUSH_TOOLS_MAX_HEIGHT,
+                      flexShrink: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "var(--mantine-color-dark-7)",
+                    }}
+                  >
+                    <Box
+                      style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <ColorSelector />
+                    </Box>
+                  </Paper>
+
+                  <Box
+                    onPointerDown={handleBrushSectionResizeStart}
+                    style={{
+                      height: BRUSH_SECTION_DIVIDER_HEIGHT,
+                      minHeight: BRUSH_SECTION_DIVIDER_HEIGHT,
+                      cursor: "row-resize",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      userSelect: "none",
+                      touchAction: "none",
+                    }}
+                  >
+                    <Box
+                      style={{
+                        width: 46,
+                        height: 4,
+                        borderRadius: 999,
+                        background: isResizingBrushSections
+                          ? "rgba(34, 139, 230, 0.9)"
+                          : "rgba(255,255,255,0.18)",
+                        transition: "background 120ms ease",
+                      }}
+                    />
+                  </Box>
+
+                  <Paper
+                    radius={0}
+                    p={8}
+                    style={{
+                      flex: 1,
+                      minHeight: BRUSH_LIBRARY_MIN_HEIGHT,
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "var(--mantine-color-dark-7)",
+                    }}
+                  >
+                    <Box
+                      style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <BrushSidePanel
+                        onBrushSelect={onBrushSelect ?? undefined}
+                        registerStroke={registerStroke}
+                      />
+                    </Box>
+                  </Paper>
+                </Box>
+              </Box>
+            ) : null}
+          </Box>
+        }
+        leftPanelWidth={leftPanelWidth}
         rightPanel={
           <Box
             style={{
@@ -1701,63 +1971,6 @@ export function RoomLayout() {
             </Group>
           </Paper>
         }
-        sidebarSlots={{
-          main: (
-            <Box
-              style={{
-                height: "100%",
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-              }}
-            >
-              <Box style={{ flexShrink: 0 }}>
-                <ColorSelector />
-              </Box>
-
-              <Box style={{ flexShrink: 0 }} mt={7} mb={7}>
-                <Divider w="100%" />
-                <Text size="sm" fw={600}>
-                  Diameter
-                </Text>
-                <Group wrap="nowrap" align="center">
-                  <Slider
-                    style={{ flex: 1 }}
-                    min={1}
-                    max={512}
-                    step={1}
-                    value={strokeScale}
-                    onChange={setStrokeScale}
-                  />
-                  <NumberInput
-                    radius={0}
-                    w={90}
-                    min={1}
-                    max={512}
-                    step={1}
-                    value={strokeScale}
-                    onChange={(value) => setStrokeScale(value as number)}
-                  />
-                </Group>
-                <Divider w="100%" mt={7} mb={7} />
-              </Box>
-
-              <Box
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflow: "hidden",
-                }}
-              >
-                <BrushSidePanel
-                  onBrushSelect={onBrushSelect ?? undefined}
-                  registerStroke={registerStroke}
-                />
-              </Box>
-            </Box>
-          ),
-        }}
       />
     </RoomLayoutContext.Provider>
   );
