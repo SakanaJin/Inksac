@@ -17,10 +17,12 @@ import { EnvVars } from "../config/env-vars";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
+type StrokeHistoryEntry = Stroke[];
+
 class DrawManager {
   private app: pixi.Application;
-  private undoStack: Stroke[];
-  private redoStack: Stroke[];
+  private undoStack: StrokeHistoryEntry[];
+  private redoStack: StrokeHistoryEntry[];
   private lastPosition: pixi.Point;
 
   private canvasWidth: number;
@@ -41,6 +43,7 @@ class DrawManager {
   private currentStrokeLayerId: number | null = null;
 
   private currentStroke: pixi.Container | null = null;
+  private currentMirrorStrokes: pixi.Container[] = [];
   private isDrawing = false;
   private strokePoints: StrokePoint[] = [];
 
@@ -85,6 +88,12 @@ class DrawManager {
   private shapeStartPoint: BrushCoord | null = null;
 
   private activePointerId: number | null = null;
+
+  private mirrorEnabled = false;
+  private mirrorCenterX = 0;
+  private mirrorCenterY = 0;
+  private mirrorAngleRadians = Math.PI / 2;
+  private mirrorAxes: 1 | 2 = 1;
 
   constructor(
     pixiApp: pixi.Application,
@@ -313,6 +322,26 @@ class DrawManager {
 
   public setShapeType(shapeType: "line" | "rectangle" | "ellipse") {
     this.shapeType = shapeType;
+  }
+
+  public setMirror(config: {
+    enabled: boolean;
+    centerX: number;
+    centerY: number;
+    angleDegrees: number;
+    axes: 1 | 2;
+  }) {
+    this.mirrorEnabled = config.enabled;
+    this.mirrorCenterX = Math.max(
+      0,
+      Math.min(this.canvasWidth, config.centerX),
+    );
+    this.mirrorCenterY = Math.max(
+      0,
+      Math.min(this.canvasHeight, config.centerY),
+    );
+    this.mirrorAngleRadians = (config.angleDegrees * Math.PI) / 180;
+    this.mirrorAxes = config.axes === 2 ? 2 : 1;
   }
 
   public async sampleColorAtClientPoint(clientX: number, clientY: number) {
@@ -878,6 +907,200 @@ class DrawManager {
     return stroke;
   }
 
+  private getMirrorAxisAngles() {
+    const primaryAngle = this.mirrorAngleRadians;
+
+    return this.mirrorAxes === 2
+      ? [primaryAngle, primaryAngle + Math.PI / 2]
+      : [primaryAngle];
+  }
+
+  private getMirrorTransformSequences() {
+    const axisAngles = this.getMirrorAxisAngles();
+
+    if (!this.mirrorEnabled || axisAngles.length === 0) {
+      return [] as number[][];
+    }
+
+    if (axisAngles.length === 1) {
+      return [[axisAngles[0]]];
+    }
+
+    return [[axisAngles[0]], [axisAngles[1]], [axisAngles[0], axisAngles[1]]];
+  }
+
+  private reflectPointAcrossAxis(
+    point: BrushCoord,
+    axisAngle: number,
+  ): BrushCoord {
+    const dx = point.x - this.mirrorCenterX;
+    const dy = point.y - this.mirrorCenterY;
+    const dirX = Math.cos(axisAngle);
+    const dirY = Math.sin(axisAngle);
+    const projection = dx * dirX + dy * dirY;
+
+    return {
+      x: this.mirrorCenterX + 2 * projection * dirX - dx,
+      y: this.mirrorCenterY + 2 * projection * dirY - dy,
+    };
+  }
+
+  private reflectRotationAcrossAxis(rotation: number, axisAngle: number) {
+    return 2 * axisAngle - rotation;
+  }
+
+  private applyMirrorSequenceToPoint(point: BrushCoord, sequence: number[]) {
+    return sequence.reduce(
+      (currentPoint, axisAngle) =>
+        this.reflectPointAcrossAxis(currentPoint, axisAngle),
+      point,
+    );
+  }
+
+  private applyMirrorSequenceToRotation(rotation: number, sequence: number[]) {
+    return sequence.reduce(
+      (currentRotation, axisAngle) =>
+        this.reflectRotationAcrossAxis(currentRotation, axisAngle),
+      rotation,
+    );
+  }
+
+  private mirrorStrokePoints(points: StrokePoint[], sequence: number[]) {
+    return points.map((point) => {
+      const mirroredPoint = this.applyMirrorSequenceToPoint(point, sequence);
+      return {
+        ...point,
+        x: mirroredPoint.x,
+        y: mirroredPoint.y,
+      };
+    });
+  }
+
+  private hasDistinctMirror(points: StrokePoint[], sequence: number[]) {
+    return points.some((point) => {
+      const mirroredPoint = this.applyMirrorSequenceToPoint(point, sequence);
+      return (
+        Math.abs(mirroredPoint.x - point.x) > 0.001 ||
+        Math.abs(mirroredPoint.y - point.y) > 0.001
+      );
+    });
+  }
+
+  private getRenderableMirrorTransformSequences(points: StrokePoint[]) {
+    return this.getMirrorTransformSequences().filter((sequence) =>
+      this.hasDistinctMirror(points, sequence),
+    );
+  }
+
+  private shouldRenderMirrorPreview() {
+    return (
+      this.mirrorEnabled &&
+      this.getRenderableMirrorTransformSequences(this.strokePoints).length > 0
+    );
+  }
+
+  private createCombinedStrokeContainerFromPoints({
+    id,
+    layerId,
+    points,
+    texture,
+    color,
+    opacity,
+    isEraser,
+    scale,
+    rotationMode,
+    rotationJitter,
+  }: {
+    id: stringornumber;
+    layerId: number;
+    points: StrokePoint[];
+    texture: pixi.Texture;
+    color: string;
+    opacity: number;
+    isEraser: boolean;
+    scale: number;
+    rotationMode: RotationMode;
+    rotationJitter: number;
+  }) {
+    const renderedStroke = new pixi.Container();
+
+    if (isEraser) {
+      renderedStroke.blendMode = "erase";
+    }
+
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i];
+      const rotation = this.getRotationForReceivedDab(
+        point,
+        i,
+        points,
+        rotationMode,
+        rotationJitter,
+      );
+
+      const brushSprite = this.createBrushSprite(
+        texture,
+        point,
+        color,
+        opacity,
+        point.size ?? scale,
+        rotation,
+      );
+
+      renderedStroke.addChild(brushSprite);
+    }
+
+    const bounds = renderedStroke.getLocalBounds();
+    const frame = new pixi.Rectangle(
+      bounds.minX,
+      bounds.minY,
+      bounds.maxX - bounds.minX,
+      bounds.maxY - bounds.minY,
+    );
+
+    const combinedTexture = this.app.renderer.generateTexture({
+      target: renderedStroke,
+      frame,
+    });
+    const combinedSprite = new pixi.Sprite(combinedTexture);
+    combinedSprite.position.set(frame.x, frame.y);
+
+    if (isEraser) {
+      combinedSprite.blendMode = "erase";
+    }
+
+    renderedStroke.destroy({ children: true });
+
+    return this.createStrokeContainerFromSprite(id, layerId, combinedSprite);
+  }
+
+  private addStrokeToLayer(stroke: Stroke) {
+    const layerContainer = this.layerContainers.get(stroke.layerId);
+    if (!layerContainer) {
+      return false;
+    }
+
+    layerContainer.addChild(stroke);
+
+    return true;
+  }
+
+  private removeStrokeFromLayer(stroke: Stroke) {
+    const layerContainer = this.layerContainers.get(stroke.layerId);
+    if (layerContainer) {
+      layerContainer.removeChild(stroke);
+    }
+  }
+
+  private sortLayerChildren(layerId: number) {
+    const layerContainer = this.layerContainers.get(layerId);
+    if (!layerContainer) return;
+
+    (layerContainer.children as Stroke[]).sort(
+      (a, b) => Number(a.id) - Number(b.id),
+    );
+  }
+
   private getLocalPositionFromClient(clientX: number, clientY: number) {
     const rect = this.app.canvas.getBoundingClientRect();
     const globalPoint = new pixi.Point(clientX - rect.left, clientY - rect.top);
@@ -965,6 +1188,49 @@ class DrawManager {
   };
 
   //   this.drawingContainer.addChildAt(this.baseSprite, 0);
+  private stampMirrorPreviewAtPoint(
+    point: BrushCoord,
+    rotation: number,
+    size: number,
+  ) {
+    if (
+      this.currentMirrorStrokes.length === 0 ||
+      this.brushTexture == null ||
+      this.activeBrush == null ||
+      !this.shouldRenderMirrorPreview()
+    ) {
+      return;
+    }
+
+    const sequences = this.getRenderableMirrorTransformSequences(
+      this.strokePoints,
+    );
+
+    sequences.forEach((sequence, index) => {
+      const mirroredPoint = this.applyMirrorSequenceToPoint(point, sequence);
+
+      if (!this.isInsideBoard(mirroredPoint.x, mirroredPoint.y)) return;
+
+      const mirrorRotation = this.applyMirrorSequenceToRotation(
+        rotation,
+        sequence,
+      );
+      const container = this.currentMirrorStrokes[index];
+      if (!container) return;
+
+      const brushSprite = this.createBrushSprite(
+        this.brushTexture!,
+        mirroredPoint,
+        this.activeColor,
+        this.activeOpacity,
+        size,
+        mirrorRotation,
+      );
+
+      container.addChild(brushSprite);
+    });
+  }
+
   private stampCurrentBrushAtPoint(
     point: BrushCoord,
     rotation: number,
@@ -995,6 +1261,7 @@ class DrawManager {
     );
 
     this.currentStroke.addChild(brushSprite);
+    this.stampMirrorPreviewAtPoint(point, rotation, size);
 
     if (pushPoint) {
       this.strokePoints.push({
@@ -1171,6 +1438,15 @@ class DrawManager {
     for (const child of [...this.currentStroke.children]) {
       this.currentStroke.removeChild(child);
       child.destroy();
+    }
+  }
+
+  private clearCurrentMirrorStrokeChildren() {
+    for (const mirrorStroke of this.currentMirrorStrokes) {
+      for (const child of [...mirrorStroke.children]) {
+        mirrorStroke.removeChild(child);
+        child.destroy();
+      }
     }
   }
 
@@ -1372,6 +1648,7 @@ class DrawManager {
     }
 
     this.clearCurrentStrokeChildren();
+    this.clearCurrentMirrorStrokeChildren();
     this.strokePoints = [];
     this.currentStrokeDistance = 0;
 
@@ -1421,6 +1698,37 @@ class DrawManager {
 
     this.rebuildShapePreview(points);
     this.pendingStartPoint = points[0] ?? this.shapeStartPoint;
+  }
+
+  private syncMirrorPreviewFromStrokePoints() {
+    if (this.currentMirrorStrokes.length === 0) return;
+
+    this.clearCurrentMirrorStrokeChildren();
+
+    if (
+      !this.shouldRenderMirrorPreview() ||
+      this.brushTexture == null ||
+      this.activeBrush == null
+    ) {
+      return;
+    }
+
+    for (let i = 0; i < this.strokePoints.length; i += 1) {
+      const point = this.strokePoints[i];
+      const rotation = this.getRotationForReceivedDab(
+        point,
+        i,
+        this.strokePoints,
+        this.activeBrush.rotation_mode,
+        this.activeBrush.rotation_jitter,
+      );
+
+      this.stampMirrorPreviewAtPoint(
+        { x: point.x, y: point.y },
+        rotation,
+        point.size ?? this.strokeScale,
+      );
+    }
   }
 
   private continueStrokeAt(
@@ -1474,38 +1782,34 @@ class DrawManager {
   public undo() {
     if (this.undoStack.length === 0) return;
 
-    const stroke = this.undoStack.pop()!;
-    this.redoStack.push(stroke);
+    const historyEntry = this.undoStack.pop()!;
+    this.redoStack.push(historyEntry);
 
-    const layerContainer = this.layerContainers.get(stroke.layerId);
-    if (layerContainer) {
-      layerContainer.removeChild(stroke);
+    for (const stroke of historyEntry) {
+      this.removeStrokeFromLayer(stroke);
+      this.strokesMap.delete(stroke.id);
+
+      const message: WSMessage = { Mtype: WSType.UNDO, data: stroke.id };
+      this.ws.send(message);
     }
-
-    this.strokesMap.delete(stroke.id);
-
-    const message: WSMessage = { Mtype: WSType.UNDO, data: stroke.id };
-    this.ws.send(message);
   }
 
   public redo() {
     if (this.redoStack.length === 0) return;
 
-    const stroke = this.redoStack.pop()!;
-    this.undoStack.push(stroke);
+    const historyEntry = this.redoStack.pop()!;
+    this.undoStack.push(historyEntry);
 
-    const layerContainer = this.layerContainers.get(stroke.layerId);
-    if (layerContainer) {
-      layerContainer.addChild(stroke);
-      (layerContainer.children as Stroke[]).sort(
-        (a, b) => (a.id as number) - (b.id as number),
-      );
+    for (const stroke of historyEntry) {
+      if (this.addStrokeToLayer(stroke)) {
+        this.sortLayerChildren(stroke.layerId);
+      }
+
+      this.strokesMap.set(stroke.id, stroke);
+
+      const message: WSMessage = { Mtype: WSType.REDO, data: stroke.id };
+      this.ws.send(message);
     }
-
-    this.strokesMap.set(stroke.id, stroke);
-
-    const message: WSMessage = { Mtype: WSType.REDO, data: stroke.id };
-    this.ws.send(message);
   }
 
   // POINTER EVENTS ----------------------------------------------------------------------------------------
@@ -1564,6 +1868,26 @@ class DrawManager {
       this.currentStroke.blendMode = "erase";
     }
     layerContainer.addChild(this.currentStroke);
+
+    const mirrorPreviewCount = this.getRenderableMirrorTransformSequences([
+      {
+        x: localPosition.x,
+        y: localPosition.y,
+        pressure: initialPressure,
+        size: this.strokeScale,
+      },
+    ]).length;
+    this.currentMirrorStrokes = Array.from(
+      { length: mirrorPreviewCount },
+      () => {
+        const container = new pixi.Container();
+        if (this.activeErase && this.activeTool !== "shapes") {
+          container.blendMode = "erase";
+        }
+        layerContainer.addChild(container);
+        return container;
+      },
+    );
 
     this.attachWindowStrokeListeners();
 
@@ -1696,12 +2020,18 @@ class DrawManager {
       if (firstSprite) {
         firstSprite.setSize(tapSize);
       }
+
+      this.syncMirrorPreviewFromStrokePoints();
     }
 
     if (this.currentStroke.children.length === 0) {
       this.isDrawing = false;
       this.currentStroke.destroy({ children: true });
       this.currentStroke = null;
+      this.currentMirrorStrokes.forEach((stroke) =>
+        stroke.destroy({ children: true }),
+      );
+      this.currentMirrorStrokes = [];
       this.currentStrokeLayerId = null;
       this.spacingCarry = 0;
       this.currentStrokeDistance = 0;
@@ -1717,69 +2047,147 @@ class DrawManager {
       (this.taperInEnabled || this.taperOutEnabled)
     ) {
       this.rebuildCurrentStrokeWithUnifiedTaper();
+      this.syncMirrorPreviewFromStrokePoints();
     }
 
     this.isDrawing = false;
-    const tempid = crypto.randomUUID();
 
-    const bounds = this.currentStroke.getLocalBounds();
-    const frame = new pixi.Rectangle(
-      bounds.minX,
-      bounds.minY,
-      bounds.maxX - bounds.minX,
-      bounds.maxY - bounds.minY,
-    );
-
-    const combinedTexture = this.app.renderer.generateTexture({
-      target: this.currentStroke,
-      frame,
-    });
-    const combinedSprite = new pixi.Sprite(combinedTexture);
-    combinedSprite.position.set(frame.x, frame.y);
-    if (this.activeErase) combinedSprite.blendMode = "erase";
-
-    const combinedSpriteContainer = new Stroke(
-      tempid,
-      this.currentStrokeLayerId,
-    );
-    combinedSpriteContainer.addChild(combinedSprite);
-
-    const layerContainer = this.layerContainers.get(this.currentStrokeLayerId);
-    if (!layerContainer) {
+    if (
+      this.activeBrush == null ||
+      this.brushTexture == null ||
+      this.currentStrokeLayerId === null
+    ) {
       this.currentStroke.destroy({ children: true });
       this.currentStroke = null;
+      this.currentMirrorStrokes.forEach((stroke) =>
+        stroke.destroy({ children: true }),
+      );
+      this.currentMirrorStrokes = [];
       this.currentStrokeLayerId = null;
       this.spacingCarry = 0;
+      this.currentStrokeDistance = 0;
       this.pendingStartPoint = null;
       this.shapeStartPoint = null;
       this.rawPointerPosition = null;
       this.smoothedPosition = null;
+      this.currentPointerPressure = 1;
+      this.currentPointerType = "mouse";
+      this.smoothedPressure = 1;
       return;
     }
 
-    layerContainer.addChild(combinedSpriteContainer);
+    const primaryTempId = crypto.randomUUID();
+    const historyEntry: StrokeHistoryEntry = [];
+    const mirrorSequences = this.getRenderableMirrorTransformSequences(
+      this.strokePoints,
+    );
+    const shouldCreateMirroredStroke = mirrorSequences.length > 0;
+
+    const primaryStroke = this.createCombinedStrokeContainerFromPoints({
+      id: primaryTempId,
+      layerId: this.currentStrokeLayerId,
+      points: this.strokePoints,
+      texture: this.brushTexture,
+      color: this.activeColor,
+      opacity: this.activeOpacity,
+      isEraser: this.activeErase,
+      scale: this.strokeScale,
+      rotationMode: this.activeBrush.rotation_mode,
+      rotationJitter: this.activeBrush.rotation_jitter,
+    });
+
+    if (!this.addStrokeToLayer(primaryStroke)) {
+      this.currentStroke.destroy({ children: true });
+      this.currentStroke = null;
+      this.currentMirrorStrokes.forEach((stroke) =>
+        stroke.destroy({ children: true }),
+      );
+      this.currentMirrorStrokes = [];
+      this.currentStrokeLayerId = null;
+      this.spacingCarry = 0;
+      this.currentStrokeDistance = 0;
+      this.pendingStartPoint = null;
+      this.shapeStartPoint = null;
+      this.rawPointerPosition = null;
+      this.smoothedPosition = null;
+      this.currentPointerPressure = 1;
+      this.currentPointerType = "mouse";
+      this.smoothedPressure = 1;
+      return;
+    }
+
+    historyEntry.push(primaryStroke);
+    this.tempStrokes.set(primaryTempId, primaryStroke);
+
+    const outgoingStrokes: StrokeData[] = [
+      {
+        tempid: primaryTempId,
+        points: this.strokePoints,
+        color: this.activeColor,
+        opacity: this.activeOpacity,
+        iseraser: this.activeErase,
+        scale: this.strokeScale,
+        brushid: this.activeBrush.id,
+        layerid: this.currentStrokeLayerId,
+      },
+    ];
+
+    if (shouldCreateMirroredStroke) {
+      for (const sequence of mirrorSequences) {
+        const mirroredPoints = this.mirrorStrokePoints(
+          this.strokePoints,
+          sequence,
+        );
+
+        const mirroredTempId = crypto.randomUUID();
+        const mirroredStroke = this.createCombinedStrokeContainerFromPoints({
+          id: mirroredTempId,
+          layerId: this.currentStrokeLayerId,
+          points: mirroredPoints,
+          texture: this.brushTexture,
+          color: this.activeColor,
+          opacity: this.activeOpacity,
+          isEraser: this.activeErase,
+          scale: this.strokeScale,
+          rotationMode: this.activeBrush.rotation_mode,
+          rotationJitter: this.activeBrush.rotation_jitter,
+        });
+
+        if (this.addStrokeToLayer(mirroredStroke)) {
+          historyEntry.push(mirroredStroke);
+          this.tempStrokes.set(mirroredTempId, mirroredStroke);
+          outgoingStrokes.push({
+            tempid: mirroredTempId,
+            points: mirroredPoints,
+            color: this.activeColor,
+            opacity: this.activeOpacity,
+            iseraser: this.activeErase,
+            scale: this.strokeScale,
+            brushid: this.activeBrush.id,
+            layerid: this.currentStrokeLayerId,
+          });
+        } else {
+          mirroredStroke.destroy({ children: true });
+        }
+      }
+    }
 
     this.currentStroke.destroy({ children: true });
     this.currentStroke = null;
+    this.currentMirrorStrokes.forEach((stroke) =>
+      stroke.destroy({ children: true }),
+    );
+    this.currentMirrorStrokes = [];
 
-    this.undoStack.push(combinedSpriteContainer);
+    this.undoStack.push(historyEntry);
     this.redoStack = [];
-    this.tempStrokes.set(tempid, combinedSpriteContainer);
 
-    const strokeData: StrokeData = {
-      tempid,
-      points: this.strokePoints,
-      color: this.activeColor,
-      opacity: this.activeOpacity,
-      iseraser: this.activeErase,
-      scale: this.strokeScale,
-      brushid: this.activeBrush?.id ?? 1,
-      layerid: this.currentStrokeLayerId,
-    };
+    for (const strokeData of outgoingStrokes) {
+      const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
+      this.ws?.send(message);
+    }
 
-    const message: WSMessage = { Mtype: WSType.STROKE, data: strokeData };
-    this.onStroke?.(this.activeBrush?.id ?? 1);
-    this.ws?.send(message);
+    this.onStroke?.(this.activeBrush.id);
 
     this.currentStrokeLayerId = null;
     this.spacingCarry = 0;
@@ -1804,56 +2212,21 @@ class DrawManager {
     );
     if (!receivedBrushTexture) return;
 
-    const receivedStroke = new pixi.Container();
-    if (strokeData.iseraser) receivedStroke.blendMode = "erase";
+    const combinedSpriteContainer =
+      this.createCombinedStrokeContainerFromPoints({
+        id: strokeData.id,
+        layerId: strokeData.layer_id,
+        points: strokeData.points,
+        texture: receivedBrushTexture,
+        color: strokeData.color,
+        opacity: strokeData.opacity,
+        isEraser: strokeData.iseraser,
+        scale: strokeData.scale,
+        rotationMode: strokeData.brush.rotation_mode,
+        rotationJitter: strokeData.brush.rotation_jitter,
+      });
 
-    for (let i = 0; i < strokeData.points.length; i++) {
-      const point = strokeData.points[i];
-      const rotation = this.getRotationForReceivedDab(
-        point,
-        i,
-        strokeData.points,
-        strokeData.brush.rotation_mode,
-        strokeData.brush.rotation_jitter,
-      );
-
-      const brushSprite = this.createBrushSprite(
-        receivedBrushTexture,
-        point,
-        strokeData.color,
-        strokeData.opacity,
-        point.size ?? strokeData.scale,
-        rotation,
-      );
-
-      receivedStroke.addChild(brushSprite);
-    }
-
-    const bounds = receivedStroke.getLocalBounds();
-    const frame = new pixi.Rectangle(
-      bounds.minX,
-      bounds.minY,
-      bounds.maxX - bounds.minX,
-      bounds.maxY - bounds.minY,
-    );
-
-    const combinedTexture = this.app.renderer.generateTexture({
-      target: receivedStroke,
-      frame,
-    });
-    const combinedSprite = new pixi.Sprite(combinedTexture);
-    combinedSprite.position.set(frame.x, frame.y);
-    if (strokeData.iseraser) combinedSprite.blendMode = "erase";
-
-    const combinedSpriteContainer = this.createStrokeContainerFromSprite(
-      strokeData.id,
-      strokeData.layer_id,
-      combinedSprite,
-    );
     this.strokesMap.set(strokeData.id, combinedSpriteContainer);
-
-    receivedStroke.destroy({ children: true });
-
     layerContainer.addChild(combinedSpriteContainer);
   }
 

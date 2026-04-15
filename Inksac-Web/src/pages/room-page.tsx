@@ -79,6 +79,14 @@ export const RoomPage = () => {
     shapeType,
     activeTool,
     setActiveTool,
+    mirrorEnabled,
+    mirrorCenterX,
+    setMirrorCenterX,
+    mirrorCenterY,
+    setMirrorCenterY,
+    mirrorAngleDegrees,
+    mirrorAxes,
+    mirrorHandleVisible,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
@@ -124,6 +132,8 @@ export const RoomPage = () => {
   const [livePointerPressure, setLivePointerPressure] = useState(1);
   const [livePointerType, setLivePointerType] = useState("mouse");
   const [hoverSampleColor, setHoverSampleColor] = useState<string | null>(null);
+
+  const isDraggingMirrorRef = useRef(false);
 
   const isPanningRef = useRef(false);
   const isSpacePressedRef = useRef(false);
@@ -238,6 +248,104 @@ export const RoomPage = () => {
       width: width * world.scale.x,
       height: height * world.scale.y,
     };
+  };
+
+  const getMirrorScreenMetrics = () => {
+    if (!drawerRef.current) return null;
+
+    const world = drawerRef.current.getWorldContainer();
+    const { width: canvasWidth, height: canvasHeight } =
+      drawerRef.current.getCanvasSize();
+
+    const scaledWidth = canvasWidth * world.scale.x;
+    const scaledHeight = canvasHeight * world.scale.y;
+    const left = world.position.x;
+    const top = world.position.y;
+    const right = left + scaledWidth;
+    const bottom = top + scaledHeight;
+    const centerX = left + mirrorCenterX * scaledWidth;
+    const centerY = top + mirrorCenterY * scaledHeight;
+
+    const getAxisSegment = (angleDegrees: number) => {
+      const radians = (angleDegrees * Math.PI) / 180;
+      const dx = Math.cos(radians);
+      const dy = Math.sin(radians);
+      const intersections: { x: number; y: number; t: number }[] = [];
+
+      const addIntersection = (t: number) => {
+        const x = centerX + dx * t;
+        const y = centerY + dy * t;
+        const epsilon = 0.001;
+
+        if (
+          x >= left - epsilon &&
+          x <= right + epsilon &&
+          y >= top - epsilon &&
+          y <= bottom + epsilon
+        ) {
+          intersections.push({
+            x: Math.max(left, Math.min(right, x)),
+            y: Math.max(top, Math.min(bottom, y)),
+            t,
+          });
+        }
+      };
+
+      if (Math.abs(dx) > 0.000001) {
+        addIntersection((left - centerX) / dx);
+        addIntersection((right - centerX) / dx);
+      }
+
+      if (Math.abs(dy) > 0.000001) {
+        addIntersection((top - centerY) / dy);
+        addIntersection((bottom - centerY) / dy);
+      }
+
+      const unique = intersections.filter((intersection, index, array) => {
+        return (
+          array.findIndex(
+            (candidate) =>
+              Math.abs(candidate.x - intersection.x) < 0.01 &&
+              Math.abs(candidate.y - intersection.y) < 0.01,
+          ) === index
+        );
+      });
+
+      if (unique.length < 2) {
+        return null;
+      }
+
+      unique.sort((a, b) => a.t - b.t);
+      const start = unique[0];
+      const end = unique[unique.length - 1];
+
+      return {
+        left: start.x,
+        top: start.y,
+        width: Math.hypot(end.x - start.x, end.y - start.y),
+        angleDegrees,
+      };
+    };
+
+    return {
+      centerX,
+      centerY,
+      angleDegrees: mirrorAngleDegrees,
+      secondaryAngleDegrees: mirrorAngleDegrees + 90,
+      primarySegment: getAxisSegment(mirrorAngleDegrees),
+      secondarySegment: getAxisSegment(mirrorAngleDegrees + 90),
+    };
+  };
+
+  const updateMirrorFromClientPoint = (clientX: number, clientY: number) => {
+    const drawableRect = getDrawableScreenRect();
+    if (!drawableRect) return;
+
+    const xRatio = (clientX - drawableRect.left) / drawableRect.width;
+    const yRatio = (clientY - drawableRect.top) / drawableRect.height;
+
+    setMirrorCenterX(Math.max(0, Math.min(1, xRatio)));
+    setMirrorCenterY(Math.max(0, Math.min(1, yRatio)));
   };
 
   const updateCursorTrackingFromClientPoint = (
@@ -489,6 +597,25 @@ export const RoomPage = () => {
     registerRedo,
     registerResetView,
     registerExport,
+  ]);
+
+  useEffect(() => {
+    if (!drawerRef.current) return;
+
+    const { width, height } = drawerRef.current.getCanvasSize();
+    drawerRef.current.setMirror({
+      enabled: mirrorEnabled,
+      centerX: mirrorCenterX * width,
+      centerY: mirrorCenterY * height,
+      angleDegrees: mirrorAngleDegrees,
+      axes: mirrorAxes,
+    });
+  }, [
+    mirrorEnabled,
+    mirrorCenterX,
+    mirrorCenterY,
+    mirrorAngleDegrees,
+    mirrorAxes,
   ]);
 
   useEffect(() => {
@@ -829,6 +956,17 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerMoveForPan = (e: PointerEvent) => {
+      if (isDraggingMirrorRef.current) {
+        updateMirrorFromClientPoint(e.clientX, e.clientY);
+        updateCursorTrackingFromClientPoint(
+          e.clientX,
+          e.clientY,
+          e.pressure,
+          e.pointerType,
+        );
+        return;
+      }
+
       if (
         !drawerRef.current ||
         !isPanningRef.current ||
@@ -856,6 +994,12 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerUpForPan = (e: PointerEvent) => {
+      if (isDraggingMirrorRef.current) {
+        updateMirrorFromClientPoint(e.clientX, e.clientY);
+        isDraggingMirrorRef.current = false;
+        return;
+      }
+
       if (!isPanningRef.current || panPointerIdRef.current !== e.pointerId) {
         return;
       }
@@ -870,6 +1014,11 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerCancelForPan = (e: PointerEvent) => {
+      if (isDraggingMirrorRef.current) {
+        isDraggingMirrorRef.current = false;
+        return;
+      }
+
       if (!isPanningRef.current || panPointerIdRef.current !== e.pointerId) {
         return;
       }
@@ -1113,6 +1262,13 @@ export const RoomPage = () => {
           taperOutDistanceRef.current,
           taperOutEndSizePercentRef.current,
         );
+        drawer.setMirror({
+          enabled: mirrorEnabled,
+          centerX: mirrorCenterX * room.width,
+          centerY: mirrorCenterY * room.height,
+          angleDegrees: mirrorAngleDegrees,
+          axes: mirrorAxes,
+        });
         drawer.setOnStroke((brushId) => {
           setBrushInUseRef.current(brushId);
           refreshHistoryState();
@@ -1342,6 +1498,115 @@ export const RoomPage = () => {
           willChange: "transform",
         }}
       />
+
+      {canShowCanvas && mirrorEnabled
+        ? (() => {
+            const mirrorMetrics = getMirrorScreenMetrics();
+
+            if (!mirrorMetrics) {
+              return null;
+            }
+
+            const renderMirrorLine = (
+              segment: {
+                left: number;
+                top: number;
+                width: number;
+                angleDegrees: number;
+              } | null,
+              key: string,
+            ) => {
+              if (!segment || segment.width <= 0) {
+                return null;
+              }
+
+              return (
+                <>
+                  <Box
+                    key={`${key}-dark`}
+                    style={{
+                      position: "absolute",
+                      left: segment.left,
+                      top: segment.top,
+                      width: segment.width,
+                      height: 0,
+                      borderTop: "1px dotted rgba(0,0,0,0.78)",
+                      pointerEvents: "none",
+                      zIndex: 120,
+                      transform: `rotate(${segment.angleDegrees}deg)`,
+                      transformOrigin: "0 0",
+                    }}
+                  />
+
+                  <Box
+                    key={`${key}-light`}
+                    style={{
+                      position: "absolute",
+                      left: segment.left,
+                      top: segment.top,
+                      width: segment.width,
+                      height: 0,
+                      borderTop: "1px dotted rgba(255,255,255,0.96)",
+                      pointerEvents: "none",
+                      zIndex: 121,
+                      transform: `translateY(-1px) rotate(${segment.angleDegrees}deg)`,
+                      transformOrigin: "0 0",
+                    }}
+                  />
+                </>
+              );
+            };
+
+            return (
+              <>
+                {renderMirrorLine(mirrorMetrics.primarySegment, "primary")}
+                {mirrorAxes === 2
+                  ? renderMirrorLine(
+                      mirrorMetrics.secondarySegment,
+                      "secondary",
+                    )
+                  : null}
+
+                {mirrorHandleVisible ? (
+                  <Box
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      isDraggingMirrorRef.current = true;
+                      updateMirrorFromClientPoint(e.clientX, e.clientY);
+                    }}
+                    style={{
+                      position: "absolute",
+                      left: mirrorMetrics.centerX,
+                      top: mirrorMetrics.centerY,
+                      width: 18,
+                      height: 18,
+                      transform: "translate(-50%, -50%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "move",
+                      zIndex: 122,
+                    }}
+                  >
+                    <Box
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        border: "1px solid rgba(255,255,255,0.98)",
+                        background: "rgba(34, 139, 230, 0.96)",
+                        boxShadow:
+                          "0 0 0 1px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(255,255,255,0.18)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  </Box>
+                ) : null}
+              </>
+            );
+          })()
+        : null}
 
       {canShowCanvas && spacePanActive ? (
         <Box

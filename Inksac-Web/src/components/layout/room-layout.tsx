@@ -116,6 +116,18 @@ type RoomLayoutContextValue = {
   setTaperOutDistance: (value: number) => void;
   taperOutEndSizePercent: number;
   setTaperOutEndSizePercent: (value: number) => void;
+  mirrorEnabled: boolean;
+  setMirrorEnabled: (enabled: boolean) => void;
+  mirrorCenterX: number;
+  setMirrorCenterX: (x: number) => void;
+  mirrorCenterY: number;
+  setMirrorCenterY: (y: number) => void;
+  mirrorAngleDegrees: number;
+  setMirrorAngleDegrees: (angle: number) => void;
+  mirrorAxes: 1 | 2;
+  setMirrorAxes: (axes: 1 | 2) => void;
+  mirrorHandleVisible: boolean;
+  setMirrorHandleVisible: (visible: boolean) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -172,6 +184,18 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setTaperOutDistance: () => {},
   taperOutEndSizePercent: 5,
   setTaperOutEndSizePercent: () => {},
+  mirrorEnabled: false,
+  setMirrorEnabled: () => {},
+  mirrorCenterX: 0.5,
+  setMirrorCenterX: () => {},
+  mirrorCenterY: 0.5,
+  setMirrorCenterY: () => {},
+  mirrorAngleDegrees: 90,
+  setMirrorAngleDegrees: () => {},
+  mirrorAxes: 1,
+  setMirrorAxes: () => {},
+  mirrorHandleVisible: true,
+  setMirrorHandleVisible: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -597,6 +621,7 @@ export function RoomLayout() {
   const [smoothingStrength, setSmoothingStrength] = useState(35);
   const [smoothingModalOpen, setSmoothingModalOpen] = useState(false);
   const [optionsMenuOpened, setOptionsMenuOpened] = useState(false);
+  const [toolSettingsMenuOpened, setToolSettingsMenuOpened] = useState(false);
 
   const [pressureEnabled, setPressureEnabled] = useState(true);
   const [pressureMinSize, setPressureMinSize] = useState(10);
@@ -615,6 +640,12 @@ export function RoomLayout() {
   const [taperOutDistance, setTaperOutDistance] = useState(32);
   const [taperOutEndSizePercent, setTaperOutEndSizePercent] = useState(5);
   const [taperModalOpen, setTaperModalOpen] = useState(false);
+  const [mirrorEnabled, setMirrorEnabled] = useState(false);
+  const [mirrorCenterX, setMirrorCenterX] = useState(0.5);
+  const [mirrorCenterY, setMirrorCenterY] = useState(0.5);
+  const [mirrorAngleDegrees, setMirrorAngleDegrees] = useState(90);
+  const [mirrorAxes, setMirrorAxes] = useState<1 | 2>(1);
+  const [mirrorHandleVisible, setMirrorHandleVisible] = useState(true);
 
   const leftPanelContentRef = useRef<HTMLDivElement | null>(null);
   const brushPanelResizeStateRef = useRef<{
@@ -1041,6 +1072,11 @@ export function RoomLayout() {
     setLayersPanelOpen((prev) => !prev);
   }
 
+  const snapMirrorToCenter = useCallback(() => {
+    setMirrorCenterX(0.5);
+    setMirrorCenterY(0.5);
+  }, []);
+
   const clampBrushToolsHeight = useCallback((nextHeight: number) => {
     const containerHeight = leftPanelContentRef.current?.clientHeight ?? 0;
 
@@ -1193,6 +1229,18 @@ export function RoomLayout() {
         setTaperOutDistance,
         taperOutEndSizePercent,
         setTaperOutEndSizePercent,
+        mirrorEnabled,
+        setMirrorEnabled,
+        mirrorCenterX,
+        setMirrorCenterX,
+        mirrorCenterY,
+        setMirrorCenterY,
+        mirrorAngleDegrees,
+        setMirrorAngleDegrees,
+        mirrorAxes,
+        setMirrorAxes,
+        mirrorHandleVisible,
+        setMirrorHandleVisible,
       }}
     >
       <Modal
@@ -1552,6 +1600,103 @@ export function RoomLayout() {
         headerTitle={roomName}
         headerActions={
           <Group gap="xs">
+            {mirrorEnabled ? (
+              <Menu
+                shadow="sm"
+                width={300}
+                position="bottom-end"
+                withinPortal
+                opened={toolSettingsMenuOpened}
+                onChange={setToolSettingsMenuOpened}
+              >
+                <Menu.Target>
+                  <Tooltip label="Tool settings">
+                    <ActionIcon variant="subtle" size="lg" radius={0}>
+                      <IconAdjustments size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Menu.Target>
+
+                <Menu.Dropdown>
+                  <Box p="xs">
+                    <Text size="sm" fw={600} mb={8}>
+                      Mirror settings
+                    </Text>
+
+                    <Button
+                      size="xs"
+                      variant="default"
+                      fullWidth
+                      onClick={snapMirrorToCenter}
+                    >
+                      Snap to center
+                    </Button>
+
+                    <Box mt="sm">
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={500}>
+                          Axis rotation
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {mirrorAngleDegrees}°
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={359}
+                        step={1}
+                        value={mirrorAngleDegrees}
+                        onChange={setMirrorAngleDegrees}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Rotates the mirror axis around its center point.
+                      </Text>
+                    </Box>
+
+                    <Box mt="sm">
+                      <Text size="sm" fw={500} mb={6}>
+                        Mirror axes
+                      </Text>
+                      <Group grow>
+                        <Button
+                          size="xs"
+                          variant={mirrorAxes === 1 ? "filled" : "default"}
+                          onClick={() => setMirrorAxes(1)}
+                          leftSection={<IconLine size={14} />}
+                        >
+                          1 axis
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant={mirrorAxes === 2 ? "filled" : "default"}
+                          onClick={() => setMirrorAxes(2)}
+                          leftSection={<IconCircle size={14} />}
+                        >
+                          2 axes
+                        </Button>
+                      </Group>
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Two axes adds a second perpendicular mirror line and
+                        creates the extra mirrored copies.
+                      </Text>
+                    </Box>
+
+                    <Switch
+                      mt="sm"
+                      checked={mirrorHandleVisible}
+                      onChange={(event) =>
+                        setMirrorHandleVisible(event.currentTarget.checked)
+                      }
+                      label="Show move handle"
+                    />
+                  </Box>
+                </Menu.Dropdown>
+              </Menu>
+            ) : null}
+
             <Menu
               shadow="sm"
               width={280}

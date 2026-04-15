@@ -6,6 +6,7 @@ import {
   IconLine,
   IconSquare,
   IconCircle,
+  IconFlipVertical,
 } from "@tabler/icons-react";
 import { useRoomLayout } from "../layout/room-layout";
 
@@ -14,8 +15,14 @@ type RoomToolToolbarProps = {
 };
 
 export function RoomToolToolbar({ leftOffset = 16 }: RoomToolToolbarProps) {
-  const { activeTool, setActiveTool, shapeType, setShapeType } =
-    useRoomLayout();
+  const {
+    activeTool,
+    setActiveTool,
+    shapeType,
+    setShapeType,
+    mirrorEnabled,
+    setMirrorEnabled,
+  } = useRoomLayout();
 
   const shapeLabel =
     shapeType === "line"
@@ -117,6 +124,18 @@ export function RoomToolToolbar({ leftOffset = 16 }: RoomToolToolbarProps) {
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
+
+        <Tooltip label="Mirror">
+          <ActionIcon
+            variant={mirrorEnabled ? "filled" : "subtle"}
+            size="lg"
+            radius={0}
+            color={mirrorEnabled ? "blue" : undefined}
+            onClick={() => setMirrorEnabled(!mirrorEnabled)}
+          >
+            <IconFlipVertical size={18} />
+          </ActionIcon>
+        </Tooltip>
 
         <Tooltip label="Eyedropper">
           <ActionIcon
