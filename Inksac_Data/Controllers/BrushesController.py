@@ -55,10 +55,20 @@ def create(brushdto: BrushCreateDto, db: Session = Depends(get_db), user: User =
     if user.brush_count > 10:
         response.add_error("brush_count", "user cannot have more than 10 brushes")
         raise HttpException(status_code=409, response=response)
+
+    if brushdto.spacing < 1 or brushdto.spacing > 100:
+        response.add_error("spacing", "spacing must be between 1 and 100")
+        raise HttpException(status_code=400, response=response)
+
+    if brushdto.rotation_jitter < 0 or brushdto.rotation_jitter > 100:
+        response.add_error("rotation_jitter", "rotation jitter must be between 0 and 100")
+        raise HttpException(status_code=400, response=response)
+
     brush = Brush(
         name=brushdto.name,
         spacing=brushdto.spacing,
         rotation_mode=brushdto.rotation_mode,
+        rotation_jitter=brushdto.rotation_jitter,
         owner=user,
     )
     user.brush_count += 1
@@ -73,6 +83,15 @@ def update(brushdto: BrushUpdateDto, id: int, db: Session = Depends(get_db), use
     if len(brushdto.name) == 0:
         response.add_error("name", "name cannot be empty")
         raise HttpException(status_code=400, response=response)
+
+    if brushdto.spacing < 1 or brushdto.spacing > 100:
+        response.add_error("spacing", "spacing must be between 1 and 100")
+        raise HttpException(status_code=400, response=response)
+
+    if brushdto.rotation_jitter < 0 or brushdto.rotation_jitter > 100:
+        response.add_error("rotation_jitter", "rotation jitter must be between 0 and 100")
+        raise HttpException(status_code=400, response=response)
+
     brush = next((brush for brush in user.brushes if brush.id == id), None)
     if not brush:
         response.add_error("id", "brush not found")
@@ -83,6 +102,7 @@ def update(brushdto: BrushUpdateDto, id: int, db: Session = Depends(get_db), use
     brush.name = brushdto.name
     brush.spacing = brushdto.spacing
     brush.rotation_mode = brushdto.rotation_mode
+    brush.rotation_jitter = brushdto.rotation_jitter
     db.commit()
     response.data = brush.toGetDto()
     return response

@@ -2,12 +2,16 @@ from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime, Bool
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 from Inksac_Data.database import Base
 from Inksac_Data.Entities.Brushes import BrushShallowDto
 
-Point = Dict[str, float]
+class StrokePointDto(BaseModel):
+    x: float
+    y: float
+    pressure: float
+    size: float
 
 class StrokeGetDto(BaseModel):
     id: int
@@ -17,7 +21,7 @@ class StrokeGetDto(BaseModel):
     iseraser: bool
     scale: int
     created_at: datetime
-    points: List[Point]
+    points: List[StrokePointDto]
     creator_id: int
     brush: BrushShallowDto
     room_id: int
@@ -28,11 +32,11 @@ class StrokeCreateDto(BaseModel):
     opacity: float
     iseraser: bool
     scale: int
-    points: List[Point]
+    points: List[StrokePointDto]
 
 class StrokeData(BaseModel):
     tempid: str
-    points: List[Point]
+    points: List[StrokePointDto]
     color: str
     opacity: float
     scale: int

@@ -14,11 +14,13 @@ class BrushCreateDto(BaseModel):
     name: str
     spacing: float
     rotation_mode: RotationMode
+    rotation_jitter: float
 
 class BrushUpdateDto(BaseModel):
     name: str
     spacing: float
     rotation_mode: RotationMode
+    rotation_jitter: float
 
 class BrushGetDto(BaseModel):
     id: int
@@ -26,6 +28,7 @@ class BrushGetDto(BaseModel):
     imgurl: str
     spacing: float
     rotation_mode: RotationMode
+    rotation_jitter: float
     brush_type: BrushType
     owner: Optional[UserShallowDto]
     in_use: bool
@@ -36,6 +39,7 @@ class BrushShallowDto(BaseModel):
     imgurl: str
     spacing: float
     rotation_mode: RotationMode
+    rotation_jitter: float
     brush_type: BrushType
     in_use: bool
 
@@ -46,6 +50,7 @@ class Brush(Base):
     imgurl = Column(String(255), nullable=False, default=DEFAULT_BRUSH)
     spacing = Column(Float, nullable=False) # this might not be necessary
     rotation_mode = Column(Enum(RotationMode), nullable=False, default=RotationMode.FOLLOWSTROKE)
+    rotation_jitter = Column(Float, nullable=False, default=100.0)
     brush_type = Column(Enum(BrushType), nullable=False, default=BrushType.USER)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
@@ -63,6 +68,7 @@ class Brush(Base):
             imgurl=self.imgurl,
             spacing=self.spacing,
             rotation_mode=self.rotation_mode,
+            rotation_jitter=self.rotation_jitter,
             brush_type=self.brush_type,
             owner=owner,
             in_use=bool(self.rooms)
@@ -76,6 +82,7 @@ class Brush(Base):
             imgurl=self.imgurl,
             spacing=self.spacing,
             rotation_mode=self.rotation_mode,
+            rotation_jitter=self.rotation_jitter,
             brush_type=self.brush_type,
             in_use=bool(self.rooms)
         )
