@@ -7,6 +7,7 @@ import {
   IconSquare,
   IconCircle,
   IconFlipVertical,
+  IconArrowsMove,
 } from "@tabler/icons-react";
 import { useRoomLayout } from "../layout/room-layout";
 
@@ -22,6 +23,8 @@ export function RoomToolToolbar({ leftOffset = 16 }: RoomToolToolbarProps) {
     setShapeType,
     mirrorEnabled,
     setMirrorEnabled,
+    isActiveLayerMovable,
+    moveToolDisabledReason,
   } = useRoomLayout();
 
   const shapeLabel =
@@ -124,6 +127,19 @@ export function RoomToolToolbar({ leftOffset = 16 }: RoomToolToolbarProps) {
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
+
+        <Tooltip label={moveToolDisabledReason ?? "Move layer"}>
+          <ActionIcon
+            variant={activeTool === "move" ? "filled" : "subtle"}
+            size="lg"
+            radius={0}
+            color={activeTool === "move" ? "blue" : undefined}
+            disabled={!isActiveLayerMovable}
+            onClick={() => setActiveTool("move")}
+          >
+            <IconArrowsMove size={18} />
+          </ActionIcon>
+        </Tooltip>
 
         <Tooltip label="Mirror">
           <ActionIcon

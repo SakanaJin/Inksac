@@ -52,7 +52,8 @@ class DrawManager {
   private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
   private activeErase: boolean = false;
-  private activeTool: "brush" | "eraser" | "eyedropper" | "shapes" = "brush";
+  private activeTool: "brush" | "eraser" | "eyedropper" | "shapes" | "move" =
+    "brush";
   private shapeType: "line" | "rectangle" | "ellipse" = "line";
   private strokeScale: number = 16;
 
@@ -252,6 +253,8 @@ class DrawManager {
         alphaFilter.alpha = layer.opacity ?? 1;
       }
 
+      container.position.set(layer.x ?? 0, layer.y ?? 0);
+
       nextLayerContainers.set(layer.id, container);
       this.layersContainer.addChild(container);
     }
@@ -296,6 +299,55 @@ class DrawManager {
     };
   }
 
+  public getLayerOutlineScreenRect(layerId: number) {
+    const layer = this.layers.find((item) => item.id === layerId);
+    const layerContainer = this.layerContainers.get(layerId);
+
+    if (!layer || !layerContainer) {
+      return null;
+    }
+
+    const scale = this.worldContainer.scale.x;
+    const boardRect = {
+      left: this.worldContainer.position.x + (layer.x ?? 0) * scale,
+      top: this.worldContainer.position.y + (layer.y ?? 0) * scale,
+      right:
+        this.worldContainer.position.x +
+        ((layer.x ?? 0) + this.canvasWidth) * scale,
+      bottom:
+        this.worldContainer.position.y +
+        ((layer.y ?? 0) + this.canvasHeight) * scale,
+    };
+
+    if (layerContainer.children.length === 0) {
+      return {
+        left: boardRect.left,
+        top: boardRect.top,
+        width: boardRect.right - boardRect.left,
+        height: boardRect.bottom - boardRect.top,
+      };
+    }
+
+    const contentBounds = layerContainer.getBounds();
+    const left = Math.min(boardRect.left, contentBounds.x);
+    const top = Math.min(boardRect.top, contentBounds.y);
+    const right = Math.max(
+      boardRect.right,
+      contentBounds.x + contentBounds.width,
+    );
+    const bottom = Math.max(
+      boardRect.bottom,
+      contentBounds.y + contentBounds.height,
+    );
+
+    return {
+      left,
+      top,
+      width: right - left,
+      height: bottom - top,
+    };
+  }
+
   public canUndo() {
     return this.undoStack.length > 0;
   }
@@ -316,7 +368,9 @@ class DrawManager {
     this.activeErase = eraser;
   }
 
-  public setActiveTool(tool: "brush" | "eraser" | "eyedropper" | "shapes") {
+  public setActiveTool(
+    tool: "brush" | "eraser" | "eyedropper" | "shapes" | "move",
+  ) {
     this.activeTool = tool;
   }
 
@@ -1085,6 +1139,38 @@ class DrawManager {
     return true;
   }
 
+  private getLayerOffset(layerId: number) {
+    const layer = this.layers.find((item) => item.id === layerId);
+
+    return {
+      x: layer?.x ?? 0,
+      y: layer?.y ?? 0,
+    };
+  }
+
+  private toLayerLocalStrokePoints(points: StrokePoint[], layerId: number) {
+    const offset = this.getLayerOffset(layerId);
+
+    return points.map((point) => ({
+      ...point,
+      x: point.x - offset.x,
+      y: point.y - offset.y,
+    }));
+  }
+
+  private toPreviewLocalPoint(point: BrushCoord, layerId: number | null) {
+    if (layerId === null) {
+      return point;
+    }
+
+    const offset = this.getLayerOffset(layerId);
+
+    return {
+      x: point.x - offset.x,
+      y: point.y - offset.y,
+    };
+  }
+
   private removeStrokeFromLayer(stroke: Stroke) {
     const layerContainer = this.layerContainers.get(stroke.layerId);
     if (layerContainer) {
@@ -1218,9 +1304,14 @@ class DrawManager {
       const container = this.currentMirrorStrokes[index];
       if (!container) return;
 
+      const previewPoint = this.toPreviewLocalPoint(
+        mirroredPoint,
+        this.currentStrokeLayerId,
+      );
+
       const brushSprite = this.createBrushSprite(
         this.brushTexture!,
-        mirroredPoint,
+        previewPoint,
         this.activeColor,
         this.activeOpacity,
         size,
@@ -1251,9 +1342,14 @@ class DrawManager {
     // }
     if (!this.isInsideBoard(point.x, point.y)) return;
 
+    const previewPoint = this.toPreviewLocalPoint(
+      point,
+      this.currentStrokeLayerId,
+    );
+
     const brushSprite = this.createBrushSprite(
       this.brushTexture,
-      point,
+      previewPoint,
       this.activeColor,
       this.activeOpacity,
       size,
@@ -1827,6 +1923,7 @@ class DrawManager {
   private onMouseDown(event: pixi.FederatedPointerEvent) {
     if (event.button !== 0) return;
     if (this.activeTool === "eyedropper") return;
+    if (this.activeTool === "move") return;
     if (this.activeBrush == null) return;
     if (this.activeLayerId === null) return;
 
@@ -2082,11 +2179,15 @@ class DrawManager {
       this.strokePoints,
     );
     const shouldCreateMirroredStroke = mirrorSequences.length > 0;
+    const primaryLocalPoints = this.toLayerLocalStrokePoints(
+      this.strokePoints,
+      this.currentStrokeLayerId,
+    );
 
     const primaryStroke = this.createCombinedStrokeContainerFromPoints({
       id: primaryTempId,
       layerId: this.currentStrokeLayerId,
-      points: this.strokePoints,
+      points: primaryLocalPoints,
       texture: this.brushTexture,
       color: this.activeColor,
       opacity: this.activeOpacity,
@@ -2122,7 +2223,7 @@ class DrawManager {
     const outgoingStrokes: StrokeData[] = [
       {
         tempid: primaryTempId,
-        points: this.strokePoints,
+        points: primaryLocalPoints,
         color: this.activeColor,
         opacity: this.activeOpacity,
         iseraser: this.activeErase,
@@ -2138,12 +2239,16 @@ class DrawManager {
           this.strokePoints,
           sequence,
         );
+        const mirroredLocalPoints = this.toLayerLocalStrokePoints(
+          mirroredPoints,
+          this.currentStrokeLayerId,
+        );
 
         const mirroredTempId = crypto.randomUUID();
         const mirroredStroke = this.createCombinedStrokeContainerFromPoints({
           id: mirroredTempId,
           layerId: this.currentStrokeLayerId,
-          points: mirroredPoints,
+          points: mirroredLocalPoints,
           texture: this.brushTexture,
           color: this.activeColor,
           opacity: this.activeOpacity,
@@ -2158,7 +2263,7 @@ class DrawManager {
           this.tempStrokes.set(mirroredTempId, mirroredStroke);
           outgoingStrokes.push({
             tempid: mirroredTempId,
-            points: mirroredPoints,
+            points: mirroredLocalPoints,
             color: this.activeColor,
             opacity: this.activeOpacity,
             iseraser: this.activeErase,

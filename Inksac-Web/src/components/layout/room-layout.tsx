@@ -38,6 +38,7 @@ import {
   IconAdjustments,
   IconLine,
   IconSquare,
+  IconHome,
   IconCircle,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
@@ -56,7 +57,7 @@ import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
 import { UserAvatars } from "../room-tools/UserAvatars";
 
-type ToolType = "brush" | "eraser" | "eyedropper" | "shapes";
+type ToolType = "brush" | "eraser" | "eyedropper" | "shapes" | "move";
 export type ShapeType = "line" | "rectangle" | "ellipse";
 
 type RoomLayoutContextValue = {
@@ -128,6 +129,8 @@ type RoomLayoutContextValue = {
   setMirrorAxes: (axes: 1 | 2) => void;
   mirrorHandleVisible: boolean;
   setMirrorHandleVisible: (visible: boolean) => void;
+  isActiveLayerMovable: boolean;
+  moveToolDisabledReason: string | null;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -196,6 +199,8 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setMirrorAxes: () => {},
   mirrorHandleVisible: true,
   setMirrorHandleVisible: () => {},
+  isActiveLayerMovable: false,
+  moveToolDisabledReason: null,
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -975,6 +980,31 @@ export function RoomLayout() {
     [canManageLayers, setLayers],
   );
 
+  const [onSetErase, setOnSetErase] = useState<
+    ((erase: boolean) => void) | null
+  >(null);
+
+  const activeLayer =
+    layers.find((layer) => layer.id === activeLayerId) ?? null;
+  const isActiveLayerMovable = Boolean(
+    activeLayer && activeLayer.visible && !activeLayer.locked,
+  );
+  const moveToolDisabledReason = !activeLayer
+    ? "Select a layer first"
+    : !activeLayer.visible
+      ? "The active layer is hidden"
+      : activeLayer.locked
+        ? "The active layer is locked"
+        : null;
+
+  useEffect(() => {
+    if (activeToolState === "move" && !isActiveLayerMovable) {
+      setActiveToolState("brush");
+      setEraseState(false);
+      onSetErase?.(false);
+    }
+  }, [activeToolState, isActiveLayerMovable, onSetErase]);
+
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
   const navigate = useNavigate();
 
@@ -985,10 +1015,6 @@ export function RoomLayout() {
   const registerStroke = useCallback((fn: (brushId: number) => void) => {
     onStrokeRef.current = fn;
   }, []);
-
-  const [onSetErase, setOnSetErase] = useState<
-    ((erase: boolean) => void) | null
-  >(null);
 
   const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
     setOnSetErase(() => fn);
@@ -1241,6 +1267,8 @@ export function RoomLayout() {
         setMirrorAxes,
         mirrorHandleVisible,
         setMirrorHandleVisible,
+        isActiveLayerMovable,
+        moveToolDisabledReason,
       }}
     >
       <Modal
@@ -1845,7 +1873,17 @@ export function RoomLayout() {
                 </div>
               }
             >
-              <ActionIcon variant="subtle" size="lg" radius={0} c="gray.5">
+              <ActionIcon
+                color="grey.5"
+                variant="subtle"
+                styles={{
+                  root: {
+                    "&:hover": {
+                      backgroundColor: "transparent",
+                    },
+                  },
+                }}
+              >
                 <IconKeyboard size={18} />
               </ActionIcon>
             </Tooltip>
@@ -1855,10 +1893,10 @@ export function RoomLayout() {
                 variant="subtle"
                 size="lg"
                 radius={0}
-                color="red"
+                color="white"
                 onClick={() => navigate("/")}
               >
-                <IconX size={18} />
+                <IconHome size={18} />
               </ActionIcon>
             </Tooltip>
           </Group>

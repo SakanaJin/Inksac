@@ -109,13 +109,15 @@ export const RoomPage = () => {
   const taperOutEndSizePercentRef = useRef(taperOutEndSizePercent);
   const shapeTypeRef = useRef(shapeType);
   const activeToolRef = useRef(activeTool);
+  const layersRef = useRef(layers);
+  const activeLayerIdRef = useRef(activeLayerId);
   const setBrushInUseRef = useRef(setBrushInUse);
   const exportModalOpenRef = useRef(false);
   const browserCursorRef = useRef<React.CSSProperties["cursor"]>("default");
 
-  const previousToolRef = useRef<"brush" | "eraser" | "eyedropper" | "shapes">(
-    "brush",
-  );
+  const previousToolRef = useRef<
+    "brush" | "eraser" | "eyedropper" | "shapes" | "move"
+  >("brush");
   const ctrlPressedRef = useRef(false);
   const ctrlEyedropperActiveRef = useRef(false);
 
@@ -135,6 +137,13 @@ export const RoomPage = () => {
 
   const isDraggingMirrorRef = useRef(false);
 
+  const isMovingLayerRef = useRef(false);
+  const movingLayerIdRef = useRef<number | null>(null);
+  const movePointerIdRef = useRef<number | null>(null);
+  const moveStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const moveStartLayerOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const moveDirtyRef = useRef(false);
+
   const isPanningRef = useRef(false);
   const isSpacePressedRef = useRef(false);
   const lastPanPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -145,6 +154,13 @@ export const RoomPage = () => {
   const ZOOM_STEP = 1.1;
 
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
+  const activeLayer =
+    activeLayerId !== null
+      ? (layers.find((layer) => layer.id === activeLayerId) ?? null)
+      : null;
+  const isActiveLayerMovable = Boolean(
+    activeLayer && activeLayer.visible && !activeLayer.locked,
+  );
 
   useEffect(() => {
     eraseRef.current = erase;
@@ -163,6 +179,8 @@ export const RoomPage = () => {
     taperOutEndSizePercentRef.current = taperOutEndSizePercent;
     shapeTypeRef.current = shapeType;
     activeToolRef.current = activeTool;
+    layersRef.current = layers;
+    activeLayerIdRef.current = activeLayerId;
   }, [
     erase,
     smoothingEnabled,
@@ -180,6 +198,8 @@ export const RoomPage = () => {
     taperOutEndSizePercent,
     shapeType,
     activeTool,
+    layers,
+    activeLayerId,
   ]);
 
   useEffect(() => {
@@ -248,6 +268,115 @@ export const RoomPage = () => {
       width: width * world.scale.x,
       height: height * world.scale.y,
     };
+  };
+
+  const getActiveLayerOutlineRect = () => {
+    if (!drawerRef.current || !activeLayer || !activeLayer.visible) return null;
+
+    return drawerRef.current.getLayerOutlineScreenRect(activeLayer.id);
+  };
+
+  const getBoardPointFromClient = (clientX: number, clientY: number) => {
+    if (!drawerRef.current || !pixiContainer.current) return null;
+
+    const rect = pixiContainer.current.getBoundingClientRect();
+    const globalPoint = new pixi.Point(clientX - rect.left, clientY - rect.top);
+
+    return drawerRef.current.getWorldContainer().toLocal(globalPoint);
+  };
+
+  const beginLayerMove = (
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+  ) => {
+    const activeLayerId = activeLayerIdRef.current;
+    if (activeLayerId === null) return false;
+
+    const activeLayer = layersRef.current.find(
+      (layer) => layer.id === activeLayerId,
+    );
+    if (!activeLayer || !activeLayer.visible || activeLayer.locked) {
+      return false;
+    }
+
+    const boardPoint = getBoardPointFromClient(clientX, clientY);
+    if (!boardPoint) return false;
+
+    isMovingLayerRef.current = true;
+    movingLayerIdRef.current = activeLayerId;
+    movePointerIdRef.current = pointerId;
+    moveStartPointerRef.current = { x: boardPoint.x, y: boardPoint.y };
+    moveStartLayerOffsetRef.current = {
+      x: activeLayer.x ?? 0,
+      y: activeLayer.y ?? 0,
+    };
+    moveDirtyRef.current = false;
+    browserCursorRef.current = "grabbing";
+    syncCanvasCursor();
+    return true;
+  };
+
+  const updateMovingLayerFromClientPoint = (
+    clientX: number,
+    clientY: number,
+  ) => {
+    if (!isMovingLayerRef.current || movingLayerIdRef.current === null) return;
+
+    const boardPoint = getBoardPointFromClient(clientX, clientY);
+    const startPointer = moveStartPointerRef.current;
+    const startOffset = moveStartLayerOffsetRef.current;
+
+    if (!boardPoint || !startPointer || !startOffset) return;
+
+    const nextX = startOffset.x + (boardPoint.x - startPointer.x);
+    const nextY = startOffset.y + (boardPoint.y - startPointer.y);
+
+    moveDirtyRef.current = true;
+
+    const nextLayers = layersRef.current.map((layer) =>
+      layer.id === movingLayerIdRef.current
+        ? { ...layer, x: nextX, y: nextY }
+        : layer,
+    );
+
+    layersRef.current = nextLayers;
+    setLayers(nextLayers);
+  };
+
+  const endLayerMove = async () => {
+    const movingLayerId = movingLayerIdRef.current;
+    const didMove = moveDirtyRef.current;
+
+    isMovingLayerRef.current = false;
+    movingLayerIdRef.current = null;
+    movePointerIdRef.current = null;
+    moveStartPointerRef.current = null;
+    moveStartLayerOffsetRef.current = null;
+    moveDirtyRef.current = false;
+    browserCursorRef.current =
+      activeToolRef.current === "move" ? "grab" : "default";
+    syncCanvasCursor();
+
+    if (!didMove || movingLayerId === null) return;
+
+    const movedLayer = layersRef.current.find(
+      (layer) => layer.id === movingLayerId,
+    );
+    if (!movedLayer) return;
+
+    try {
+      await api.patch<LayerGetDto[]>(`/layers/${movingLayerId}`, {
+        x: movedLayer.x,
+        y: movedLayer.y,
+      });
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "Could not move layer",
+        color: "red",
+      });
+    }
   };
 
   const getMirrorScreenMetrics = () => {
@@ -399,8 +528,10 @@ export const RoomPage = () => {
     isOverDrawableArea &&
     !spacePanActive &&
     !isPanningRef.current &&
+    !isMovingLayerRef.current &&
     activeTool !== "eyedropper" &&
-    activeTool !== "shapes";
+    activeTool !== "shapes" &&
+    activeTool !== "move";
 
   const browserCursor: React.CSSProperties["cursor"] = isPanningRef.current
     ? "grabbing"
@@ -411,9 +542,16 @@ export const RoomPage = () => {
           isOverDrawableArea &&
           activeTool === "eyedropper"
         ? "crosshair"
-        : shouldShowBrushCursor
-          ? "none"
-          : "default";
+        : canShowCanvas &&
+            isHoveringCanvas &&
+            isOverDrawableArea &&
+            activeTool === "move"
+          ? isMovingLayerRef.current
+            ? "grabbing"
+            : "grab"
+          : shouldShowBrushCursor
+            ? "none"
+            : "default";
 
   const syncCanvasCursor = () => {
     const currentCursor = browserCursorRef.current;
@@ -758,6 +896,14 @@ export const RoomPage = () => {
         return;
       }
 
+      if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        if (isActiveLayerMovable) {
+          setActiveTool("move");
+        }
+        return;
+      }
+
       if (e.key === "[") {
         e.preventDefault();
         setStrokeScale(Math.max(1, strokeScale - 4));
@@ -839,7 +985,13 @@ export const RoomPage = () => {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [toggleSidebar, strokeScale, setStrokeScale, setActiveTool]);
+  }, [
+    toggleSidebar,
+    strokeScale,
+    setStrokeScale,
+    setActiveTool,
+    isActiveLayerMovable,
+  ]);
 
   useEffect(() => {
     drawerRef.current?.setStrokeScale(strokeScale);
@@ -956,6 +1108,21 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerMoveForPan = (e: PointerEvent) => {
+      if (isMovingLayerRef.current) {
+        if (movePointerIdRef.current !== e.pointerId) {
+          return;
+        }
+
+        updateMovingLayerFromClientPoint(e.clientX, e.clientY);
+        updateCursorTrackingFromClientPoint(
+          e.clientX,
+          e.clientY,
+          e.pressure,
+          e.pointerType,
+        );
+        return;
+      }
+
       if (isDraggingMirrorRef.current) {
         updateMirrorFromClientPoint(e.clientX, e.clientY);
         updateCursorTrackingFromClientPoint(
@@ -994,6 +1161,16 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerUpForPan = (e: PointerEvent) => {
+      if (isMovingLayerRef.current) {
+        if (movePointerIdRef.current !== e.pointerId) {
+          return;
+        }
+
+        updateMovingLayerFromClientPoint(e.clientX, e.clientY);
+        void endLayerMove();
+        return;
+      }
+
       if (isDraggingMirrorRef.current) {
         updateMirrorFromClientPoint(e.clientX, e.clientY);
         isDraggingMirrorRef.current = false;
@@ -1014,6 +1191,15 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerCancelForPan = (e: PointerEvent) => {
+      if (isMovingLayerRef.current) {
+        if (movePointerIdRef.current !== e.pointerId) {
+          return;
+        }
+
+        void endLayerMove();
+        return;
+      }
+
       if (isDraggingMirrorRef.current) {
         isDraggingMirrorRef.current = false;
         return;
@@ -1125,6 +1311,13 @@ export const RoomPage = () => {
         e.preventDefault();
         e.stopPropagation();
         beginPan(e.pointerId, e.clientX, e.clientY);
+        return;
+      }
+
+      if (activeToolRef.current === "move" && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        beginLayerMove(e.pointerId, e.clientX, e.clientY);
         return;
       }
 
@@ -1386,6 +1579,7 @@ export const RoomPage = () => {
         );
       }
 
+      isMovingLayerRef.current = false;
       wsRef.current?.close();
       wsRef.current = null;
 
@@ -1429,6 +1623,33 @@ export const RoomPage = () => {
           cursor: browserCursor,
         }}
       />
+
+      {canShowCanvas && activeTool === "move" && isActiveLayerMovable
+        ? (() => {
+            const outlineRect = getActiveLayerOutlineRect();
+
+            if (!outlineRect) {
+              return null;
+            }
+
+            return (
+              <Box
+                style={{
+                  position: "absolute",
+                  left: outlineRect.left,
+                  top: outlineRect.top,
+                  width: outlineRect.width,
+                  height: outlineRect.height,
+                  border: "2px dotted rgba(59, 130, 246, 0.96)",
+                  boxShadow: "0 0 0 1px rgba(10, 25, 48, 0.75)",
+                  pointerEvents: "none",
+                  zIndex: 130,
+                  boxSizing: "border-box",
+                }}
+              />
+            );
+          })()
+        : null}
 
       {shouldShowBrushCursor ? (
         <Box
