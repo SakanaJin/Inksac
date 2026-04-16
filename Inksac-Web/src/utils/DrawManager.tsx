@@ -17,6 +17,14 @@ import { EnvVars } from "../config/env-vars";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
+function getBrushImageUrl(imgurl: string) {
+  if (imgurl.startsWith("/system-brush-tips/")) {
+    return imgurl;
+  }
+
+  return baseurl + imgurl;
+}
+
 class DrawManager {
   private app: pixi.Application;
   private undoStack: Stroke[];
@@ -146,7 +154,7 @@ class DrawManager {
   }
 
   async init() {
-    const response = await api.get<BrushGetDto>("/brushes/1");
+    const response = await api.get<BrushGetDto>("/brushes/default");
     this.setActiveBrush(response.data.data);
   }
 
@@ -154,7 +162,7 @@ class DrawManager {
     // pixijs automatically caches textures by url
     this.activeBrush = brush;
     this.brushTexture = await pixi.Assets.load<pixi.Texture>(
-      baseurl + this.activeBrush.imgurl,
+      getBrushImageUrl(this.activeBrush.imgurl),
     );
   }
 
@@ -1441,7 +1449,7 @@ class DrawManager {
     if (!layerContainer) return;
 
     const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(
-      baseurl + strokeData.brush.imgurl,
+      getBrushImageUrl(strokeData.brush.imgurl),
     );
     if (!receivedBrushTexture) return;
 
