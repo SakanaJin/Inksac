@@ -36,6 +36,23 @@ def get_user_and_system(db: Session = Depends(get_db), user: User = Depends(get_
     response.data = [brush.toGetDto() for brush in brushes]
     return response
 
+@router.get("/default")
+def get_default(db: Session = Depends(get_db)):
+    response = Response()
+
+    brush = db.execute(
+        select(Brush)
+        .where(Brush.brush_type == BrushType.SYSTEM)
+        .order_by(Brush.id.asc()),
+    ).scalars().first()
+
+    if not brush:
+        response.add_error("brush", "default brush not found")
+        raise HttpException(status_code=404, response=response)
+
+    response.data = brush.toGetDto()
+    return response
+
 @router.get("/{id}")
 def get_by_id(id: int, db: Session = Depends(get_db)):
     response = Response()
