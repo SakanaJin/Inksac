@@ -52,7 +52,7 @@ def create(brushdto: BrushCreateDto, db: Session = Depends(get_db), user: User =
     if len(brushdto.name) == 0:
         response.add_error("name", "name cannot be empty")
         raise HttpException(status_code=400, response=response)
-    if user.brush_count > 10:
+    if user.brush_count >= 10:
         response.add_error("brush_count", "user cannot have more than 10 brushes")
         raise HttpException(status_code=409, response=response)
 

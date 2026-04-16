@@ -1,8 +1,37 @@
 [
   {
-    "name": "Default 1",
-    "spacing": 1,
+    "name": "Hard Round",
+    "spacing": 20,
+    "rotation_mode": "none",
+    "rotation_jitter": 0,
+    "imgurl": "/system-brush-tips/round.png"
+  },
+  {
+    "name": "Soft Round",
+    "spacing": 30,
+    "rotation_mode": "none",
+    "rotation_jitter": 0,
+    "imgurl": "/system-brush-tips/soft.png"
+  },
+  {
+    "name": "Palette Knife",
+    "spacing": 6,
     "rotation_mode": "followstroke",
-    "imgurl": "/user/brush/softShape.png"
+    "rotation_jitter": 0,
+    "imgurl": "/system-brush-tips/oil_knife.png"
+  },
+  {
+    "name": "Grunge",
+    "spacing": 40,
+    "rotation_mode": "random",
+    "rotation_jitter": 100,
+    "imgurl": "/system-brush-tips/A_concrete.png"
+  },
+  {
+    "name": "Crayon",
+    "spacing": 35,
+    "rotation_mode": "random",
+    "rotation_jitter": 100,
+    "imgurl": "/system-brush-tips/A_crayon.png"
   }
 ]

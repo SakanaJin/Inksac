@@ -566,7 +566,7 @@ export function RoomLayout() {
   const { id } = useParams();
   const [canManageLayers, setCanManageLayers] = useState(false);
   const [roomName, setRoomName] = useState<string | undefined>(undefined);
-  const [color, setColor] = useState("#ffffffff");
+  const [color, setColor] = useState("#000000ff");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
