@@ -10,11 +10,17 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ActionIcon,
   Box,
+  Button,
   Divider,
   Group,
+  Menu,
+  Modal,
   NumberInput,
   Paper,
   Slider,
+  Stack,
+  ScrollArea,
+  Switch,
   Text,
   Tooltip,
 } from "@mantine/core";
@@ -28,6 +34,8 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconX,
+  IconSettings,
+  IconDots,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
@@ -71,6 +79,32 @@ type RoomLayoutContextValue = {
     layerId: number,
     opacityPercent: number,
   ) => Promise<void>;
+  smoothingEnabled: boolean;
+  setSmoothingEnabled: (enabled: boolean) => void;
+  smoothingStrength: number;
+  setSmoothingStrength: (strength: number) => void;
+  pressureEnabled: boolean;
+  setPressureEnabled: (enabled: boolean) => void;
+  pressureMinSize: number;
+  setPressureMinSize: (value: number) => void;
+  pressureSensitivity: number;
+  setPressureSensitivity: (value: number) => void;
+  pressureStabilizationEnabled: boolean;
+  setPressureStabilizationEnabled: (enabled: boolean) => void;
+  pressureStabilizationStrength: number;
+  setPressureStabilizationStrength: (value: number) => void;
+  taperInEnabled: boolean;
+  setTaperInEnabled: (enabled: boolean) => void;
+  taperInDistance: number;
+  setTaperInDistance: (value: number) => void;
+  taperInStartSizePercent: number;
+  setTaperInStartSizePercent: (value: number) => void;
+  taperOutEnabled: boolean;
+  setTaperOutEnabled: (enabled: boolean) => void;
+  taperOutDistance: number;
+  setTaperOutDistance: (value: number) => void;
+  taperOutEndSizePercent: number;
+  setTaperOutEndSizePercent: (value: number) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -97,6 +131,32 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   activeLayerId: null,
   setActiveLayerId: () => {},
   updateLayerOpacity: async () => {},
+  smoothingEnabled: false,
+  setSmoothingEnabled: () => {},
+  smoothingStrength: 35,
+  setSmoothingStrength: () => {},
+  pressureEnabled: true,
+  setPressureEnabled: () => {},
+  pressureMinSize: 10,
+  setPressureMinSize: () => {},
+  pressureSensitivity: 65,
+  setPressureSensitivity: () => {},
+  pressureStabilizationEnabled: true,
+  setPressureStabilizationEnabled: () => {},
+  pressureStabilizationStrength: 30,
+  setPressureStabilizationStrength: () => {},
+  taperInEnabled: false,
+  setTaperInEnabled: () => {},
+  taperInDistance: 32,
+  setTaperInDistance: () => {},
+  taperInStartSizePercent: 5,
+  setTaperInStartSizePercent: () => {},
+  taperOutEnabled: false,
+  setTaperOutEnabled: () => {},
+  taperOutDistance: 32,
+  setTaperOutDistance: () => {},
+  taperOutEndSizePercent: 5,
+  setTaperOutEndSizePercent: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -117,6 +177,391 @@ function mergeClientLayerVisibility(
     .sort((a, b) => a.position - b.position);
 }
 
+function PressurePreview({
+  pressureEnabled,
+  pressureMinSize,
+  pressureSensitivity,
+  pressureStabilizationEnabled,
+  pressureStabilizationStrength,
+}: {
+  pressureEnabled: boolean;
+  pressureMinSize: number;
+  pressureSensitivity: number;
+  pressureStabilizationEnabled: boolean;
+  pressureStabilizationStrength: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, width, height);
+
+    for (let y = 0; y < height; y += 12) {
+      for (let x = 0; x < width; x += 12) {
+        ctx.fillStyle = (x / 12 + y / 12) % 2 === 0 ? "#272727" : "#2d2d2d";
+        ctx.fillRect(x, y, 12, 12);
+      }
+    }
+
+    const clamp = (value: number, min: number, max: number) =>
+      Math.max(min, Math.min(max, value));
+
+    const getPressureStabilizationFollowFactor = () => {
+      const t = clamp(pressureStabilizationStrength, 0, 100) / 100;
+      const curved = t * t;
+      return 1 - curved * 0.965;
+    };
+
+    const normalizePressure = (pressure: number) => {
+      if (!pressureEnabled) return 1;
+      const safePressure = clamp(pressure || 0, 0, 1);
+      return safePressure > 0 ? safePressure : 0.001;
+    };
+
+    const getAdjustedSize = (normalizedPressure: number) => {
+      if (!pressureEnabled) return 22;
+
+      const minRatio = clamp(pressureMinSize / 100, 0, 1);
+      const sensitivityT = clamp(pressureSensitivity, 0, 100) / 100;
+      const exponent = 2.2 - sensitivityT * 1.9;
+      const curvedPressure = Math.pow(normalizedPressure, exponent);
+      const sizeRatio = minRatio + (1 - minRatio) * curvedPressure;
+
+      return Math.max(3, 22 * sizeRatio);
+    };
+
+    const buildRawPressureValues = (kind: "up" | "down" | "jitter") => {
+      const values: number[] = [];
+
+      for (let i = 0; i < 80; i += 1) {
+        const t = i / 79;
+
+        if (kind === "up") {
+          values.push(0.08 + t * 0.92);
+        } else if (kind === "down") {
+          values.push(1 - t * 0.92);
+        } else {
+          const base = 0.5 + Math.sin(t * Math.PI * 3.5) * 0.18;
+          const jitter = Math.sin(t * Math.PI * 17) * 0.1;
+          values.push(clamp(base + jitter, 0.05, 1));
+        }
+      }
+
+      return values;
+    };
+
+    const drawStrokeRow = (
+      top: number,
+      label: string,
+      kind: "up" | "down" | "jitter",
+    ) => {
+      const rawValues = buildRawPressureValues(kind);
+      const follow = getPressureStabilizationFollowFactor();
+      let smoothed = normalizePressure(rawValues[0]);
+
+      ctx.fillStyle = "rgba(255,255,255,0.72)";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, 12, top - 14);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.10)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(12, top);
+      ctx.lineTo(width - 12, top);
+      ctx.stroke();
+
+      for (let i = 0; i < rawValues.length; i += 1) {
+        const rawPressure = normalizePressure(rawValues[i]);
+
+        if (!pressureEnabled) {
+          smoothed = 1;
+        } else if (!pressureStabilizationEnabled) {
+          smoothed = rawPressure;
+        } else if (i === 0) {
+          smoothed = rawPressure;
+        } else {
+          smoothed = smoothed + (rawPressure - smoothed) * follow;
+        }
+
+        const x = 18 + (i / (rawValues.length - 1)) * (width - 36);
+        const y =
+          top +
+          Math.sin(i / 7) * (kind === "jitter" ? 5 : 3) +
+          (kind === "up" ? -3 : kind === "down" ? 3 : 0);
+
+        const size = getAdjustedSize(smoothed);
+
+        ctx.beginPath();
+        ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.fill();
+      }
+    };
+
+    drawStrokeRow(62, "Light → Heavy", "up");
+    drawStrokeRow(145, "Heavy → Light", "down");
+    drawStrokeRow(228, "Jitter Test", "jitter");
+
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+  }, [
+    pressureEnabled,
+    pressureMinSize,
+    pressureSensitivity,
+    pressureStabilizationEnabled,
+    pressureStabilizationStrength,
+  ]);
+
+  return (
+    <Stack gap={6}>
+      <Text size="sm" fw={600}>
+        Live Preview
+      </Text>
+      <Box
+        style={{
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: "#262626",
+          overflow: "hidden",
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={220}
+          height={290}
+          style={{ display: "block", width: "100%", height: 290 }}
+        />
+      </Box>
+      <Text size="xs" c="dimmed">
+        Shows how pressure response and stabilization affect stroke thickness.
+      </Text>
+    </Stack>
+  );
+}
+
+function TaperPreview({
+  taperInEnabled,
+  taperInDistance,
+  taperInStartSizePercent,
+  taperOutEnabled,
+  taperOutDistance,
+  taperOutEndSizePercent,
+}: {
+  taperInEnabled: boolean;
+  taperInDistance: number;
+  taperInStartSizePercent: number;
+  taperOutEnabled: boolean;
+  taperOutDistance: number;
+  taperOutEndSizePercent: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const taperInMinMultiplier = Math.max(
+      0.01,
+      Math.min(1, taperInStartSizePercent / 100),
+    );
+    const taperOutMinMultiplier = Math.max(
+      0.01,
+      Math.min(1, taperOutEndSizePercent / 100),
+    );
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, width, height);
+
+    for (let y = 0; y < height; y += 12) {
+      for (let x = 0; x < width; x += 12) {
+        ctx.fillStyle = (x / 12 + y / 12) % 2 === 0 ? "#272727" : "#2d2d2d";
+        ctx.fillRect(x, y, 12, 12);
+      }
+    }
+
+    const samplePoint = (t: number) => ({
+      x:
+        width / 2 +
+        Math.sin(t * Math.PI * 1.15) * 24 -
+        Math.sin(t * Math.PI * 2.4) * 7,
+      y: 20 + t * (height - 40),
+    });
+
+    const rawPoints: { x: number; y: number }[] = [];
+    for (let i = 0; i <= 140; i += 1) {
+      rawPoints.push(samplePoint(i / 140));
+    }
+
+    const cumulativeDistances: number[] = [0];
+    for (let i = 1; i < rawPoints.length; i += 1) {
+      const prev = rawPoints[i - 1];
+      const current = rawPoints[i];
+      const dx = current.x - prev.x;
+      const dy = current.y - prev.y;
+      cumulativeDistances.push(
+        cumulativeDistances[i - 1] + Math.sqrt(dx * dx + dy * dy),
+      );
+    }
+
+    const totalDistance =
+      cumulativeDistances[cumulativeDistances.length - 1] ?? 0;
+    const baseSize = 20;
+    const normalSpacing = baseSize * 0.45;
+
+    const getTaperInMultiplier = (distance: number) => {
+      if (!taperInEnabled || taperInDistance <= 0) return 1;
+      const progress = Math.max(0, Math.min(1, distance / taperInDistance));
+      return taperInMinMultiplier + (1 - taperInMinMultiplier) * progress;
+    };
+
+    const getTaperOutMultiplier = (distanceFromEnd: number) => {
+      if (!taperOutEnabled || taperOutDistance <= 0) return 1;
+      const progress = Math.max(
+        0,
+        Math.min(1, distanceFromEnd / taperOutDistance),
+      );
+      return taperOutMinMultiplier + (1 - taperOutMinMultiplier) * progress;
+    };
+
+    const getSizeAtDistance = (distance: number) => {
+      const taperInMultiplier = getTaperInMultiplier(distance);
+      const taperOutMultiplier = getTaperOutMultiplier(
+        totalDistance - distance,
+      );
+      return Math.max(1.5, baseSize * taperInMultiplier * taperOutMultiplier);
+    };
+
+    const getSpacingAtDistance = (distance: number) => {
+      const size = getSizeAtDistance(distance);
+      return Math.min(normalSpacing, Math.max(size * 0.15, 2));
+    };
+
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rawPoints[0].x, rawPoints[0].y);
+    for (let i = 1; i < rawPoints.length; i += 1) {
+      ctx.lineTo(rawPoints[i].x, rawPoints[i].y);
+    }
+    ctx.stroke();
+
+    const dabs: { x: number; y: number; size: number }[] = [];
+    dabs.push({
+      x: rawPoints[0].x,
+      y: rawPoints[0].y,
+      size: getSizeAtDistance(0),
+    });
+
+    let spacingCarry = 0;
+
+    for (let i = 1; i < rawPoints.length; i += 1) {
+      const start = rawPoints[i - 1];
+      const end = rawPoints[i];
+      const startDistance = cumulativeDistances[i - 1];
+      const endDistance = cumulativeDistances[i];
+
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      let segment = Math.sqrt(dx * dx + dy * dy);
+
+      if (segment <= 0) continue;
+
+      const dirX = dx / segment;
+      const dirY = dy / segment;
+      let cursorX = start.x;
+      let cursorY = start.y;
+      let traveled = 0;
+
+      while (segment > 0) {
+        const distance = startDistance + traveled;
+        const spacing = getSpacingAtDistance(distance);
+
+        if (spacingCarry + segment < spacing) {
+          spacingCarry += segment;
+          break;
+        }
+
+        const step = spacing - spacingCarry;
+        cursorX += dirX * step;
+        cursorY += dirY * step;
+        segment -= step;
+        traveled += step;
+        spacingCarry = 0;
+
+        const dabDistance = Math.max(
+          0,
+          Math.min(endDistance, startDistance + traveled),
+        );
+
+        dabs.push({
+          x: cursorX,
+          y: cursorY,
+          size: getSizeAtDistance(dabDistance),
+        });
+      }
+    }
+
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    for (const dab of dabs) {
+      ctx.beginPath();
+      ctx.arc(dab.x, dab.y, dab.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+  }, [
+    taperInEnabled,
+    taperInDistance,
+    taperInStartSizePercent,
+    taperOutEnabled,
+    taperOutDistance,
+    taperOutEndSizePercent,
+  ]);
+
+  return (
+    <Stack gap={6}>
+      <Text size="sm" fw={600}>
+        Live Preview
+      </Text>
+      <Box
+        style={{
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: "#262626",
+          overflow: "hidden",
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={180}
+          height={320}
+          style={{ display: "block", width: "100%", height: 320 }}
+        />
+      </Box>
+      <Text size="xs" c="dimmed">
+        Updates as you adjust taper in and taper out settings.
+      </Text>
+    </Stack>
+  );
+}
+
 export function RoomLayout() {
   const { id } = useParams();
   const [canManageLayers, setCanManageLayers] = useState(false);
@@ -131,6 +576,49 @@ export function RoomLayout() {
   const [layers, setLayersState] = useState<ClientLayerDto[]>([]);
   const [activeLayerId, setActiveLayerIdState] = useState<number | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(true);
+  const [smoothingEnabled, setSmoothingEnabled] = useState(false);
+  const [smoothingStrength, setSmoothingStrength] = useState(35);
+  const [smoothingModalOpen, setSmoothingModalOpen] = useState(false);
+  const [optionsMenuOpened, setOptionsMenuOpened] = useState(false);
+
+  const [pressureEnabled, setPressureEnabled] = useState(true);
+  const [pressureMinSize, setPressureMinSize] = useState(10);
+  const [pressureSensitivity, setPressureSensitivity] = useState(65);
+  const [pressureModalOpen, setPressureModalOpen] = useState(false);
+
+  const [pressureStabilizationEnabled, setPressureStabilizationEnabled] =
+    useState(true);
+  const [pressureStabilizationStrength, setPressureStabilizationStrength] =
+    useState(30);
+
+  const [taperInEnabled, setTaperInEnabled] = useState(false);
+  const [taperInDistance, setTaperInDistance] = useState(32);
+  const [taperInStartSizePercent, setTaperInStartSizePercent] = useState(5);
+  const [taperOutEnabled, setTaperOutEnabled] = useState(false);
+  const [taperOutDistance, setTaperOutDistance] = useState(32);
+  const [taperOutEndSizePercent, setTaperOutEndSizePercent] = useState(5);
+  const [taperModalOpen, setTaperModalOpen] = useState(false);
+
+  function resetPressureDefaults() {
+    setPressureEnabled(true);
+    setPressureMinSize(10);
+    setPressureSensitivity(65);
+  }
+
+  function resetPressureStabilizationDefaults() {
+    setPressureStabilizationEnabled(true);
+    setPressureStabilizationStrength(30);
+  }
+
+  function resetTaperInDefaults() {
+    setTaperInDistance(32);
+    setTaperInStartSizePercent(5);
+  }
+
+  function resetTaperOutDefaults() {
+    setTaperOutDistance(32);
+    setTaperOutEndSizePercent(5);
+  }
 
   const addUser = (user: UserGetDto) => {
     setUsers((users) => {
@@ -169,9 +657,9 @@ export function RoomLayout() {
     [],
   );
 
-  const setActiveLayerId = useCallback((layerId: number | null) => {
+  function setActiveLayerId(layerId: number | null) {
     setActiveLayerIdState(layerId);
-  }, []);
+  }
 
   const createLayer = useCallback(async () => {
     if (!id || !canManageLayers) return;
@@ -497,21 +985,18 @@ export function RoomLayout() {
     setOnExport(() => fn);
   }, []);
 
-  const setHistoryState = useCallback(
-    (nextCanUndo: boolean, nextCanRedo: boolean) => {
-      setCanUndo(nextCanUndo);
-      setCanRedo(nextCanRedo);
-    },
-    [],
-  );
+  function setHistoryState(nextCanUndo: boolean, nextCanRedo: boolean) {
+    setCanUndo(nextCanUndo);
+    setCanRedo(nextCanRedo);
+  }
 
-  const toggleSidebar = useCallback(() => {
+  function toggleSidebar() {
     setSidebarOpen((prev) => !prev);
-  }, []);
+  }
 
-  const toggleLayersPanel = useCallback(() => {
+  function toggleLayersPanel() {
     setLayersPanelOpen((prev) => !prev);
-  }, []);
+  }
 
   return (
     <RoomLayoutContext.Provider
@@ -539,12 +1024,507 @@ export function RoomLayout() {
         activeLayerId,
         setActiveLayerId,
         updateLayerOpacity,
+        smoothingEnabled,
+        setSmoothingEnabled,
+        smoothingStrength,
+        setSmoothingStrength,
+        pressureEnabled,
+        setPressureEnabled,
+        pressureMinSize,
+        setPressureMinSize,
+        pressureSensitivity,
+        setPressureSensitivity,
+        pressureStabilizationEnabled,
+        setPressureStabilizationEnabled,
+        pressureStabilizationStrength,
+        setPressureStabilizationStrength,
+        taperInEnabled,
+        setTaperInEnabled,
+        taperInDistance,
+        setTaperInDistance,
+        taperInStartSizePercent,
+        setTaperInStartSizePercent,
+        taperOutEnabled,
+        setTaperOutEnabled,
+        taperOutDistance,
+        setTaperOutDistance,
+        taperOutEndSizePercent,
+        setTaperOutEndSizePercent,
       }}
     >
+      <Modal
+        opened={smoothingModalOpen}
+        onClose={() => setSmoothingModalOpen(false)}
+        title="Stroke smoothing"
+        centered
+      >
+        <Stack gap="md">
+          <Box>
+            <Group justify="space-between" mb={6}>
+              <Text size="sm" fw={600}>
+                Smoothing strength
+              </Text>
+              <Text size="sm" c="dimmed">
+                {smoothingStrength}
+              </Text>
+            </Group>
+
+            <Slider
+              min={0}
+              max={100}
+              step={1}
+              value={smoothingStrength}
+              onChange={setSmoothingStrength}
+            />
+
+            <Text size="xs" c="dimmed" mt={8}>
+              Higher values add more stabilizer lag.
+            </Text>
+          </Box>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={pressureModalOpen}
+        onClose={() => setPressureModalOpen(false)}
+        title="Pen pressure"
+        centered
+        size="xl"
+      >
+        <Group align="stretch" wrap="nowrap" gap="md">
+          <Box style={{ width: 230, flexShrink: 0 }}>
+            <PressurePreview
+              pressureEnabled={pressureEnabled}
+              pressureMinSize={pressureMinSize}
+              pressureSensitivity={pressureSensitivity}
+              pressureStabilizationEnabled={pressureStabilizationEnabled}
+              pressureStabilizationStrength={pressureStabilizationStrength}
+            />
+          </Box>
+
+          <Box
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "70vh",
+            }}
+          >
+            <ScrollArea
+              offsetScrollbars
+              scrollbarSize={10}
+              style={{ flex: 1, minHeight: 0 }}
+            >
+              <Stack gap="md" pr="xs">
+                <Paper withBorder p="sm" radius={0}>
+                  <Stack gap="md">
+                    <Switch
+                      checked={pressureEnabled}
+                      onChange={(event) =>
+                        setPressureEnabled(event.currentTarget.checked)
+                      }
+                      label="Enable pressure size"
+                    />
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Minimum size
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {pressureMinSize}%
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={pressureMinSize}
+                        onChange={setPressureMinSize}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Sets the smallest brush size reached with very light pen
+                        pressure.
+                      </Text>
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Sensitivity
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {pressureSensitivity}
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={pressureSensitivity}
+                        onChange={setPressureSensitivity}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Higher values make the brush react more quickly to pen
+                        pressure.
+                      </Text>
+                    </Box>
+                  </Stack>
+                </Paper>
+
+                <Paper withBorder p="sm" radius={0}>
+                  <Stack gap="md">
+                    <Switch
+                      checked={pressureStabilizationEnabled}
+                      onChange={(event) =>
+                        setPressureStabilizationEnabled(
+                          event.currentTarget.checked,
+                        )
+                      }
+                      label="Enable pressure stabilization"
+                    />
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Stabilization strength
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {pressureStabilizationStrength}
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={pressureStabilizationStrength}
+                        onChange={setPressureStabilizationStrength}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Higher values smooth out pressure changes more strongly.
+                      </Text>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </Stack>
+            </ScrollArea>
+
+            <Group justify="space-between" mt="md">
+              <Button
+                variant="default"
+                onClick={() => {
+                  resetPressureDefaults();
+                  resetPressureStabilizationDefaults();
+                }}
+              >
+                Restore defaults
+              </Button>
+
+              <Button onClick={() => setPressureModalOpen(false)}>Done</Button>
+            </Group>
+          </Box>
+        </Group>
+      </Modal>
+
+      <Modal
+        opened={taperModalOpen}
+        onClose={() => setTaperModalOpen(false)}
+        title="Taper"
+        centered
+        size="xl"
+      >
+        <Group align="stretch" wrap="nowrap" gap="md">
+          <Box style={{ width: 190, flexShrink: 0 }}>
+            <TaperPreview
+              taperInEnabled={taperInEnabled}
+              taperInDistance={taperInDistance}
+              taperInStartSizePercent={taperInStartSizePercent}
+              taperOutEnabled={taperOutEnabled}
+              taperOutDistance={taperOutDistance}
+              taperOutEndSizePercent={taperOutEndSizePercent}
+            />
+          </Box>
+
+          <Box
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "70vh",
+            }}
+          >
+            <ScrollArea
+              offsetScrollbars
+              scrollbarSize={10}
+              style={{ flex: 1, minHeight: 0 }}
+            >
+              <Stack gap="md" pr="xs">
+                <Paper withBorder p="sm" radius={0}>
+                  <Stack gap="md">
+                    <Switch
+                      checked={taperInEnabled}
+                      onChange={(event) =>
+                        setTaperInEnabled(event.currentTarget.checked)
+                      }
+                      label="Enable taper in"
+                    />
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Taper in distance
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {taperInDistance}px
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={128}
+                        step={1}
+                        value={taperInDistance}
+                        onChange={setTaperInDistance}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Higher values make the stroke take longer to reach full
+                        size.
+                      </Text>
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Taper in start size
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {taperInStartSizePercent}%
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={taperInStartSizePercent}
+                        onChange={setTaperInStartSizePercent}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Controls how thin the very start of the stroke can be
+                        before it ramps up.
+                      </Text>
+                    </Box>
+                  </Stack>
+                </Paper>
+
+                <Paper withBorder p="sm" radius={0}>
+                  <Stack gap="md">
+                    <Switch
+                      checked={taperOutEnabled}
+                      onChange={(event) =>
+                        setTaperOutEnabled(event.currentTarget.checked)
+                      }
+                      label="Enable taper out"
+                    />
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Taper out distance
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {taperOutDistance}px
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={128}
+                        step={1}
+                        value={taperOutDistance}
+                        onChange={setTaperOutDistance}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Higher values make the stroke fade out over a longer
+                        tail.
+                      </Text>
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>
+                          Taper out end size
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {taperOutEndSizePercent}%
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={taperOutEndSizePercent}
+                        onChange={setTaperOutEndSizePercent}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Controls how small the stroke tail gets at the very end.
+                      </Text>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </Stack>
+            </ScrollArea>
+
+            <Group justify="space-between" mt="md">
+              <Button
+                variant="default"
+                onClick={() => {
+                  resetTaperInDefaults();
+                  resetTaperOutDefaults();
+                }}
+              >
+                Restore defaults
+              </Button>
+
+              <Button onClick={() => setTaperModalOpen(false)}>Done</Button>
+            </Group>
+          </Box>
+        </Group>
+      </Modal>
+
       <AppLayout
         headerTitle={roomName}
         headerActions={
           <Group gap="xs">
+            <Menu
+              shadow="sm"
+              width={280}
+              position="bottom-end"
+              withinPortal
+              opened={optionsMenuOpened}
+              onChange={setOptionsMenuOpened}
+            >
+              <Menu.Target>
+                <Tooltip label="Options">
+                  <ActionIcon variant="subtle" size="lg" radius={0}>
+                    <IconSettings size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+
+              <Menu.Dropdown>
+                <Box p="xs">
+                  <Group justify="space-between" align="center">
+                    <Group gap="xs">
+                      <Switch
+                        checked={pressureEnabled}
+                        onChange={(event) =>
+                          setPressureEnabled(event.currentTarget.checked)
+                        }
+                        size="sm"
+                      />
+                      <Text size="sm">Pen Pressure</Text>
+                    </Group>
+
+                    <ActionIcon
+                      variant="subtle"
+                      radius={0}
+                      onClick={() => {
+                        setOptionsMenuOpened(false);
+                        setPressureModalOpen(true);
+                      }}
+                    >
+                      <IconDots size={16} />
+                    </ActionIcon>
+                  </Group>
+
+                  <Text size="xs" c="dimmed" mt={8}>
+                    Controls pressure size and pressure stabilization.
+                  </Text>
+                </Box>
+
+                <Divider />
+
+                <Box p="xs">
+                  <Group justify="space-between" align="center">
+                    <Group gap="xs">
+                      <Switch
+                        checked={smoothingEnabled}
+                        onChange={(event) =>
+                          setSmoothingEnabled(event.currentTarget.checked)
+                        }
+                        size="sm"
+                      />
+
+                      <Text size="sm">Stroke Smoothing</Text>
+                    </Group>
+
+                    <ActionIcon
+                      variant="subtle"
+                      radius={0}
+                      onClick={() => {
+                        setOptionsMenuOpened(false);
+                        setSmoothingModalOpen(true);
+                      }}
+                    >
+                      <IconDots size={16} />
+                    </ActionIcon>
+                  </Group>
+
+                  <Text size="xs" c="dimmed" mt={8}>
+                    Stabilizes strokes with lag.
+                  </Text>
+                </Box>
+
+                <Divider />
+
+                <Box p="xs">
+                  <Group justify="space-between" align="center">
+                    <Group gap="xs">
+                      <Switch
+                        checked={taperInEnabled || taperOutEnabled}
+                        onChange={(event) => {
+                          const enabled = event.currentTarget.checked;
+                          setTaperInEnabled(enabled);
+                          setTaperOutEnabled(enabled);
+                        }}
+                        size="sm"
+                      />
+                      <Text size="sm">Taper</Text>
+                    </Group>
+
+                    <ActionIcon
+                      variant="subtle"
+                      radius={0}
+                      onClick={() => {
+                        setOptionsMenuOpened(false);
+                        setTaperModalOpen(true);
+                      }}
+                    >
+                      <IconDots size={16} />
+                    </ActionIcon>
+                  </Group>
+
+                  <Text size="xs" c="dimmed" mt={8}>
+                    Controls how strokes narrow at the start and end.
+                  </Text>
+                </Box>
+              </Menu.Dropdown>
+            </Menu>
+
             <Tooltip label="Export canvas">
               <ActionIcon
                 variant="subtle"
@@ -777,8 +1757,6 @@ export function RoomLayout() {
               </Box>
             </Box>
           ),
-          // add more sidebar content here later, e.g:
-          // bottom: <RoomParticipants />
         }}
       />
     </RoomLayoutContext.Provider>
