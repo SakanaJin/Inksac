@@ -109,6 +109,8 @@ async def create(
         locked=False,
         position=next_position,
         opacity=1.0,
+        x=0.0,
+        y=0.0,
         room_id=roomid,
     )
     db.add(layer)
@@ -152,7 +154,13 @@ async def update(
         response.add_error("room", "room not found")
         raise HttpException(status_code=404, response=response)
 
-    require_room_owner(room, user, response)
+    is_owner_managed_update = any(
+        value is not None
+        for value in [layerdto.name, layerdto.locked, layerdto.opacity]
+    )
+
+    if is_owner_managed_update:
+        require_room_owner(room, user, response)
 
     if layerdto.name is not None:
         if len(layerdto.name.strip()) == 0:
@@ -168,6 +176,12 @@ async def update(
             response.add_error("opacity", "opacity must be between 0 and 1")
             raise HttpException(status_code=400, response=response)
         layer.opacity = layerdto.opacity
+
+    if layerdto.x is not None:
+        layer.x = layerdto.x
+
+    if layerdto.y is not None:
+        layer.y = layerdto.y
 
     db.commit()
 

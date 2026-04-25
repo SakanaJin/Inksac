@@ -13,6 +13,8 @@ class LayerGetDto(BaseModel):
     position: int
     room_id: int
     opacity: float
+    x: float
+    y: float
 
 
 class LayerCreateDto(BaseModel):
@@ -23,6 +25,8 @@ class LayerUpdateDto(BaseModel):
     name: Optional[str] = None
     locked: Optional[bool] = None
     opacity: Optional[float] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
 
 
 class LayerReorderDto(BaseModel):
@@ -37,6 +41,8 @@ class Layer(Base):
     locked = Column(Boolean, nullable=False, default=False)
     position = Column(Integer, nullable=False, default=0)
     opacity = Column(Float, nullable=False, default=1.0)
+    x = Column(Float, nullable=False, default=0.0)
+    y = Column(Float, nullable=False, default=0.0)
 
     room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
     room = relationship("Room", back_populates="layers")
@@ -56,4 +62,6 @@ class Layer(Base):
             position=self.position,
             room_id=self.room_id,
             opacity=self.opacity,
+            x=self.x,
+            y=self.y,
         )
