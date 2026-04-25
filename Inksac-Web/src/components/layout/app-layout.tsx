@@ -47,7 +47,7 @@ export const AppLayout = ({
   const opened = controlledOpened ?? internalOpened;
   const toggle = controlledToggle ?? internalToggle;
 
-  const showNavbar = !leftPanel && !!sidebarSlots;
+  const showNavbar = !leftPanel;
   const effectiveLeftPanelWidth = leftPanel ? leftPanelWidth : 0;
   const effectiveRightPanelWidth = rightPanel ? rightPanelWidth : 0;
   const mainContentWidth =
