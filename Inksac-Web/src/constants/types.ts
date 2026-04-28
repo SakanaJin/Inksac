@@ -164,12 +164,16 @@ export interface LayerGetDto {
   position: number;
   room_id: number;
   opacity: number;
+  x: number;
+  y: number;
 }
 
 export interface LayerUpdateDto {
   name?: string;
   locked?: boolean;
   opacity?: number;
+  x?: number;
+  y?: number;
 }
 
 export interface LayerCreateDto {

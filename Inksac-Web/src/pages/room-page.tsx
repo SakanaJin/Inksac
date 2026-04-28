@@ -33,6 +33,7 @@ export const RoomPage = () => {
   const drawerRef = useRef<DrawManager | null>(null);
   const pixiContainer = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const eyedropperPreviewRef = useRef<HTMLDivElement>(null);
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<pixi.Application | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -50,11 +51,11 @@ export const RoomPage = () => {
     registerExport,
     setHistoryState,
     color,
+    setColor,
     toggleSidebar,
     strokeScale,
     setStrokeScale,
     erase,
-    setErase,
     setUsers,
     addUser,
     removeUser,
@@ -75,6 +76,17 @@ export const RoomPage = () => {
     taperOutEnabled,
     taperOutDistance,
     taperOutEndSizePercent,
+    shapeType,
+    activeTool,
+    setActiveTool,
+    mirrorEnabled,
+    mirrorCenterX,
+    setMirrorCenterX,
+    mirrorCenterY,
+    setMirrorCenterY,
+    mirrorAngleDegrees,
+    mirrorAxes,
+    mirrorHandleVisible,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
@@ -95,9 +107,19 @@ export const RoomPage = () => {
   const taperOutEnabledRef = useRef(taperOutEnabled);
   const taperOutDistanceRef = useRef(taperOutDistance);
   const taperOutEndSizePercentRef = useRef(taperOutEndSizePercent);
+  const shapeTypeRef = useRef(shapeType);
+  const activeToolRef = useRef(activeTool);
+  const layersRef = useRef(layers);
+  const activeLayerIdRef = useRef(activeLayerId);
   const setBrushInUseRef = useRef(setBrushInUse);
   const exportModalOpenRef = useRef(false);
   const browserCursorRef = useRef<React.CSSProperties["cursor"]>("default");
+
+  const previousToolRef = useRef<
+    "brush" | "eraser" | "eyedropper" | "shapes" | "move"
+  >("brush");
+  const ctrlPressedRef = useRef(false);
+  const ctrlEyedropperActiveRef = useRef(false);
 
   const [spacePanActive, setSpacePanActive] = useState(false);
 
@@ -111,6 +133,16 @@ export const RoomPage = () => {
   const [cursorScale, setCursorScale] = useState(1);
   const [livePointerPressure, setLivePointerPressure] = useState(1);
   const [livePointerType, setLivePointerType] = useState("mouse");
+  const [hoverSampleColor, setHoverSampleColor] = useState<string | null>(null);
+
+  const isDraggingMirrorRef = useRef(false);
+
+  const isMovingLayerRef = useRef(false);
+  const movingLayerIdRef = useRef<number | null>(null);
+  const movePointerIdRef = useRef<number | null>(null);
+  const moveStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const moveStartLayerOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const moveDirtyRef = useRef(false);
 
   const isPanningRef = useRef(false);
   const isSpacePressedRef = useRef(false);
@@ -122,6 +154,13 @@ export const RoomPage = () => {
   const ZOOM_STEP = 1.1;
 
   const canShowCanvas = isCanvasDataReady && hasShownLoaderOnce;
+  const activeLayer =
+    activeLayerId !== null
+      ? (layers.find((layer) => layer.id === activeLayerId) ?? null)
+      : null;
+  const isActiveLayerMovable = Boolean(
+    activeLayer && activeLayer.visible && !activeLayer.locked,
+  );
 
   useEffect(() => {
     eraseRef.current = erase;
@@ -138,6 +177,10 @@ export const RoomPage = () => {
     taperOutEnabledRef.current = taperOutEnabled;
     taperOutDistanceRef.current = taperOutDistance;
     taperOutEndSizePercentRef.current = taperOutEndSizePercent;
+    shapeTypeRef.current = shapeType;
+    activeToolRef.current = activeTool;
+    layersRef.current = layers;
+    activeLayerIdRef.current = activeLayerId;
   }, [
     erase,
     smoothingEnabled,
@@ -153,11 +196,41 @@ export const RoomPage = () => {
     taperOutEnabled,
     taperOutDistance,
     taperOutEndSizePercent,
+    shapeType,
+    activeTool,
+    layers,
+    activeLayerId,
   ]);
 
   useEffect(() => {
     setBrushInUseRef.current = setBrushInUse;
   }, [setBrushInUse]);
+
+  useEffect(() => {
+    if (!eyedropperPreviewRef.current) return;
+
+    eyedropperPreviewRef.current.style.display =
+      activeTool === "eyedropper" &&
+      isHoveringCanvas &&
+      isOverDrawableArea &&
+      !spacePanActive &&
+      !isPanningRef.current &&
+      hoverSampleColor
+        ? "block"
+        : "none";
+  }, [
+    activeTool,
+    isHoveringCanvas,
+    isOverDrawableArea,
+    spacePanActive,
+    hoverSampleColor,
+  ]);
+
+  useEffect(() => {
+    if (!eyedropperPreviewRef.current) return;
+    eyedropperPreviewRef.current.style.background =
+      hoverSampleColor ?? "transparent";
+  }, [hoverSampleColor]);
 
   const refreshCursorScale = () => {
     const nextScale = drawerRef.current?.getWorldContainer().scale.x ?? 1;
@@ -197,6 +270,213 @@ export const RoomPage = () => {
     };
   };
 
+  const getActiveLayerOutlineRect = () => {
+    if (!drawerRef.current || !activeLayer || !activeLayer.visible) return null;
+
+    return drawerRef.current.getLayerOutlineScreenRect(activeLayer.id);
+  };
+
+  const getBoardPointFromClient = (clientX: number, clientY: number) => {
+    if (!drawerRef.current || !pixiContainer.current) return null;
+
+    const rect = pixiContainer.current.getBoundingClientRect();
+    const globalPoint = new pixi.Point(clientX - rect.left, clientY - rect.top);
+
+    return drawerRef.current.getWorldContainer().toLocal(globalPoint);
+  };
+
+  const beginLayerMove = (
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+  ) => {
+    const activeLayerId = activeLayerIdRef.current;
+    if (activeLayerId === null) return false;
+
+    const activeLayer = layersRef.current.find(
+      (layer) => layer.id === activeLayerId,
+    );
+    if (!activeLayer || !activeLayer.visible || activeLayer.locked) {
+      return false;
+    }
+
+    const boardPoint = getBoardPointFromClient(clientX, clientY);
+    if (!boardPoint) return false;
+
+    isMovingLayerRef.current = true;
+    movingLayerIdRef.current = activeLayerId;
+    movePointerIdRef.current = pointerId;
+    moveStartPointerRef.current = { x: boardPoint.x, y: boardPoint.y };
+    moveStartLayerOffsetRef.current = {
+      x: activeLayer.x ?? 0,
+      y: activeLayer.y ?? 0,
+    };
+    moveDirtyRef.current = false;
+    browserCursorRef.current = "grabbing";
+    syncCanvasCursor();
+    return true;
+  };
+
+  const updateMovingLayerFromClientPoint = (
+    clientX: number,
+    clientY: number,
+  ) => {
+    if (!isMovingLayerRef.current || movingLayerIdRef.current === null) return;
+
+    const boardPoint = getBoardPointFromClient(clientX, clientY);
+    const startPointer = moveStartPointerRef.current;
+    const startOffset = moveStartLayerOffsetRef.current;
+
+    if (!boardPoint || !startPointer || !startOffset) return;
+
+    const nextX = startOffset.x + (boardPoint.x - startPointer.x);
+    const nextY = startOffset.y + (boardPoint.y - startPointer.y);
+
+    moveDirtyRef.current = true;
+
+    const nextLayers = layersRef.current.map((layer) =>
+      layer.id === movingLayerIdRef.current
+        ? { ...layer, x: nextX, y: nextY }
+        : layer,
+    );
+
+    layersRef.current = nextLayers;
+    setLayers(nextLayers);
+  };
+
+  const endLayerMove = async () => {
+    const movingLayerId = movingLayerIdRef.current;
+    const didMove = moveDirtyRef.current;
+
+    isMovingLayerRef.current = false;
+    movingLayerIdRef.current = null;
+    movePointerIdRef.current = null;
+    moveStartPointerRef.current = null;
+    moveStartLayerOffsetRef.current = null;
+    moveDirtyRef.current = false;
+    browserCursorRef.current =
+      activeToolRef.current === "move" ? "grab" : "default";
+    syncCanvasCursor();
+
+    if (!didMove || movingLayerId === null) return;
+
+    const movedLayer = layersRef.current.find(
+      (layer) => layer.id === movingLayerId,
+    );
+    if (!movedLayer) return;
+
+    try {
+      await api.patch<LayerGetDto[]>(`/layers/${movingLayerId}`, {
+        x: movedLayer.x,
+        y: movedLayer.y,
+      });
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "Could not move layer",
+        color: "red",
+      });
+    }
+  };
+
+  const getMirrorScreenMetrics = () => {
+    if (!drawerRef.current) return null;
+
+    const world = drawerRef.current.getWorldContainer();
+    const { width: canvasWidth, height: canvasHeight } =
+      drawerRef.current.getCanvasSize();
+
+    const scaledWidth = canvasWidth * world.scale.x;
+    const scaledHeight = canvasHeight * world.scale.y;
+    const left = world.position.x;
+    const top = world.position.y;
+    const right = left + scaledWidth;
+    const bottom = top + scaledHeight;
+    const centerX = left + mirrorCenterX * scaledWidth;
+    const centerY = top + mirrorCenterY * scaledHeight;
+
+    const getAxisSegment = (angleDegrees: number) => {
+      const radians = (angleDegrees * Math.PI) / 180;
+      const dx = Math.cos(radians);
+      const dy = Math.sin(radians);
+      const intersections: { x: number; y: number; t: number }[] = [];
+
+      const addIntersection = (t: number) => {
+        const x = centerX + dx * t;
+        const y = centerY + dy * t;
+        const epsilon = 0.001;
+
+        if (
+          x >= left - epsilon &&
+          x <= right + epsilon &&
+          y >= top - epsilon &&
+          y <= bottom + epsilon
+        ) {
+          intersections.push({
+            x: Math.max(left, Math.min(right, x)),
+            y: Math.max(top, Math.min(bottom, y)),
+            t,
+          });
+        }
+      };
+
+      if (Math.abs(dx) > 0.000001) {
+        addIntersection((left - centerX) / dx);
+        addIntersection((right - centerX) / dx);
+      }
+
+      if (Math.abs(dy) > 0.000001) {
+        addIntersection((top - centerY) / dy);
+        addIntersection((bottom - centerY) / dy);
+      }
+
+      const unique = intersections.filter((intersection, index, array) => {
+        return (
+          array.findIndex(
+            (candidate) =>
+              Math.abs(candidate.x - intersection.x) < 0.01 &&
+              Math.abs(candidate.y - intersection.y) < 0.01,
+          ) === index
+        );
+      });
+
+      if (unique.length < 2) {
+        return null;
+      }
+
+      unique.sort((a, b) => a.t - b.t);
+      const start = unique[0];
+      const end = unique[unique.length - 1];
+
+      return {
+        left: start.x,
+        top: start.y,
+        width: Math.hypot(end.x - start.x, end.y - start.y),
+        angleDegrees,
+      };
+    };
+
+    return {
+      centerX,
+      centerY,
+      angleDegrees: mirrorAngleDegrees,
+      secondaryAngleDegrees: mirrorAngleDegrees + 90,
+      primarySegment: getAxisSegment(mirrorAngleDegrees),
+      secondarySegment: getAxisSegment(mirrorAngleDegrees + 90),
+    };
+  };
+
+  const updateMirrorFromClientPoint = (clientX: number, clientY: number) => {
+    const drawableRect = getDrawableScreenRect();
+    if (!drawableRect) return;
+
+    const xRatio = (clientX - drawableRect.left) / drawableRect.width;
+    const yRatio = (clientY - drawableRect.top) / drawableRect.height;
+
+    setMirrorCenterX(Math.max(0, Math.min(1, xRatio)));
+    setMirrorCenterY(Math.max(0, Math.min(1, yRatio)));
+  };
+
   const updateCursorTrackingFromClientPoint = (
     clientX: number,
     clientY: number,
@@ -206,11 +486,17 @@ export const RoomPage = () => {
     if (!pixiContainer.current) return;
 
     const rect = pixiContainer.current.getBoundingClientRect();
+    const nextX = clientX - rect.left;
+    const nextY = clientY - rect.top;
 
     setCursorPos({
-      x: clientX - rect.left,
-      y: clientY - rect.top,
+      x: nextX,
+      y: nextY,
     });
+
+    if (eyedropperPreviewRef.current) {
+      eyedropperPreviewRef.current.style.transform = `translate3d(${nextX + 10}px, ${nextY - 24}px, 0)`;
+    }
 
     if (typeof pressure === "number") {
       setLivePointerPressure(pressure > 0 ? pressure : 1);
@@ -241,15 +527,31 @@ export const RoomPage = () => {
     isHoveringCanvas &&
     isOverDrawableArea &&
     !spacePanActive &&
-    !isPanningRef.current;
+    !isPanningRef.current &&
+    !isMovingLayerRef.current &&
+    activeTool !== "eyedropper" &&
+    activeTool !== "shapes" &&
+    activeTool !== "move";
 
   const browserCursor: React.CSSProperties["cursor"] = isPanningRef.current
     ? "grabbing"
     : isSpacePressedRef.current
       ? "grab"
-      : shouldShowBrushCursor
-        ? "none"
-        : "default";
+      : canShowCanvas &&
+          isHoveringCanvas &&
+          isOverDrawableArea &&
+          activeTool === "eyedropper"
+        ? "crosshair"
+        : canShowCanvas &&
+            isHoveringCanvas &&
+            isOverDrawableArea &&
+            activeTool === "move"
+          ? isMovingLayerRef.current
+            ? "grabbing"
+            : "grab"
+          : shouldShowBrushCursor
+            ? "none"
+            : "default";
 
   const syncCanvasCursor = () => {
     const currentCursor = browserCursorRef.current;
@@ -436,6 +738,25 @@ export const RoomPage = () => {
   ]);
 
   useEffect(() => {
+    if (!drawerRef.current) return;
+
+    const { width, height } = drawerRef.current.getCanvasSize();
+    drawerRef.current.setMirror({
+      enabled: mirrorEnabled,
+      centerX: mirrorCenterX * width,
+      centerY: mirrorCenterY * height,
+      angleDegrees: mirrorAngleDegrees,
+      axes: mirrorAxes,
+    });
+  }, [
+    mirrorEnabled,
+    mirrorCenterX,
+    mirrorCenterY,
+    mirrorAngleDegrees,
+    mirrorAxes,
+  ]);
+
+  useEffect(() => {
     drawerRef.current?.setColor(color);
     colorRef.current = color;
   }, [color]);
@@ -450,6 +771,8 @@ export const RoomPage = () => {
     if (!drawerRef.current) return;
 
     drawerRef.current.setErase(erase);
+    drawerRef.current.setActiveTool(activeTool);
+    drawerRef.current.setShapeType(shapeType);
     drawerRef.current.setSmoothing(smoothingEnabled, smoothingStrength);
     drawerRef.current.setPressureSettings(
       pressureEnabled,
@@ -472,6 +795,8 @@ export const RoomPage = () => {
     );
   }, [
     erase,
+    activeTool,
+    shapeType,
     smoothingEnabled,
     smoothingStrength,
     pressureEnabled,
@@ -508,6 +833,7 @@ export const RoomPage = () => {
     isOverDrawableArea,
     spacePanActive,
     erase,
+    activeTool,
     activeBrush,
     strokeScale,
     cursorScale,
@@ -516,6 +842,7 @@ export const RoomPage = () => {
     pressureSensitivity,
     livePointerPressure,
     livePointerType,
+    hoverSampleColor,
   ]);
 
   useEffect(() => {
@@ -559,9 +886,23 @@ export const RoomPage = () => {
         return;
       }
 
+      if (e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setActiveTool("brush");
+        return;
+      }
+
       if (e.key.toLowerCase() === "e") {
         e.preventDefault();
-        setErase(!erase);
+        setActiveTool("eraser");
+        return;
+      }
+
+      if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        if (isActiveLayerMovable) {
+          setActiveTool("move");
+        }
         return;
       }
 
@@ -587,6 +928,20 @@ export const RoomPage = () => {
           syncCanvasCursor();
         }
       }
+
+      if (e.key === "Control") {
+        if (!ctrlPressedRef.current) {
+          ctrlPressedRef.current = true;
+
+          if (activeToolRef.current !== "eyedropper") {
+            ctrlEyedropperActiveRef.current = true;
+            previousToolRef.current = activeToolRef.current;
+            setActiveTool("eyedropper");
+          }
+        }
+
+        return;
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -595,12 +950,32 @@ export const RoomPage = () => {
         setSpacePanActive(false);
         endPan();
       }
+
+      if (e.key === "Control") {
+        ctrlPressedRef.current = false;
+
+        if (ctrlEyedropperActiveRef.current) {
+          ctrlEyedropperActiveRef.current = false;
+          setActiveTool(previousToolRef.current);
+        }
+
+        setHoverSampleColor(null);
+      }
     };
 
     const handleWindowBlur = () => {
       isSpacePressedRef.current = false;
       setSpacePanActive(false);
       endPan();
+
+      ctrlPressedRef.current = false;
+
+      if (ctrlEyedropperActiveRef.current) {
+        ctrlEyedropperActiveRef.current = false;
+        setActiveTool(previousToolRef.current);
+      }
+
+      setHoverSampleColor(null);
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -612,7 +987,13 @@ export const RoomPage = () => {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [toggleSidebar, erase, setErase, strokeScale, setStrokeScale]);
+  }, [
+    toggleSidebar,
+    strokeScale,
+    setStrokeScale,
+    setActiveTool,
+    isActiveLayerMovable,
+  ]);
 
   useEffect(() => {
     drawerRef.current?.setStrokeScale(strokeScale);
@@ -729,6 +1110,32 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerMoveForPan = (e: PointerEvent) => {
+      if (isMovingLayerRef.current) {
+        if (movePointerIdRef.current !== e.pointerId) {
+          return;
+        }
+
+        updateMovingLayerFromClientPoint(e.clientX, e.clientY);
+        updateCursorTrackingFromClientPoint(
+          e.clientX,
+          e.clientY,
+          e.pressure,
+          e.pointerType,
+        );
+        return;
+      }
+
+      if (isDraggingMirrorRef.current) {
+        updateMirrorFromClientPoint(e.clientX, e.clientY);
+        updateCursorTrackingFromClientPoint(
+          e.clientX,
+          e.clientY,
+          e.pressure,
+          e.pointerType,
+        );
+        return;
+      }
+
       if (
         !drawerRef.current ||
         !isPanningRef.current ||
@@ -756,6 +1163,22 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerUpForPan = (e: PointerEvent) => {
+      if (isMovingLayerRef.current) {
+        if (movePointerIdRef.current !== e.pointerId) {
+          return;
+        }
+
+        updateMovingLayerFromClientPoint(e.clientX, e.clientY);
+        void endLayerMove();
+        return;
+      }
+
+      if (isDraggingMirrorRef.current) {
+        updateMirrorFromClientPoint(e.clientX, e.clientY);
+        isDraggingMirrorRef.current = false;
+        return;
+      }
+
       if (!isPanningRef.current || panPointerIdRef.current !== e.pointerId) {
         return;
       }
@@ -770,6 +1193,20 @@ export const RoomPage = () => {
     };
 
     const handleWindowPointerCancelForPan = (e: PointerEvent) => {
+      if (isMovingLayerRef.current) {
+        if (movePointerIdRef.current !== e.pointerId) {
+          return;
+        }
+
+        void endLayerMove();
+        return;
+      }
+
+      if (isDraggingMirrorRef.current) {
+        isDraggingMirrorRef.current = false;
+        return;
+      }
+
       if (!isPanningRef.current || panPointerIdRef.current !== e.pointerId) {
         return;
       }
@@ -835,6 +1272,7 @@ export const RoomPage = () => {
       setIsOverDrawableArea(false);
       setLivePointerPressure(1);
       setLivePointerType("mouse");
+      setHoverSampleColor(null);
       syncCanvasCursor();
     };
 
@@ -845,6 +1283,21 @@ export const RoomPage = () => {
         e.pressure,
         e.pointerType,
       );
+
+      if (activeToolRef.current === "eyedropper") {
+        void (async () => {
+          const sampledColor =
+            await drawerRef.current?.sampleColorAtClientPoint(
+              e.clientX,
+              e.clientY,
+            );
+
+          setHoverSampleColor(sampledColor ?? null);
+        })();
+      } else {
+        setHoverSampleColor(null);
+      }
+
       syncCanvasCursor();
     };
 
@@ -860,6 +1313,46 @@ export const RoomPage = () => {
         e.preventDefault();
         e.stopPropagation();
         beginPan(e.pointerId, e.clientX, e.clientY);
+        return;
+      }
+
+      if (activeToolRef.current === "move" && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        beginLayerMove(e.pointerId, e.clientX, e.clientY);
+        return;
+      }
+
+      if (activeToolRef.current === "eyedropper" && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        void (async () => {
+          const sampledColor =
+            await drawerRef.current?.sampleColorAtClientPoint(
+              e.clientX,
+              e.clientY,
+            );
+
+          if (!sampledColor) {
+            return;
+          }
+
+          const currentAlpha = colorRef.current.slice(7, 9) || "ff";
+          const sampledRgb = sampledColor.slice(0, 7);
+          setColor(`${sampledRgb}${currentAlpha}`);
+
+          if (ctrlEyedropperActiveRef.current) {
+            ctrlEyedropperActiveRef.current = false;
+            ctrlPressedRef.current = false;
+            setActiveTool(previousToolRef.current);
+            setHoverSampleColor(null);
+          } else {
+            setActiveTool("brush");
+          }
+        })();
+
+        return;
       }
     };
 
@@ -939,6 +1432,8 @@ export const RoomPage = () => {
         drawer.setColor(colorRef.current);
         drawer.setStrokeScale(strokeScaleRef.current);
         drawer.setErase(eraseRef.current);
+        drawer.setActiveTool(activeToolRef.current);
+        drawer.setShapeType(shapeTypeRef.current);
         drawer.setSmoothing(
           smoothingEnabledRef.current,
           smoothingStrengthRef.current,
@@ -962,6 +1457,13 @@ export const RoomPage = () => {
           taperOutDistanceRef.current,
           taperOutEndSizePercentRef.current,
         );
+        drawer.setMirror({
+          enabled: mirrorEnabled,
+          centerX: mirrorCenterX * room.width,
+          centerY: mirrorCenterY * room.height,
+          angleDegrees: mirrorAngleDegrees,
+          axes: mirrorAxes,
+        });
         drawer.setOnStroke((brushId) => {
           setBrushInUseRef.current(brushId);
           refreshHistoryState();
@@ -1079,6 +1581,7 @@ export const RoomPage = () => {
         );
       }
 
+      isMovingLayerRef.current = false;
       wsRef.current?.close();
       wsRef.current = null;
 
@@ -1122,6 +1625,33 @@ export const RoomPage = () => {
           cursor: browserCursor,
         }}
       />
+
+      {canShowCanvas && activeTool === "move" && isActiveLayerMovable
+        ? (() => {
+            const outlineRect = getActiveLayerOutlineRect();
+
+            if (!outlineRect) {
+              return null;
+            }
+
+            return (
+              <Box
+                style={{
+                  position: "absolute",
+                  left: outlineRect.left,
+                  top: outlineRect.top,
+                  width: outlineRect.width,
+                  height: outlineRect.height,
+                  border: "2px dotted rgba(59, 130, 246, 0.96)",
+                  boxShadow: "0 0 0 1px rgba(10, 25, 48, 0.75)",
+                  pointerEvents: "none",
+                  zIndex: 130,
+                  boxSizing: "border-box",
+                }}
+              />
+            );
+          })()
+        : null}
 
       {shouldShowBrushCursor ? (
         <Box
@@ -1173,6 +1703,133 @@ export const RoomPage = () => {
           />
         </Box>
       ) : null}
+
+      <Box
+        ref={eyedropperPreviewRef}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: 16,
+          height: 16,
+          background: hoverSampleColor ?? "transparent",
+          border: "1px solid white",
+          boxShadow: "0 0 0 1px black",
+          pointerEvents: "none",
+          zIndex: 10000,
+          display: "none",
+          willChange: "transform",
+        }}
+      />
+
+      {canShowCanvas && mirrorEnabled
+        ? (() => {
+            const mirrorMetrics = getMirrorScreenMetrics();
+
+            if (!mirrorMetrics) {
+              return null;
+            }
+
+            const renderMirrorLine = (
+              segment: {
+                left: number;
+                top: number;
+                width: number;
+                angleDegrees: number;
+              } | null,
+              key: string,
+            ) => {
+              if (!segment || segment.width <= 0) {
+                return null;
+              }
+
+              return (
+                <>
+                  <Box
+                    key={`${key}-dark`}
+                    style={{
+                      position: "absolute",
+                      left: segment.left,
+                      top: segment.top,
+                      width: segment.width,
+                      height: 0,
+                      borderTop: "1px dotted rgba(0,0,0,0.78)",
+                      pointerEvents: "none",
+                      zIndex: 120,
+                      transform: `rotate(${segment.angleDegrees}deg)`,
+                      transformOrigin: "0 0",
+                    }}
+                  />
+
+                  <Box
+                    key={`${key}-light`}
+                    style={{
+                      position: "absolute",
+                      left: segment.left,
+                      top: segment.top,
+                      width: segment.width,
+                      height: 0,
+                      borderTop: "1px dotted rgba(255,255,255,0.96)",
+                      pointerEvents: "none",
+                      zIndex: 121,
+                      transform: `translateY(-1px) rotate(${segment.angleDegrees}deg)`,
+                      transformOrigin: "0 0",
+                    }}
+                  />
+                </>
+              );
+            };
+
+            return (
+              <>
+                {renderMirrorLine(mirrorMetrics.primarySegment, "primary")}
+                {mirrorAxes === 2
+                  ? renderMirrorLine(
+                      mirrorMetrics.secondarySegment,
+                      "secondary",
+                    )
+                  : null}
+
+                {mirrorHandleVisible ? (
+                  <Box
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      isDraggingMirrorRef.current = true;
+                      updateMirrorFromClientPoint(e.clientX, e.clientY);
+                    }}
+                    style={{
+                      position: "absolute",
+                      left: mirrorMetrics.centerX,
+                      top: mirrorMetrics.centerY,
+                      width: 18,
+                      height: 18,
+                      transform: "translate(-50%, -50%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "move",
+                      zIndex: 122,
+                    }}
+                  >
+                    <Box
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        border: "1px solid rgba(255,255,255,0.98)",
+                        background: "rgba(34, 139, 230, 0.96)",
+                        boxShadow:
+                          "0 0 0 1px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(255,255,255,0.18)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  </Box>
+                ) : null}
+              </>
+            );
+          })()
+        : null}
 
       {canShowCanvas && spacePanActive ? (
         <Box

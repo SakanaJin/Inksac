@@ -15,7 +15,6 @@ import {
   Group,
   Menu,
   Modal,
-  NumberInput,
   Paper,
   Slider,
   Stack,
@@ -36,11 +35,17 @@ import {
   IconX,
   IconSettings,
   IconDots,
+  IconAdjustments,
+  IconLine,
+  IconSquare,
+  IconHome,
+  IconCircle,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
 import { BrushSidePanel } from "../brushes/brush-side-panel";
 import { LayerSidePanel } from "../layers/layer-side-panel";
+import { RoomToolToolbar } from "../room-tools/room-tool-toolbar";
 import {
   type UserGetDto,
   type BrushGetDto,
@@ -51,6 +56,9 @@ import {
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
 import { UserAvatars } from "../room-tools/UserAvatars";
+
+type ToolType = "brush" | "eraser" | "eyedropper" | "shapes" | "move";
+export type ShapeType = "line" | "rectangle" | "ellipse";
 
 type RoomLayoutContextValue = {
   registerBrushSelect: (fn: (brush: BrushGetDto) => void) => void;
@@ -65,6 +73,10 @@ type RoomLayoutContextValue = {
   toggleSidebar: () => void;
   registerSetErase: (fn: (erase: boolean) => void) => void;
   setErase: (erase: boolean) => void;
+  activeTool: ToolType;
+  setActiveTool: (tool: ToolType) => void;
+  shapeType: ShapeType;
+  setShapeType: (shapeType: ShapeType) => void;
   color: string;
   erase: boolean;
   setStrokeScale: (strokeScale: number) => void;
@@ -105,6 +117,20 @@ type RoomLayoutContextValue = {
   setTaperOutDistance: (value: number) => void;
   taperOutEndSizePercent: number;
   setTaperOutEndSizePercent: (value: number) => void;
+  mirrorEnabled: boolean;
+  setMirrorEnabled: (enabled: boolean) => void;
+  mirrorCenterX: number;
+  setMirrorCenterX: (x: number) => void;
+  mirrorCenterY: number;
+  setMirrorCenterY: (y: number) => void;
+  mirrorAngleDegrees: number;
+  setMirrorAngleDegrees: (angle: number) => void;
+  mirrorAxes: 1 | 2;
+  setMirrorAxes: (axes: 1 | 2) => void;
+  mirrorHandleVisible: boolean;
+  setMirrorHandleVisible: (visible: boolean) => void;
+  isActiveLayerMovable: boolean;
+  moveToolDisabledReason: string | null;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -118,6 +144,10 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setColor: () => {},
   registerSetErase: () => {},
   setErase: () => {},
+  activeTool: "brush",
+  setActiveTool: () => {},
+  shapeType: "line",
+  setShapeType: () => {},
   color: "#ffffffff",
   toggleSidebar: () => {},
   erase: false,
@@ -157,6 +187,20 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setTaperOutDistance: () => {},
   taperOutEndSizePercent: 5,
   setTaperOutEndSizePercent: () => {},
+  mirrorEnabled: false,
+  setMirrorEnabled: () => {},
+  mirrorCenterX: 0.5,
+  setMirrorCenterX: () => {},
+  mirrorCenterY: 0.5,
+  setMirrorCenterY: () => {},
+  mirrorAngleDegrees: 90,
+  setMirrorAngleDegrees: () => {},
+  mirrorAxes: 1,
+  setMirrorAxes: () => {},
+  mirrorHandleVisible: true,
+  setMirrorHandleVisible: () => {},
+  isActiveLayerMovable: false,
+  moveToolDisabledReason: null,
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -571,6 +615,8 @@ export function RoomLayout() {
   const [canRedo, setCanRedo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [erase, setEraseState] = useState(false);
+  const [activeToolState, setActiveToolState] = useState<ToolType>("brush");
+  const [shapeType, setShapeType] = useState<ShapeType>("line");
   const [strokeScale, setStrokeScale] = useState(16);
   const [users, setUsers] = useState<UserGetDto[]>([]);
   const [layers, setLayersState] = useState<ClientLayerDto[]>([]);
@@ -580,6 +626,7 @@ export function RoomLayout() {
   const [smoothingStrength, setSmoothingStrength] = useState(35);
   const [smoothingModalOpen, setSmoothingModalOpen] = useState(false);
   const [optionsMenuOpened, setOptionsMenuOpened] = useState(false);
+  const [toolSettingsMenuOpened, setToolSettingsMenuOpened] = useState(false);
 
   const [pressureEnabled, setPressureEnabled] = useState(true);
   const [pressureMinSize, setPressureMinSize] = useState(10);
@@ -598,6 +645,27 @@ export function RoomLayout() {
   const [taperOutDistance, setTaperOutDistance] = useState(32);
   const [taperOutEndSizePercent, setTaperOutEndSizePercent] = useState(5);
   const [taperModalOpen, setTaperModalOpen] = useState(false);
+  const [mirrorEnabled, setMirrorEnabled] = useState(false);
+  const [mirrorCenterX, setMirrorCenterX] = useState(0.5);
+  const [mirrorCenterY, setMirrorCenterY] = useState(0.5);
+  const [mirrorAngleDegrees, setMirrorAngleDegrees] = useState(90);
+  const [mirrorAxes, setMirrorAxes] = useState<1 | 2>(1);
+  const [mirrorHandleVisible, setMirrorHandleVisible] = useState(true);
+
+  const leftPanelContentRef = useRef<HTMLDivElement | null>(null);
+  const brushPanelResizeStateRef = useRef<{
+    startY: number;
+    startHeight: number;
+  } | null>(null);
+  const hasInitializedBrushSplitRef = useRef(false);
+
+  const BRUSH_TOOLS_MIN_HEIGHT = 190;
+  const BRUSH_TOOLS_MAX_HEIGHT = 360;
+  const BRUSH_LIBRARY_MIN_HEIGHT = 0;
+  const BRUSH_SECTION_DIVIDER_HEIGHT = 12;
+
+  const [brushToolsHeight, setBrushToolsHeight] = useState(220);
+  const [isResizingBrushSections, setIsResizingBrushSections] = useState(false);
 
   function resetPressureDefaults() {
     setPressureEnabled(true);
@@ -912,6 +980,31 @@ export function RoomLayout() {
     [canManageLayers, setLayers],
   );
 
+  const [onSetErase, setOnSetErase] = useState<
+    ((erase: boolean) => void) | null
+  >(null);
+
+  const activeLayer =
+    layers.find((layer) => layer.id === activeLayerId) ?? null;
+  const isActiveLayerMovable = Boolean(
+    activeLayer && activeLayer.visible && !activeLayer.locked,
+  );
+  const moveToolDisabledReason = !activeLayer
+    ? "Select a layer first"
+    : !activeLayer.visible
+      ? "The active layer is hidden"
+      : activeLayer.locked
+        ? "The active layer is locked"
+        : null;
+
+  useEffect(() => {
+    if (activeToolState === "move" && !isActiveLayerMovable) {
+      setActiveToolState("brush");
+      setEraseState(false);
+      onSetErase?.(false);
+    }
+  }, [activeToolState, isActiveLayerMovable, onSetErase]);
+
   const onStrokeRef = useRef<((brushId: number) => void) | null>(null);
   const navigate = useNavigate();
 
@@ -923,10 +1016,6 @@ export function RoomLayout() {
     onStrokeRef.current = fn;
   }, []);
 
-  const [onSetErase, setOnSetErase] = useState<
-    ((erase: boolean) => void) | null
-  >(null);
-
   const registerSetErase = useCallback((fn: (erase: boolean) => void) => {
     setOnSetErase(() => fn);
   }, []);
@@ -934,7 +1023,18 @@ export function RoomLayout() {
   const setErase = useCallback(
     (erase: boolean) => {
       setEraseState(erase);
+      setActiveToolState(erase ? "eraser" : "brush");
       onSetErase?.(erase);
+    },
+    [onSetErase],
+  );
+
+  const setActiveTool = useCallback(
+    (tool: ToolType) => {
+      setActiveToolState(tool);
+      const nextErase = tool === "eraser";
+      setEraseState(nextErase);
+      onSetErase?.(nextErase);
     },
     [onSetErase],
   );
@@ -998,6 +1098,107 @@ export function RoomLayout() {
     setLayersPanelOpen((prev) => !prev);
   }
 
+  const snapMirrorToCenter = useCallback(() => {
+    setMirrorCenterX(0.5);
+    setMirrorCenterY(0.5);
+  }, []);
+
+  const clampBrushToolsHeight = useCallback((nextHeight: number) => {
+    const containerHeight = leftPanelContentRef.current?.clientHeight ?? 0;
+
+    const boundedByPreset = Math.max(
+      BRUSH_TOOLS_MIN_HEIGHT,
+      Math.min(BRUSH_TOOLS_MAX_HEIGHT, nextHeight),
+    );
+
+    if (containerHeight <= 0) {
+      return boundedByPreset;
+    }
+
+    const maxHeightFromContainer = Math.max(
+      BRUSH_TOOLS_MIN_HEIGHT,
+      containerHeight - BRUSH_LIBRARY_MIN_HEIGHT - BRUSH_SECTION_DIVIDER_HEIGHT,
+    );
+
+    return Math.min(boundedByPreset, maxHeightFromContainer);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const container = leftPanelContentRef.current;
+    if (!container) return;
+
+    const syncBrushSplit = () => {
+      const height = container.clientHeight;
+      if (height <= 0) return;
+
+      if (!hasInitializedBrushSplitRef.current) {
+        hasInitializedBrushSplitRef.current = true;
+        setBrushToolsHeight(clampBrushToolsHeight(220));
+        return;
+      }
+
+      setBrushToolsHeight((prev) => clampBrushToolsHeight(prev));
+    };
+
+    syncBrushSplit();
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncBrushSplit();
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [sidebarOpen, clampBrushToolsHeight]);
+
+  useEffect(() => {
+    if (!isResizingBrushSections) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const resizeState = brushPanelResizeStateRef.current;
+      if (!resizeState) return;
+
+      const deltaY = event.clientY - resizeState.startY;
+      setBrushToolsHeight(
+        clampBrushToolsHeight(resizeState.startHeight + deltaY),
+      );
+    };
+
+    const handlePointerUp = () => {
+      brushPanelResizeStateRef.current = null;
+      setIsResizingBrushSections(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isResizingBrushSections, clampBrushToolsHeight]);
+
+  const handleBrushSectionResizeStart = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    brushPanelResizeStateRef.current = {
+      startY: event.clientY,
+      startHeight: brushToolsHeight,
+    };
+
+    setIsResizingBrushSections(true);
+  };
+
+  const leftPanelWidth = sidebarOpen ? 340 : 0;
+  const toolbarLeftOffset = sidebarOpen ? 340 + 16 : 16;
+
   return (
     <RoomLayoutContext.Provider
       value={{
@@ -1013,6 +1214,10 @@ export function RoomLayout() {
         setColor,
         toggleSidebar,
         setErase,
+        activeTool: activeToolState,
+        setActiveTool,
+        shapeType,
+        setShapeType,
         color,
         erase,
         setStrokeScale,
@@ -1050,6 +1255,20 @@ export function RoomLayout() {
         setTaperOutDistance,
         taperOutEndSizePercent,
         setTaperOutEndSizePercent,
+        mirrorEnabled,
+        setMirrorEnabled,
+        mirrorCenterX,
+        setMirrorCenterX,
+        mirrorCenterY,
+        setMirrorCenterY,
+        mirrorAngleDegrees,
+        setMirrorAngleDegrees,
+        mirrorAxes,
+        setMirrorAxes,
+        mirrorHandleVisible,
+        setMirrorHandleVisible,
+        isActiveLayerMovable,
+        moveToolDisabledReason,
       }}
     >
       <Modal
@@ -1409,6 +1628,103 @@ export function RoomLayout() {
         headerTitle={roomName}
         headerActions={
           <Group gap="xs">
+            {mirrorEnabled ? (
+              <Menu
+                shadow="sm"
+                width={300}
+                position="bottom-end"
+                withinPortal
+                opened={toolSettingsMenuOpened}
+                onChange={setToolSettingsMenuOpened}
+              >
+                <Menu.Target>
+                  <Tooltip label="Tool settings">
+                    <ActionIcon variant="subtle" size="lg" radius={0}>
+                      <IconAdjustments size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Menu.Target>
+
+                <Menu.Dropdown>
+                  <Box p="xs">
+                    <Text size="sm" fw={600} mb={8}>
+                      Mirror settings
+                    </Text>
+
+                    <Button
+                      size="xs"
+                      variant="default"
+                      fullWidth
+                      onClick={snapMirrorToCenter}
+                    >
+                      Snap to center
+                    </Button>
+
+                    <Box mt="sm">
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={500}>
+                          Axis rotation
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {mirrorAngleDegrees}°
+                        </Text>
+                      </Group>
+
+                      <Slider
+                        min={0}
+                        max={359}
+                        step={1}
+                        value={mirrorAngleDegrees}
+                        onChange={setMirrorAngleDegrees}
+                      />
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Rotates the mirror axis around its center point.
+                      </Text>
+                    </Box>
+
+                    <Box mt="sm">
+                      <Text size="sm" fw={500} mb={6}>
+                        Mirror axes
+                      </Text>
+                      <Group grow>
+                        <Button
+                          size="xs"
+                          variant={mirrorAxes === 1 ? "filled" : "default"}
+                          onClick={() => setMirrorAxes(1)}
+                          leftSection={<IconLine size={14} />}
+                        >
+                          1 axis
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant={mirrorAxes === 2 ? "filled" : "default"}
+                          onClick={() => setMirrorAxes(2)}
+                          leftSection={<IconCircle size={14} />}
+                        >
+                          2 axes
+                        </Button>
+                      </Group>
+
+                      <Text size="xs" c="dimmed" mt={8}>
+                        Two axes adds a second perpendicular mirror line and
+                        creates the extra mirrored copies.
+                      </Text>
+                    </Box>
+
+                    <Switch
+                      mt="sm"
+                      checked={mirrorHandleVisible}
+                      onChange={(event) =>
+                        setMirrorHandleVisible(event.currentTarget.checked)
+                      }
+                      label="Show move handle"
+                    />
+                  </Box>
+                </Menu.Dropdown>
+              </Menu>
+            ) : null}
+
             <Menu
               shadow="sm"
               width={280}
@@ -1546,7 +1862,9 @@ export function RoomLayout() {
                   </div>
                   <div>Ctrl+Z - Undo</div>
                   <div>Ctrl+Shift+Z - Redo</div>
-                  <div>E - Toggle eraser</div>
+                  <div>B - Brush</div>
+                  <div>E - Eraser</div>
+                  <div>Ctrl+Left Click - Eyedropper</div>
                   <div>[ - Decrease brush size</div>
                   <div>] - Increase brush size</div>
                   <div>Ctrl+S - Open export modal</div>
@@ -1555,7 +1873,17 @@ export function RoomLayout() {
                 </div>
               }
             >
-              <ActionIcon variant="subtle" size="lg" radius={0} c="gray.5">
+              <ActionIcon
+                color="grey.5"
+                variant="subtle"
+                styles={{
+                  root: {
+                    "&:hover": {
+                      backgroundColor: "transparent",
+                    },
+                  },
+                }}
+              >
                 <IconKeyboard size={18} />
               </ActionIcon>
             </Tooltip>
@@ -1565,20 +1893,145 @@ export function RoomLayout() {
                 variant="subtle"
                 size="lg"
                 radius={0}
-                color="red"
+                color="white"
                 onClick={() => navigate("/")}
               >
-                <IconX size={18} />
+                <IconHome size={18} />
               </ActionIcon>
             </Tooltip>
           </Group>
         }
-        sidebarWidth={340}
         hideActions
         hideUserInfo
         overlayNavbar
         opened={sidebarOpen}
         toggle={toggleSidebar}
+        leftOverlaySlot={<RoomToolToolbar leftOffset={toolbarLeftOffset} />}
+        leftPanel={
+          <Box
+            style={{
+              height: "100%",
+              position: "relative",
+              overflow: "visible",
+              pointerEvents: "none",
+            }}
+          >
+            <Box
+              style={{
+                position: "absolute",
+                right: -18,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 200,
+                pointerEvents: "auto",
+              }}
+            ></Box>
+
+            {sidebarOpen ? (
+              <Box
+                style={{
+                  height: "100%",
+                  width: "340px",
+                  pointerEvents: "auto",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  ref={leftPanelContentRef}
+                  style={{
+                    height: "100%",
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    padding: 0,
+                    gap: 0,
+                  }}
+                >
+                  <Paper
+                    radius={0}
+                    p={8}
+                    style={{
+                      height: brushToolsHeight,
+                      minHeight: BRUSH_TOOLS_MIN_HEIGHT,
+                      maxHeight: BRUSH_TOOLS_MAX_HEIGHT,
+                      flexShrink: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "var(--mantine-color-dark-7)",
+                    }}
+                  >
+                    <Box
+                      style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <ColorSelector />
+                    </Box>
+                  </Paper>
+
+                  <Box
+                    onPointerDown={handleBrushSectionResizeStart}
+                    style={{
+                      height: BRUSH_SECTION_DIVIDER_HEIGHT,
+                      minHeight: BRUSH_SECTION_DIVIDER_HEIGHT,
+                      cursor: "row-resize",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      userSelect: "none",
+                      touchAction: "none",
+                    }}
+                  >
+                    <Box
+                      style={{
+                        width: 46,
+                        height: 4,
+                        borderRadius: 999,
+                        background: isResizingBrushSections
+                          ? "rgba(34, 139, 230, 0.9)"
+                          : "rgba(255,255,255,0.18)",
+                        transition: "background 120ms ease",
+                      }}
+                    />
+                  </Box>
+
+                  <Paper
+                    radius={0}
+                    p={8}
+                    style={{
+                      flex: 1,
+                      minHeight: BRUSH_LIBRARY_MIN_HEIGHT,
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "var(--mantine-color-dark-7)",
+                    }}
+                  >
+                    <Box
+                      style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <BrushSidePanel
+                        onBrushSelect={onBrushSelect ?? undefined}
+                        registerStroke={registerStroke}
+                      />
+                    </Box>
+                  </Paper>
+                </Box>
+              </Box>
+            ) : null}
+          </Box>
+        }
+        leftPanelWidth={leftPanelWidth}
         rightPanel={
           <Box
             style={{
@@ -1701,63 +2154,6 @@ export function RoomLayout() {
             </Group>
           </Paper>
         }
-        sidebarSlots={{
-          main: (
-            <Box
-              style={{
-                height: "100%",
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-              }}
-            >
-              <Box style={{ flexShrink: 0 }}>
-                <ColorSelector />
-              </Box>
-
-              <Box style={{ flexShrink: 0 }} mt={7} mb={7}>
-                <Divider w="100%" />
-                <Text size="sm" fw={600}>
-                  Diameter
-                </Text>
-                <Group wrap="nowrap" align="center">
-                  <Slider
-                    style={{ flex: 1 }}
-                    min={1}
-                    max={512}
-                    step={1}
-                    value={strokeScale}
-                    onChange={setStrokeScale}
-                  />
-                  <NumberInput
-                    radius={0}
-                    w={90}
-                    min={1}
-                    max={512}
-                    step={1}
-                    value={strokeScale}
-                    onChange={(value) => setStrokeScale(value as number)}
-                  />
-                </Group>
-                <Divider w="100%" mt={7} mb={7} />
-              </Box>
-
-              <Box
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflow: "hidden",
-                }}
-              >
-                <BrushSidePanel
-                  onBrushSelect={onBrushSelect ?? undefined}
-                  registerStroke={registerStroke}
-                />
-              </Box>
-            </Box>
-          ),
-        }}
       />
     </RoomLayoutContext.Provider>
   );
