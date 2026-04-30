@@ -820,6 +820,8 @@ export const RoomPage = () => {
     if (activeLayerId !== null) {
       drawerRef.current.setActiveLayer(activeLayerId);
     }
+
+    refreshHistoryState();
   }, [layers, activeLayerId]);
 
   useEffect(() => {

@@ -228,9 +228,72 @@ class DrawManager {
     sprite.destroy();
   }
 
+  private destroyStrokeIfDetached(stroke: Stroke) {
+    if (stroke.parent) {
+      stroke.parent.removeChild(stroke);
+    }
+
+    stroke.destroy({ children: true });
+  }
+
+  private pruneHistoryForMissingLayers(validLayerIds: Set<number>) {
+    const keepStroke = (stroke: Stroke) => validLayerIds.has(stroke.layerId);
+
+    const removedUndo = this.undoStack.filter((stroke) => !keepStroke(stroke));
+    const removedRedo = this.redoStack.filter((stroke) => !keepStroke(stroke));
+
+    this.undoStack = this.undoStack.filter(keepStroke);
+    this.redoStack = this.redoStack.filter(keepStroke);
+
+    for (const stroke of removedUndo) {
+      this.strokesMap.delete(stroke.id);
+      this.destroyStrokeIfDetached(stroke);
+    }
+
+    for (const stroke of removedRedo) {
+      this.strokesMap.delete(stroke.id);
+      this.destroyStrokeIfDetached(stroke);
+    }
+
+    for (const [key, stroke] of this.strokesMap.entries()) {
+      if (!validLayerIds.has(stroke.layerId)) {
+        this.strokesMap.delete(key);
+        this.destroyStrokeIfDetached(stroke);
+      }
+    }
+
+    for (const [key, stroke] of this.tempStrokes.entries()) {
+      if (!validLayerIds.has(stroke.layerId)) {
+        this.tempStrokes.delete(key);
+        this.destroyStrokeIfDetached(stroke);
+      }
+    }
+
+    if (
+      this.currentStrokeLayerId !== null &&
+      !validLayerIds.has(this.currentStrokeLayerId)
+    ) {
+      if (this.currentStroke) {
+        this.currentStroke.destroy({ children: true });
+      }
+
+      this.currentStroke = null;
+      this.currentStrokeLayerId = null;
+      this.isDrawing = false;
+      this.strokePoints = [];
+      this.spacingCarry = 0;
+      this.currentStrokeDistance = 0;
+      this.pendingStartPoint = null;
+      this.rawPointerPosition = null;
+      this.smoothedPosition = null;
+      this.activePointerId = null;
+    }
+  }
+
   public setLayers(layers: ClientLayerDto[]) {
     const sortedLayers = [...layers].sort((a, b) => a.position - b.position);
     const nextLayerContainers = new Map<number, pixi.Container>();
+    const validLayerIds = new Set(sortedLayers.map((layer) => layer.id));
 
     this.layers = sortedLayers;
     this.layersContainer.removeChildren();
@@ -260,6 +323,7 @@ class DrawManager {
     }
 
     this.layerContainers = nextLayerContainers;
+    this.pruneHistoryForMissingLayers(validLayerIds);
 
     if (
       this.activeLayerId !== null &&
