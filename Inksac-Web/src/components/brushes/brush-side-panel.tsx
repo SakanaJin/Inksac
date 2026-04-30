@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon,
   Box,
@@ -15,11 +15,16 @@ import {
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
-import { IconChevronRight } from "@tabler/icons-react";
+import {
+  IconChevronRight,
+  IconMinus,
+  IconPlus as IconPlusSmall,
+} from "@tabler/icons-react";
 import api from "../../config/axios";
 import { useAuth } from "../../authentication/use-auth";
 import { EnvVars } from "../../config/env-vars";
 import { BrushType, UserRole, type BrushGetDto } from "../../constants/types";
+import { useRoomLayout } from "../layout/room-layout";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
@@ -33,6 +38,7 @@ export function BrushSidePanel({
   registerStroke,
 }: BrushSidePanelProps) {
   const { user } = useAuth();
+  const { strokeScale, setStrokeScale } = useRoomLayout();
   const isguest = user.role === UserRole.GUEST;
 
   const [brushes, setBrushes] = useState<BrushGetDto[]>([]);
@@ -42,6 +48,9 @@ export function BrushSidePanel({
   const [selectedBrushId, setSelectedBrushId] = useState<number | null>(null);
   const [systemOpen, setSystemOpen] = useState(true);
   const [userOpen, setUserOpen] = useState(true);
+
+  const diameterSliderRef = useRef<HTMLDivElement | null>(null);
+  const isDiameterDraggingRef = useRef(false);
 
   const getBrushImageSrc = (brush: BrushGetDto) => {
     return brush.brush_type === BrushType.SYSTEM
@@ -82,6 +91,13 @@ export function BrushSidePanel({
     });
   }, [registerStroke]);
 
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("pointermove", handleDiameterPointerMove);
+      window.removeEventListener("pointerup", handleDiameterPointerUp);
+    };
+  }, []);
+
   const handleBrushSubmit = (brush: BrushGetDto) => {
     setBrushes((prev) => {
       const exists = prev.some((item) => item.id === brush.id);
@@ -98,6 +114,14 @@ export function BrushSidePanel({
     setSelectedBrushId(brush.id);
     onBrushSelect?.(brush);
   };
+
+  const userBrushCount = useMemo(
+    () =>
+      brushes.filter((brush) => brush.brush_type !== BrushType.SYSTEM).length,
+    [brushes],
+  );
+
+  const isAtBrushLimit = userBrushCount >= 10;
 
   const openCreateModal = () => {
     if (isguest || isAtBrushLimit) return;
@@ -190,16 +214,54 @@ export function BrushSidePanel({
     [filtered],
   );
 
-  const userBrushCount = useMemo(
-    () =>
-      brushes.filter((brush) => brush.brush_type !== BrushType.SYSTEM).length,
-    [brushes],
-  );
+  const updateDiameter = (nextValue: number) => {
+    const clampedValue = Math.max(1, Math.min(512, nextValue));
+    setStrokeScale(clampedValue);
+  };
 
-  const isAtBrushLimit = userBrushCount >= 10;
+  const nudgeDiameter = (delta: number) => {
+    updateDiameter(strokeScale + delta);
+  };
+
+  const getDiameterFromClientX = (clientX: number) => {
+    const slider = diameterSliderRef.current;
+    if (!slider) return strokeScale;
+
+    const rect = slider.getBoundingClientRect();
+    if (rect.width <= 0) return strokeScale;
+
+    const relativeX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const ratio = relativeX / rect.width;
+
+    return Math.round(1 + ratio * (512 - 1));
+  };
+
+  const handleDiameterPointerMove = (e: PointerEvent) => {
+    if (!isDiameterDraggingRef.current) return;
+    updateDiameter(getDiameterFromClientX(e.clientX));
+  };
+
+  const handleDiameterPointerUp = () => {
+    isDiameterDraggingRef.current = false;
+    window.removeEventListener("pointermove", handleDiameterPointerMove);
+    window.removeEventListener("pointerup", handleDiameterPointerUp);
+  };
+
+  const handleDiameterPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDiameterDraggingRef.current = true;
+    updateDiameter(getDiameterFromClientX(e.clientX));
+
+    window.addEventListener("pointermove", handleDiameterPointerMove);
+    window.addEventListener("pointerup", handleDiameterPointerUp);
+  };
+
+  const diameterPercent = ((strokeScale - 1) / (512 - 1)) * 100;
 
   const renderBrushGrid = (brushList: BrushGetDto[]) => (
-    <SimpleGrid cols={3} spacing={2} mt={4}>
+    <SimpleGrid cols={4} spacing={2} mt={4}>
       {brushList.map((brush) => {
         const isowner = brush.owner?.id === user.id;
         const canedit =
@@ -274,6 +336,85 @@ export function BrushSidePanel({
 
   return (
     <Stack gap={6} style={{ height: "100%" }}>
+      <Group gap={0} wrap="nowrap" align="stretch">
+        <Box
+          ref={diameterSliderRef}
+          onPointerDown={handleDiameterPointerDown}
+          style={{
+            position: "relative",
+            width: "calc(100% - 36px)",
+            height: 32,
+            cursor: "pointer",
+            userSelect: "none",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              height: "100%",
+              width: `${diameterPercent}%`,
+              background: "rgba(34, 139, 230, 0.65)",
+              pointerEvents: "none",
+            }}
+          />
+          <Box
+            style={{
+              position: "relative",
+              zIndex: 1,
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 10px",
+            }}
+          >
+            <Text size="sm" fw={500}>
+              Diameter: {strokeScale}px
+            </Text>
+          </Box>
+        </Box>
+
+        <Box
+          style={{
+            width: 36,
+            height: 32,
+            borderLeft: "1px solid rgba(255,255,255,0.08)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <ActionIcon
+            variant="subtle"
+            radius={0}
+            size={16}
+            style={{ width: "100%", height: 16 }}
+            disabled={strokeScale >= 512}
+            onClick={() => nudgeDiameter(5)}
+          >
+            <IconPlusSmall size={12} />
+          </ActionIcon>
+
+          <ActionIcon
+            variant="subtle"
+            radius={0}
+            size={16}
+            style={{
+              width: "100%",
+              height: 16,
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+            }}
+            disabled={strokeScale <= 1}
+            onClick={() => nudgeDiameter(-5)}
+          >
+            <IconMinus size={12} />
+          </ActionIcon>
+        </Box>
+      </Group>
+
       <Group justify="space-between" align="center" gap={4}>
         <Text fw={600}>Brushes</Text>
 
@@ -348,6 +489,7 @@ export function BrushSidePanel({
                 }}
               />
             </Group>
+
             {userOpen ? renderBrushGrid(userBrushes) : null}
           </Box>
 
