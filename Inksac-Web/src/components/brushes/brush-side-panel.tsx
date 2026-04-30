@@ -28,6 +28,8 @@ import { useRoomLayout } from "../layout/room-layout";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
+let lastSelectedBrushId: number | null = null;
+
 interface BrushSidePanelProps {
   onBrushSelect?: (brush: BrushGetDto) => void;
   registerStroke?: (fn: (brushId: number) => void) => void;
@@ -45,7 +47,9 @@ export function BrushSidePanel({
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
 
-  const [selectedBrushId, setSelectedBrushId] = useState<number | null>(null);
+  const [selectedBrushId, setSelectedBrushId] = useState<number | null>(
+    lastSelectedBrushId,
+  );
   const [systemOpen, setSystemOpen] = useState(true);
   const [userOpen, setUserOpen] = useState(true);
 
@@ -63,13 +67,21 @@ export function BrushSidePanel({
 
     try {
       const response = await api.get<BrushGetDto[]>("/brushes/user-and-system");
+      const loadedBrushes = response.data.data ?? [];
 
-      if (response.data.data) {
-        setBrushes(response.data.data);
-      }
+      setBrushes(loadedBrushes);
 
-      if (selectedBrushId === null) {
-        const defaultBrush = response.data.data[0];
+      const savedBrush =
+        lastSelectedBrushId !== null
+          ? loadedBrushes.find((brush) => brush.id === lastSelectedBrushId)
+          : null;
+
+      if (savedBrush) {
+        setSelectedBrushId(savedBrush.id);
+        onBrushSelect?.(savedBrush);
+      } else if (selectedBrushId === null && loadedBrushes.length > 0) {
+        const defaultBrush = loadedBrushes[0];
+        lastSelectedBrushId = defaultBrush.id;
         setSelectedBrushId(defaultBrush.id);
         onBrushSelect?.(defaultBrush);
       }
@@ -111,6 +123,7 @@ export function BrushSidePanel({
   };
 
   const handleBrushClick = (brush: BrushGetDto) => {
+    lastSelectedBrushId = brush.id;
     setSelectedBrushId(brush.id);
     onBrushSelect?.(brush);
   };
@@ -182,6 +195,7 @@ export function BrushSidePanel({
           if (selectedBrushId === brush.id) {
             const fallback = await api.get<BrushGetDto>("/brushes/default");
             const defaultBrush = fallback.data.data;
+            lastSelectedBrushId = defaultBrush.id;
             setSelectedBrushId(defaultBrush.id);
             onBrushSelect?.(defaultBrush);
           }
