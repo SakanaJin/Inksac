@@ -149,6 +149,7 @@ export interface RoomCreateDto {
   width: number;
   height: number;
   canvas_color: string;
+  private: boolean;
 }
 
 export interface RoomUpdateDto {
