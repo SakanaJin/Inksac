@@ -9,6 +9,13 @@ from Inksac_Data.Common.BrushType import BrushType
 from Inksac_Data.Entities.Users import UserShallowDto
 
 DEFAULT_BRUSH = "/user/brush/softShape.png"
+SYSTEM_BRUSH_ORDER = [
+    "/user/brush/round.png",
+    "/user/brush/soft.png",
+    "/user/brush/oil_knife.png",
+    "/user/brush/A_concrete.png",
+    "/user/brush/A_crayon.png",
+]
 
 class BrushCreateDto(BaseModel):
     name: str
