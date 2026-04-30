@@ -17,6 +17,14 @@ import { EnvVars } from "../config/env-vars";
 
 const baseurl = EnvVars.mediaBaseUrl;
 
+function getBrushImageUrl(imgurl: string) {
+  if (imgurl.startsWith("/system-brush-tips/")) {
+    return imgurl;
+  }
+
+  return baseurl + imgurl;
+}
+
 type StrokeHistoryEntry = Stroke[];
 
 class DrawManager {
@@ -159,7 +167,7 @@ class DrawManager {
   }
 
   async init() {
-    const response = await api.get<BrushGetDto>("/brushes/1");
+    const response = await api.get<BrushGetDto>("/brushes/default");
     this.setActiveBrush(response.data.data);
   }
 
@@ -167,7 +175,7 @@ class DrawManager {
     // pixijs automatically caches textures by url
     this.activeBrush = brush;
     this.brushTexture = await pixi.Assets.load<pixi.Texture>(
-      baseurl + this.activeBrush.imgurl,
+      getBrushImageUrl(this.activeBrush.imgurl),
     );
   }
 
@@ -237,23 +245,31 @@ class DrawManager {
   }
 
   private pruneHistoryForMissingLayers(validLayerIds: Set<number>) {
-    const keepStroke = (stroke: Stroke) => validLayerIds.has(stroke.layerId);
+    const pruneHistoryStack = (stack: StrokeHistoryEntry[]) => {
+      const nextStack: StrokeHistoryEntry[] = [];
 
-    const removedUndo = this.undoStack.filter((stroke) => !keepStroke(stroke));
-    const removedRedo = this.redoStack.filter((stroke) => !keepStroke(stroke));
+      for (const historyEntry of stack) {
+        const keptEntry: StrokeHistoryEntry = [];
 
-    this.undoStack = this.undoStack.filter(keepStroke);
-    this.redoStack = this.redoStack.filter(keepStroke);
+        for (const stroke of historyEntry) {
+          if (validLayerIds.has(stroke.layerId)) {
+            keptEntry.push(stroke);
+          } else {
+            this.strokesMap.delete(stroke.id);
+            this.destroyStrokeIfDetached(stroke);
+          }
+        }
 
-    for (const stroke of removedUndo) {
-      this.strokesMap.delete(stroke.id);
-      this.destroyStrokeIfDetached(stroke);
-    }
+        if (keptEntry.length > 0) {
+          nextStack.push(keptEntry);
+        }
+      }
 
-    for (const stroke of removedRedo) {
-      this.strokesMap.delete(stroke.id);
-      this.destroyStrokeIfDetached(stroke);
-    }
+      return nextStack;
+    };
+
+    this.undoStack = pruneHistoryStack(this.undoStack);
+    this.redoStack = pruneHistoryStack(this.redoStack);
 
     for (const [key, stroke] of this.strokesMap.entries()) {
       if (!validLayerIds.has(stroke.layerId)) {
@@ -277,6 +293,10 @@ class DrawManager {
         this.currentStroke.destroy({ children: true });
       }
 
+      this.currentMirrorStrokes.forEach((stroke) =>
+        stroke.destroy({ children: true }),
+      );
+      this.currentMirrorStrokes = [];
       this.currentStroke = null;
       this.currentStrokeLayerId = null;
       this.isDrawing = false;
@@ -284,6 +304,7 @@ class DrawManager {
       this.spacingCarry = 0;
       this.currentStrokeDistance = 0;
       this.pendingStartPoint = null;
+      this.shapeStartPoint = null;
       this.rawPointerPosition = null;
       this.smoothedPosition = null;
       this.activePointerId = null;
@@ -2377,7 +2398,7 @@ class DrawManager {
     if (!layerContainer) return;
 
     const receivedBrushTexture = await pixi.Assets.load<pixi.Texture>(
-      baseurl + strokeData.brush.imgurl,
+      getBrushImageUrl(strokeData.brush.imgurl),
     );
     if (!receivedBrushTexture) return;
 

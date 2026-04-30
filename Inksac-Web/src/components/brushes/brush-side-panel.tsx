@@ -15,7 +15,11 @@ import {
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
-import { IconMinus, IconPlus as IconPlusSmall } from "@tabler/icons-react";
+import {
+  IconChevronRight,
+  IconMinus,
+  IconPlus as IconPlusSmall,
+} from "@tabler/icons-react";
 import api from "../../config/axios";
 import { useAuth } from "../../authentication/use-auth";
 import { EnvVars } from "../../config/env-vars";
@@ -23,6 +27,8 @@ import { BrushType, UserRole, type BrushGetDto } from "../../constants/types";
 import { useRoomLayout } from "../layout/room-layout";
 
 const baseurl = EnvVars.mediaBaseUrl;
+
+let lastSelectedBrushId: number | null = null;
 
 interface BrushSidePanelProps {
   onBrushSelect?: (brush: BrushGetDto) => void;
@@ -41,23 +47,41 @@ export function BrushSidePanel({
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
 
-  const [selectedBrushId, setSelectedBrushId] = useState<number | null>(null);
+  const [selectedBrushId, setSelectedBrushId] = useState<number | null>(
+    lastSelectedBrushId,
+  );
+  const [systemOpen, setSystemOpen] = useState(true);
+  const [userOpen, setUserOpen] = useState(true);
 
   const diameterSliderRef = useRef<HTMLDivElement | null>(null);
   const isDiameterDraggingRef = useRef(false);
+
+  const getBrushImageSrc = (brush: BrushGetDto) => {
+    return brush.brush_type === BrushType.SYSTEM
+      ? brush.imgurl
+      : baseurl + brush.imgurl;
+  };
 
   const refresh = async () => {
     setLoading(true);
 
     try {
       const response = await api.get<BrushGetDto[]>("/brushes/user-and-system");
+      const loadedBrushes = response.data.data ?? [];
 
-      if (response.data.data) {
-        setBrushes(response.data.data);
-      }
+      setBrushes(loadedBrushes);
 
-      if (selectedBrushId === null) {
-        const defaultBrush = response.data.data[0];
+      const savedBrush =
+        lastSelectedBrushId !== null
+          ? loadedBrushes.find((brush) => brush.id === lastSelectedBrushId)
+          : null;
+
+      if (savedBrush) {
+        setSelectedBrushId(savedBrush.id);
+        onBrushSelect?.(savedBrush);
+      } else if (selectedBrushId === null && loadedBrushes.length > 0) {
+        const defaultBrush = loadedBrushes[0];
+        lastSelectedBrushId = defaultBrush.id;
         setSelectedBrushId(defaultBrush.id);
         onBrushSelect?.(defaultBrush);
       }
@@ -99,12 +123,21 @@ export function BrushSidePanel({
   };
 
   const handleBrushClick = (brush: BrushGetDto) => {
+    lastSelectedBrushId = brush.id;
     setSelectedBrushId(brush.id);
     onBrushSelect?.(brush);
   };
 
+  const userBrushCount = useMemo(
+    () =>
+      brushes.filter((brush) => brush.brush_type !== BrushType.SYSTEM).length,
+    [brushes],
+  );
+
+  const isAtBrushLimit = userBrushCount >= 10;
+
   const openCreateModal = () => {
-    if (isguest) return;
+    if (isguest || isAtBrushLimit) return;
 
     modals.openContextModal({
       modal: "brusheditormodal",
@@ -160,11 +193,13 @@ export function BrushSidePanel({
           setBrushes((prev) => prev.filter((item) => item.id !== brush.id));
 
           if (selectedBrushId === brush.id) {
-            const fallback = await api.get<BrushGetDto>("/brushes/1");
+            const fallback = await api.get<BrushGetDto>("/brushes/default");
             const defaultBrush = fallback.data.data;
+            lastSelectedBrushId = defaultBrush.id;
             setSelectedBrushId(defaultBrush.id);
             onBrushSelect?.(defaultBrush);
           }
+
           notifications.show({
             title: "Success",
             message: "Brush deleted successfully",
@@ -182,6 +217,16 @@ export function BrushSidePanel({
 
     return brushes.filter((brush) => brush.name.toLowerCase().includes(q));
   }, [brushes, query]);
+
+  const systemBrushes = useMemo(
+    () => filtered.filter((brush) => brush.brush_type === BrushType.SYSTEM),
+    [filtered],
+  );
+
+  const userBrushes = useMemo(
+    () => filtered.filter((brush) => brush.brush_type !== BrushType.SYSTEM),
+    [filtered],
+  );
 
   const updateDiameter = (nextValue: number) => {
     const clampedValue = Math.max(1, Math.min(512, nextValue));
@@ -228,6 +273,80 @@ export function BrushSidePanel({
   };
 
   const diameterPercent = ((strokeScale - 1) / (512 - 1)) * 100;
+
+  const renderBrushGrid = (brushList: BrushGetDto[]) => (
+    <SimpleGrid cols={4} spacing={2} mt={4}>
+      {brushList.map((brush) => {
+        const isowner = brush.owner?.id === user.id;
+        const canedit =
+          !isguest && isowner && brush.brush_type !== BrushType.SYSTEM;
+
+        return (
+          <Paper
+            key={brush.id}
+            p={4}
+            radius={0}
+            onClick={() => handleBrushClick(brush)}
+            style={{
+              cursor: "pointer",
+              background: selectedBrushId === brush.id ? "#4a4848" : "#323131",
+            }}
+          >
+            <Box
+              style={{
+                width: "100%",
+                aspectRatio: "1 / 1",
+                overflow: "hidden",
+                background: "rgba(0,0,0,0.06)",
+              }}
+            >
+              <Image
+                src={getBrushImageSrc(brush)}
+                alt={brush.name}
+                fit="contain"
+                radius={0}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </Box>
+
+            <Group justify="space-between" mt={4} gap={4} wrap="nowrap">
+              <Text size="xs" fw={600} lineClamp={1} style={{ flex: 1 }}>
+                {brush.name}
+              </Text>
+
+              {canedit && !brush.in_use ? (
+                <Menu withinPortal position="bottom-end" shadow="sm">
+                  <Menu.Target>
+                    <ActionIcon
+                      size="xs"
+                      variant="subtle"
+                      radius={0}
+                      disabled={isguest}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      ⋮
+                    </ActionIcon>
+                  </Menu.Target>
+
+                  <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                    <Menu.Item onClick={() => openEditModal(brush)}>
+                      Edit
+                    </Menu.Item>
+                    <Menu.Item
+                      color="red"
+                      onClick={() => openDeleteModal(brush)}
+                    >
+                      Delete
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              ) : null}
+            </Group>
+          </Paper>
+        );
+      })}
+    </SimpleGrid>
+  );
 
   return (
     <Stack gap={6} style={{ height: "100%" }}>
@@ -334,78 +453,59 @@ export function BrushSidePanel({
 
       <Box style={{ flex: 1, minHeight: 0 }}>
         <ScrollArea h="100%" type="always" scrollbarSize={6} offsetScrollbars>
-          <SimpleGrid cols={4} spacing={2}>
-            {filtered.map((brush) => {
-              const isowner = brush.owner?.id === user.id;
-              const canedit =
-                !isguest && isowner && brush.brush_type !== BrushType.SYSTEM;
+          <Box mb={8}>
+            <Group
+              justify="space-between"
+              align="center"
+              onClick={() => setSystemOpen((prev) => !prev)}
+              style={{
+                cursor: "pointer",
+                userSelect: "none",
+                background: "rgba(34, 139, 230, 0.10)",
+                padding: "4px 6px",
+              }}
+            >
+              <Text size="xs" fw={700}>
+                System Brushes
+              </Text>
+              <IconChevronRight
+                size={14}
+                style={{
+                  transform: systemOpen ? "rotate(90deg)" : "rotate(0deg)",
+                  transition: "transform 0.15s ease",
+                }}
+              />
+            </Group>
 
-              return (
-                <Paper
-                  key={brush.id}
-                  p={4}
-                  radius={0}
-                  onClick={() => handleBrushClick(brush)}
-                  style={{
-                    cursor: "pointer",
-                    background:
-                      selectedBrushId === brush.id ? "#4a4848" : "#323131",
-                  }}
-                >
-                  <Box
-                    style={{
-                      width: "100%",
-                      aspectRatio: "1 / 1",
-                      overflow: "hidden",
-                      background: "rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <Image
-                      src={baseurl + brush.imgurl}
-                      alt={brush.name}
-                      fit="contain"
-                      radius={0}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                  </Box>
+            {systemOpen ? renderBrushGrid(systemBrushes) : null}
+          </Box>
 
-                  <Group justify="space-between" mt={4} gap={4} wrap="nowrap">
-                    <Text size="xs" fw={600} lineClamp={1} style={{ flex: 1 }}>
-                      {brush.name}
-                    </Text>
+          <Box>
+            <Group
+              justify="space-between"
+              align="center"
+              onClick={() => setUserOpen((prev) => !prev)}
+              style={{
+                cursor: "pointer",
+                userSelect: "none",
+                background: "rgba(34, 139, 230, 0.10)",
+                padding: "4px 6px",
+              }}
+            >
+              <Text size="xs" fw={700}>
+                User Brushes
+              </Text>
+              <IconChevronRight
+                size={14}
+                style={{
+                  transform: userOpen ? "rotate(90deg)" : "rotate(0deg)",
+                  transition: "transform 0.15s ease",
+                }}
+              />
+            </Group>
 
-                    {canedit && !brush.in_use ? (
-                      <Menu withinPortal position="bottom-end" shadow="sm">
-                        <Menu.Target>
-                          <ActionIcon
-                            size="xs"
-                            variant="subtle"
-                            radius={0}
-                            disabled={isguest}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            ⋮
-                          </ActionIcon>
-                        </Menu.Target>
-
-                        <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-                          <Menu.Item onClick={() => openEditModal(brush)}>
-                            Edit
-                          </Menu.Item>
-                          <Menu.Item
-                            color="red"
-                            onClick={() => openDeleteModal(brush)}
-                          >
-                            Delete
-                          </Menu.Item>
-                        </Menu.Dropdown>
-                      </Menu>
-                    ) : null}
-                  </Group>
-                </Paper>
-              );
-            })}
-          </SimpleGrid>
+            {userOpen ? renderBrushGrid(userBrushes) : null}
+          </Box>
 
           {!loading && filtered.length === 0 ? (
             <Text size="xs" c="dimmed" ta="center" mt="sm">
@@ -428,7 +528,11 @@ export function BrushSidePanel({
           variant="filled"
           radius={0}
           onClick={openCreateModal}
-          disabled={isguest}
+          disabled={isguest || isAtBrushLimit}
+          style={{
+            opacity: isguest || isAtBrushLimit ? 0.4 : 1,
+            cursor: isguest || isAtBrushLimit ? "not-allowed" : "pointer",
+          }}
         >
           +
         </ActionIcon>
