@@ -32,14 +32,13 @@ import {
   IconDownload,
   IconChevronLeft,
   IconChevronRight,
-  IconX,
   IconSettings,
   IconDots,
   IconAdjustments,
   IconLine,
-  IconSquare,
   IconHome,
   IconCircle,
+  IconShare,
 } from "@tabler/icons-react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { AppLayout } from "./app-layout";
@@ -56,6 +55,7 @@ import {
 import api from "../../config/axios";
 import { ColorSelector } from "../room-tools/color-selector";
 import { UserAvatars } from "../room-tools/UserAvatars";
+import { useUser } from "../../authentication/use-auth";
 
 type ToolType = "brush" | "eraser" | "eyedropper" | "shapes" | "move";
 export type ShapeType = "line" | "rectangle" | "ellipse";
@@ -131,6 +131,7 @@ type RoomLayoutContextValue = {
   setMirrorHandleVisible: (visible: boolean) => void;
   isActiveLayerMovable: boolean;
   moveToolDisabledReason: string | null;
+  setCanAddUsers: (enabled: boolean) => void;
 };
 
 const RoomLayoutContext = createContext<RoomLayoutContextValue>({
@@ -201,6 +202,7 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setMirrorHandleVisible: () => {},
   isActiveLayerMovable: false,
   moveToolDisabledReason: null,
+  setCanAddUsers: () => {},
 });
 
 export const useRoomLayout = () => useContext(RoomLayoutContext);
@@ -607,6 +609,7 @@ function TaperPreview({
 }
 
 export function RoomLayout() {
+  const user = useUser();
   const { id } = useParams();
   const [canManageLayers, setCanManageLayers] = useState(false);
   const [roomName, setRoomName] = useState<string | undefined>(undefined);
@@ -627,6 +630,7 @@ export function RoomLayout() {
   const [smoothingModalOpen, setSmoothingModalOpen] = useState(false);
   const [optionsMenuOpened, setOptionsMenuOpened] = useState(false);
   const [toolSettingsMenuOpened, setToolSettingsMenuOpened] = useState(false);
+  const [canAddUsers, setCanAddUsers] = useState(false);
 
   const [pressureEnabled, setPressureEnabled] = useState(true);
   const [pressureMinSize, setPressureMinSize] = useState(10);
@@ -1269,6 +1273,7 @@ export function RoomLayout() {
         setMirrorHandleVisible,
         isActiveLayerMovable,
         moveToolDisabledReason,
+        setCanAddUsers,
       }}
     >
       <Modal
@@ -2117,6 +2122,30 @@ export function RoomLayout() {
           >
             <Group gap="xs" wrap="nowrap">
               <UserAvatars users={users} />
+
+              {canAddUsers && (
+                <Tooltip label="Manage Users">
+                  <ActionIcon
+                    variant="filled"
+                    size="lg"
+                    radius={0}
+                    onClick={() =>
+                      modals.openContextModal({
+                        modal: "useraddmodal",
+                        title: "Add Users",
+                        centered: true,
+                        innerProps: {
+                          roomid: +id,
+                          userid: user.id,
+                        },
+                      })
+                    }
+                  >
+                    <IconShare size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+
               <Tooltip label="Undo">
                 <ActionIcon
                   variant="filled"

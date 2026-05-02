@@ -10,7 +10,8 @@ from datetime import datetime
 import re
 
 from Inksac_Data.database import get_db, SECRET_KEY
-from Inksac_Data.Entities.Users import User, LoginDto, UserCreateDto
+from Inksac_Data.Entities.Users import User
+from Inksac_Data.Entities.dtos import UserCreateDto, LoginDto
 from Inksac_Data.Entities.Auth import UserAuth, create_password_hash, EMAIL_PATTERN
 from Inksac_Data.Entities.Strokes import Stroke
 from Inksac_Data.Common.Response import Response, HttpException

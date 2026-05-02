@@ -121,7 +121,6 @@ export function ColorSelector() {
             value={normalizedColor}
             onChange={setColor}
             mb={5}
-            //swatches={["#ffffff00", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff" ]}
             pos={"relative"}
             classNames={{
               sliders: "sliders",

@@ -48,13 +48,7 @@ export const HomePage = () => {
       </Center>
     );
   } else {
-    roomList = (
-      <RoomsList
-        rooms={rooms}
-        currentUserId={currentUserId}
-        onRoomAction={invalidateAndRefresh}
-      />
-    );
+    roomList = <RoomsList rooms={rooms} onRoomAction={invalidateAndRefresh} />;
   }
 
   useEffect(() => {

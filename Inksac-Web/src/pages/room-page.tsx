@@ -25,6 +25,7 @@ import { routes } from "../routes/RouteIndex";
 import { useRoomLayout } from "../components/layout/room-layout";
 import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
+import { useUser } from "../authentication/use-auth";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 const LOADER_MIN_DURATION_MS = 2000;
@@ -40,6 +41,8 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
+
+  const user = useUser();
 
   const {
     registerBrushSelect,
@@ -87,6 +90,7 @@ export const RoomPage = () => {
     mirrorAngleDegrees,
     mirrorAxes,
     mirrorHandleVisible,
+    setCanAddUsers,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
@@ -1338,11 +1342,12 @@ export const RoomPage = () => {
             return;
           }
 
-          const alphaMatch = colorRef.current.match(/[\d.]+/g);
-          const currentAlphaFloat = alphaMatch ? Number(alphaMatch[3] ?? 1) : 1;
-          const currentAlpha = Math.round(currentAlphaFloat * 255).toString(16).padStart(2, '0');
+          const currentAlpha = colorRef.current.slice(7, 9) || "ff";
           const sampledRgb = sampledColor.slice(0, 7);
-          setColor(`${sampledRgb}${currentAlpha}`);
+          const r = parseInt(sampledRgb.slice(1,3), 16);
+          const g = parseInt(sampledRgb.slice(3,5), 16);
+          const b = parseInt(sampledRgb.slice(5,7), 16);
+          setColor(`rgb(${r}, ${g}, ${b})`);
 
           if (ctrlEyedropperActiveRef.current) {
             ctrlEyedropperActiveRef.current = false;
@@ -1384,6 +1389,8 @@ export const RoomPage = () => {
         const room = roomRes.data.data;
 
         if (!isMounted || !pixiContainer.current) return;
+
+        setCanAddUsers(room.private && user.id == room.owner.id);
 
         const app = new pixi.Application();
         await app.init({

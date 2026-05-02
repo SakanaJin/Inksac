@@ -7,9 +7,10 @@ from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.Role import Role
 from Inksac_Data.Controllers.AuthController import get_current_user
 from Inksac_Data.Entities.Users import User
-from Inksac_Data.Entities.Strokes import Stroke, StrokeCreateDto
+from Inksac_Data.Entities.Strokes import Stroke
 from Inksac_Data.Entities.Rooms import Room
 from Inksac_Data.Entities.Brushes import Brush
+from Inksac_Data.Entities.dtos import StrokeCreateDto
 
 router = APIRouter(prefix="/api/strokes", tags=["Strokes"])
 

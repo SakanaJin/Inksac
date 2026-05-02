@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, File, UploadFile, Request
+from fastapi import APIRouter, Depends, File, UploadFile, Request, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import os
@@ -6,7 +7,9 @@ import uuid
 import re
 from datetime import datetime
 
-from Inksac_Data.Entities.Users import User, UserCreateDto, DEFAULT_PFP
+from Inksac_Data.Entities.dtos import UserCreateDto
+from Inksac_Data.Entities.Users import User, DEFAULT_PFP
+from Inksac_Data.Entities.Rooms import Room
 from Inksac_Data.Entities.Auth import UserAuth, create_password_hash, EMAIL_PATTERN
 from Inksac_Data.Controllers.AuthController import require_admin, get_current_user, require_not_guest
 from Inksac_Data.Common.Response import Response, HttpException
@@ -62,6 +65,22 @@ def get_all_users(db: Session = Depends(get_db)):
     response = Response()
     users = db.query(User).all()
     response.data = [user.toGetDto() for user in users]
+    return response
+
+@router.get("/search")
+def search_users(username: str = Query(..., min_length=1, max_length=100), roomid: int | None = None, limit: int = Query(10, le=50), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    response = Response()
+    stmt = (
+        select(User)
+        .where(User.username.like(f"%{username}%"))
+        .where(User.id != user.id)
+        .where(User.role != Role.GUEST)
+        .limit(limit)
+    )
+    if roomid:
+        stmt = stmt.where(~User.allowed_rooms.any(Room.id == roomid))
+    users = db.execute(stmt).scalars().all()
+    response.data = [user.toShallowDto() for user in users]
     return response
 
 @router.get("/{id}")
