@@ -57,7 +57,7 @@ class DrawManager {
 
   private brushTexture: pixi.Texture | null = null;
   private activeBrush: BrushGetDto | null = null;
-  private activeColor: string = "rgb(0, 0, 0)";
+  private activeColor: string = "#ffffffff";
   private activeOpacity: number = 1;
   private activeErase: boolean = false;
   private activeTool: "brush" | "eraser" | "eyedropper" | "shapes" | "move" =
@@ -363,9 +363,9 @@ class DrawManager {
   }
 
   public setColor(color: string) {
-    const [r,g,b,a = 1] = color.match(/[\d.]+/g)!.map(Number);
-    this.activeColor = `rgb(${r}, ${g}, ${b})`;
-    this.activeOpacity = a;
+    this.activeColor = color;
+    const alpha = color.slice(-2);
+    this.activeOpacity = parseInt(alpha, 16) / 255;
   }
 
   public setStrokeScale(strokeScale: number) {
