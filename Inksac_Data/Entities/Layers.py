@@ -1,37 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Float
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
-from typing import Optional
 
 from Inksac_Data.database import Base
-
-
-class LayerGetDto(BaseModel):
-    id: int
-    name: str
-    locked: bool
-    position: int
-    room_id: int
-    opacity: float
-    x: float
-    y: float
-
-
-class LayerCreateDto(BaseModel):
-    name: str
-
-
-class LayerUpdateDto(BaseModel):
-    name: Optional[str] = None
-    locked: Optional[bool] = None
-    opacity: Optional[float] = None
-    x: Optional[float] = None
-    y: Optional[float] = None
-
-
-class LayerReorderDto(BaseModel):
-    ordered_layer_ids: list[int]
-
+from Inksac_Data.Entities.dtos import LayerGetDto
 
 class Layer(Base):
     __tablename__ = "layers"

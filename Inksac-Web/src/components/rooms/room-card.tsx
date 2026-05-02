@@ -9,23 +9,20 @@ import {
 import type { RoomGetDto } from "../../constants/types";
 import { modals } from "@mantine/modals";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "../../authentication/use-auth";
 
 interface RoomCardProps {
   room: RoomGetDto;
-  currentUserId: number;
   onRoomAction?: () => void;
   onJoinRoom?: (roomId: number) => void;
 }
 
-export const RoomCard = ({
-  room,
-  currentUserId,
-  onRoomAction,
-  onJoinRoom,
-}: RoomCardProps) => {
+export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
+  const user = useUser();
   const navigate = useNavigate();
-  const isUserRoom = room.owner.id === currentUserId;
+  const isUserRoom = room.owner.id === user.id;
   const userCount = room.user_count;
+  const canJoin = !room.private || room.allowed_user_ids.includes(user.id);
 
   const handleJoinRoom = () => {
     if (onJoinRoom) {
@@ -69,6 +66,9 @@ export const RoomCard = ({
             </Badge>
           ) : (
             <Group gap={6} align="center">
+              <Badge variant="outline" color={room.private ? "red" : "blue"}>
+                {room.private ? "Private" : "Public"}
+              </Badge>
               <Text size="sm" c="dimmed">
                 Owner:
               </Text>
@@ -102,6 +102,7 @@ export const RoomCard = ({
             color="green"
             leftSection={<FontAwesomeIcon icon={faRightToBracket} />}
             onClick={handleJoinRoom}
+            disabled={!canJoin}
           >
             Join
           </Button>

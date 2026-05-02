@@ -52,6 +52,7 @@ export interface UserGetDto {
   role: UserRole;
   pfp_path: string;
   has_room: boolean;
+  allowed_room_ids: number[];
 }
 
 export interface LoginDto {
@@ -135,6 +136,8 @@ export interface RoomGetDto {
   owner: UserShallowDto;
   user_count: number;
   canvas_color: string;
+  private: boolean;
+  allowed_user_ids: Number[];
 }
 
 export interface RoomShallowDto {
@@ -149,6 +152,7 @@ export interface RoomCreateDto {
   width: number;
   height: number;
   canvas_color: string;
+  private: boolean;
 }
 
 export interface RoomUpdateDto {
