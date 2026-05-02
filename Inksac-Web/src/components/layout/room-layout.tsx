@@ -148,7 +148,7 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setActiveTool: () => {},
   shapeType: "line",
   setShapeType: () => {},
-  color: "#ffffffff",
+  color: "rgb(0, 0, 0)",
   toggleSidebar: () => {},
   erase: false,
   strokeScale: 16,
@@ -610,7 +610,7 @@ export function RoomLayout() {
   const { id } = useParams();
   const [canManageLayers, setCanManageLayers] = useState(false);
   const [roomName, setRoomName] = useState<string | undefined>(undefined);
-  const [color, setColor] = useState("#000000ff");
+  const [color, setColor] = useState("rgb(0, 0, 0)");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
