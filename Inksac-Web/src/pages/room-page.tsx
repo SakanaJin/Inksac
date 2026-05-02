@@ -1338,7 +1338,9 @@ export const RoomPage = () => {
             return;
           }
 
-          const currentAlpha = colorRef.current.slice(7, 9) || "ff";
+          const alphaMatch = colorRef.current.match(/[\d.]+/g);
+          const currentAlphaFloat = alphaMatch ? Number(alphaMatch[3] ?? 1) : 1;
+          const currentAlpha = Math.round(currentAlphaFloat * 255).toString(16).padStart(2, '0');
           const sampledRgb = sampledColor.slice(0, 7);
           setColor(`${sampledRgb}${currentAlpha}`);
 

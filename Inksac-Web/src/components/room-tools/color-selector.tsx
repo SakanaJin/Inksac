@@ -2,13 +2,34 @@ import { Box, ColorInput, ColorPicker, NumberInput, TextInput } from "@mantine/c
 import { useRoomLayout } from "../layout/room-layout";
 import { useEffect, useRef, useState } from "react";
 
+
+function toRgba(input: string): string {
+  const hexMatch = input.trim().match(/^#?(?<hex>[0-9a-fA-F]{3,8})$/);
+  if (hexMatch) {
+    let h = hexMatch.groups!.hex;
+
+    if (h.length === 3) {
+      h = h.split("").map(c => c + c).join("");
+    }
+
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    const a = h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1;
+    return `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
+  }
+  return input;
+}
+
 export function ColorSelector() {
   const { color, setColor } = useRoomLayout();
-  const [r,g,b,a = 1] = color.match(/[\d.]+/g)!.map(Number);
+  const normalizedColor = toRgba(color);
+  const [r,g,b,a = 1] = normalizedColor.match(/[\d.]+/g)!.map(Number);
   const [localHex, setLocalHex] = useState(
     `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`.toUpperCase()
   );
   const hexInputFocus = useRef(false);
+  
 
   useEffect(() => {
     if (!hexInputFocus.current) {
@@ -76,9 +97,12 @@ export function ColorSelector() {
           border-radius: 0;
         }
 
-        .preview {
-
+        .responsive-color-picker .mantine-ColorPicker-swatch {
+          --cp-swatch-size: 30px;
+          grid-column: 1;
+          grid-row: 2;
         }
+
       `}</style>
 
       <Box
@@ -94,15 +118,17 @@ export function ColorSelector() {
           <ColorPicker
             fullWidth
             format="rgba"
-            value={color}
+            value={normalizedColor}
             onChange={setColor}
-            mb={6}
-            swatchesPerRow={7}
+            mb={5}
+            //swatches={["#ffffff00", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff" ]}
             pos={"relative"}
             classNames={{
               sliders: "sliders",
               preview: "preview",
               body: "body",
+              swatches: "swatches",
+              swatch: "swatch"
             }}
             styles={{
               saturation: { height: 150 },
@@ -130,7 +156,7 @@ export function ColorSelector() {
                 );
               }}
               radius={0}
-              size="18.3"
+              size="18"
               styles={{
                 input: {
                   fontSize: "70%"
