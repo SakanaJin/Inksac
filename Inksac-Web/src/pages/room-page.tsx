@@ -1344,7 +1344,10 @@ export const RoomPage = () => {
 
           const currentAlpha = colorRef.current.slice(7, 9) || "ff";
           const sampledRgb = sampledColor.slice(0, 7);
-          setColor(`${sampledRgb}${currentAlpha}`);
+          const r = parseInt(sampledRgb.slice(1,3), 16);
+          const g = parseInt(sampledRgb.slice(3,5), 16);
+          const b = parseInt(sampledRgb.slice(5,7), 16);
+          setColor(`rgb(${r}, ${g}, ${b})`);
 
           if (ctrlEyedropperActiveRef.current) {
             ctrlEyedropperActiveRef.current = false;
