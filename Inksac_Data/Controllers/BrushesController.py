@@ -7,8 +7,9 @@ import uuid
 from Inksac_Data.database import get_db, MEDIA_DIR
 from Inksac_Data.Common.Response import Response, HttpException
 from Inksac_Data.Common.BrushType import BrushType
-from Inksac_Data.Entities.Brushes import Brush, BrushCreateDto, BrushUpdateDto, DEFAULT_BRUSH
+from Inksac_Data.Entities.Brushes import Brush, DEFAULT_BRUSH
 from Inksac_Data.Entities.Users import User
+from Inksac_Data.Entities.dtos import BrushCreateDto, BrushUpdateDto
 from Inksac_Data.Controllers.AuthController import require_not_guest, get_current_user
 
 MAX_BRUSH_SIZE = 1 * 1024 * 1024 # 1MB

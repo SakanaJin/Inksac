@@ -25,6 +25,7 @@ import { routes } from "../routes/RouteIndex";
 import { useRoomLayout } from "../components/layout/room-layout";
 import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
+import { useUser } from "../authentication/use-auth";
 
 const wsbaseurl = EnvVars.wsBaseUrl;
 const LOADER_MIN_DURATION_MS = 2000;
@@ -40,6 +41,8 @@ export const RoomPage = () => {
   const { id } = useParams();
   const wsRef = useRef<WSManager | null>(null);
   const navigate = useNavigate();
+
+  const user = useUser();
 
   const {
     registerBrushSelect,
@@ -87,6 +90,7 @@ export const RoomPage = () => {
     mirrorAngleDegrees,
     mirrorAxes,
     mirrorHandleVisible,
+    setCanAddUsers,
   } = useRoomLayout();
 
   const colorRef = useRef(color);
@@ -1382,6 +1386,8 @@ export const RoomPage = () => {
         const room = roomRes.data.data;
 
         if (!isMounted || !pixiContainer.current) return;
+
+        setCanAddUsers(room.private && user.id == room.owner.id);
 
         const app = new pixi.Application();
         await app.init({

@@ -7,12 +7,8 @@ from Inksac_Data.Common.WSManager import WSManager, WSMessage, WSMTypes
 from Inksac_Data.Controllers.AuthController import get_current_user
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Rooms import Room
-from Inksac_Data.Entities.Layers import (
-    Layer,
-    LayerCreateDto,
-    LayerUpdateDto,
-    LayerReorderDto,
-)
+from Inksac_Data.Entities.Layers import Layer
+from Inksac_Data.Entities.dtos import LayerCreateDto, LayerUpdateDto, LayerReorderDto
 
 router = APIRouter(prefix="/api/layers", tags=["Layers"])
 

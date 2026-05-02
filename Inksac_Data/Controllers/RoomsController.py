@@ -10,8 +10,9 @@ from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.Controllers.AuthController import get_current_user, require_not_guest
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Layers import Layer
-from Inksac_Data.Entities.Rooms import Room, RoomCreateUpdateDto, RoomRenameDto, round_nearest_hour
+from Inksac_Data.Entities.Rooms import Room, round_nearest_hour
 from Inksac_Data.Entities.AllowedUsers import AllowedUser
+from Inksac_Data.Entities.dtos import RoomCreateUpdateDto, RoomRenameDto
 
 MAXROOMS = 10
 CANVASDIMMIN = 256
@@ -104,6 +105,19 @@ def update(roomdto: RoomRenameDto, db: Session = Depends(get_db), user: User = D
     response.data = user.room.toGetDto()
     return response
 
+@router.get("/{roomid}/allowed")
+def get_allowed(roomid: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    response = Response()
+    room = db.get(Room, roomid)
+    if not room:
+        response.add_error("roomid", "room not found")
+        raise HttpException(status_code=404, response=response)
+    if room.owner_id != user.id:
+        response.add_error("user", "Room Owner only")
+        raise HttpException(status_code=403, response=response)
+    response.data = [user.toShallowDto() for user in room.allowed_users]
+    return response
+
 @router.post("/{roomid}/user/{userid}")
 def allow_user(roomid: int, userid: int, db: Session = Depends(get_db), user = Depends(get_current_user)):
     response = Response()
@@ -119,7 +133,8 @@ def allow_user(roomid: int, userid: int, db: Session = Depends(get_db), user = D
     )
     db.add(allowed_user)
     db.commit()
-    response.data = True
+    user = db.get(User, userid)
+    response.data = user.toShallowDto()
     return response
 
 @router.delete("/{roomid}/user/{userid}")
@@ -137,7 +152,7 @@ async def remove_user(roomid: int, userid: int, db: Session = Depends(get_db), u
         raise HttpException(status_code=400, response=response)
     user.room.allowed_users.remove(allowed_user)
     db.commit()
-    response.data = True
+    response.data = allowed_user.toShallowDto()
     await WSManager.disconnect_user(roomid=roomid, userid=userid, reason="Kicked from room")
     return response
 

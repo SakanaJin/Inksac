@@ -12,6 +12,7 @@ import {
   Divider,
   SimpleGrid,
   ThemeIcon,
+  Switch,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import type { ContextModalProps } from "@mantine/modals";
@@ -21,6 +22,7 @@ import { useForm, type FormErrors } from "@mantine/form";
 import { useState } from "react";
 import { IconX, IconPhoto } from "@tabler/icons-react";
 import type { FileWithPath } from "@mantine/dropzone";
+import { useToggle } from "react-use";
 
 export interface RoomCreateModalProps {
   onSuccess?: (room: RoomGetDto) => void;
@@ -69,6 +71,7 @@ export const RoomCreateModal = ({
   const [selectedFile, setSelectedFile] = useState<FileWithPath | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [priv, togglePriv] = useToggle(false);
 
   const form = useForm({
     initialValues: {
@@ -76,6 +79,7 @@ export const RoomCreateModal = ({
       width: 1920,
       height: 1080,
       canvas_color: "#f0f0f0",
+      private: priv,
     },
     validate: {
       name: (value) =>
@@ -214,6 +218,13 @@ export const RoomCreateModal = ({
           label="Room Name"
           placeholder="Enter room name"
           {...form.getInputProps("name")}
+        />
+
+        <Switch
+          label="Private"
+          value={priv}
+          onChange={() => togglePriv()}
+          {...form.getInputProps("private")}
         />
 
         <Divider />

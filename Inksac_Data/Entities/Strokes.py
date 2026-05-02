@@ -1,48 +1,9 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime, Boolean, Float
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Optional
 
 from Inksac_Data.database import Base
-from Inksac_Data.Entities.Brushes import BrushShallowDto
-
-class StrokePointDto(BaseModel):
-    x: float
-    y: float
-    pressure: float
-    size: float
-
-class StrokeGetDto(BaseModel):
-    id: int
-    tempid: Optional[str] = ""
-    color: str
-    opacity: float
-    iseraser: bool
-    scale: int
-    created_at: datetime
-    points: List[StrokePointDto]
-    creator_id: int
-    brush: BrushShallowDto
-    room_id: int
-    layer_id: int
-
-class StrokeCreateDto(BaseModel):
-    color: str
-    opacity: float
-    iseraser: bool
-    scale: int
-    points: List[StrokePointDto]
-
-class StrokeData(BaseModel):
-    tempid: str
-    points: List[StrokePointDto]
-    color: str
-    opacity: float
-    scale: int
-    brushid: int
-    iseraser: bool
-    layerid: int
+from Inksac_Data.Entities.dtos import StrokeGetDto
 
 class Stroke(Base):
     __tablename__ = "strokes"

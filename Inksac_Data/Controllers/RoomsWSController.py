@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends
-from pydantic import ValidationError, BaseModel
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
@@ -8,16 +8,11 @@ from Inksac_Data.Common.WSManager import WSManager, WSMHandler, WSMTypes, WSMess
 from Inksac_Data.database import db_session
 from Inksac_Data.Entities.Users import User
 from Inksac_Data.Entities.Rooms import Room
-from Inksac_Data.Entities.Strokes import StrokeData, Stroke, StrokeGetDto
-from Inksac_Data.Entities.Layers import Layer, LayerGetDto
+from Inksac_Data.Entities.Strokes import Stroke
+from Inksac_Data.Entities.Layers import Layer
 from Inksac_Data.Entities.UsedBrushes import UsedBrushes
+from Inksac_Data.Entities.dtos import ReadyDataDto, StrokeData
 from Inksac_Data.Controllers.AuthController import get_current_user
-
-
-class ReadyDataDto(BaseModel):
-    layers: list[LayerGetDto]
-    strokes: list[StrokeGetDto]
-
 
 router = APIRouter(prefix="/ws/rooms", tags=["RoomsWS"])
 

@@ -1,45 +1,13 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
 from datetime import datetime, timedelta
 
 from Inksac_Data.Common.WSManager import WSManager
 from Inksac_Data.database import Base
-from Inksac_Data.Entities.Users import UserShallowDto
+from Inksac_Data.Entities.dtos import RoomGetDto, RoomShallowDto
 
 def round_nearest_hour(time: datetime) -> datetime:
     return (time.replace(second=0, microsecond=0, minute=0, hour=time.hour) + timedelta(hours=time.minute//30))
-
-class RoomCreateUpdateDto(BaseModel):
-    name: str
-    width: int
-    height: int
-    canvas_color: str
-    private: bool
-
-class RoomRenameDto(BaseModel):
-    name: str
-
-class RoomGetDto(BaseModel):
-    id: int
-    name: str
-    width: int
-    height: int
-    imgurl: str | None
-    expiration: datetime
-    owner: UserShallowDto
-    user_count: int
-    canvas_color: str
-    private: bool
-
-class RoomShallowDto(BaseModel):
-    id: int
-    name: str
-    width: int
-    height: int
-    expiration: datetime
-    canvas_color: str
-    private: bool
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -74,7 +42,8 @@ class Room(Base):
             owner=self.owner.toShallowDto(),
             user_count=len(WSManager.rooms.get(self.id, {})),
             canvas_color=self.canvas_color,
-            private=self.private
+            private=self.private,
+            allowed_user_ids=[user.id for user in self.allowed_users]
         )
         return roomdto
     

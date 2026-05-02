@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
 import bcrypt
 
 from Inksac_Data.database import Base

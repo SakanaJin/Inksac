@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, ForeignKey
 
 from Inksac_Data.database import Base
 

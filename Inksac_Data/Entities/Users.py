@@ -1,35 +1,12 @@
 from sqlalchemy import Column, Integer, String, Enum, DateTime
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from Inksac_Data.database import Base
 from Inksac_Data.Common.Role import Role
+from Inksac_Data.Entities.dtos import UserGetDto, UserShallowDto
 
 DEFAULT_PFP = "/user/pfp/default.png"
-
-class LoginDto(BaseModel):
-    username: str
-    password: str
-
-class UserCreateDto(BaseModel):
-    username: str
-    email: str
-    password: str
-    confirm_password: str
-
-class UserGetDto(BaseModel):
-    id: int
-    username: str
-    role: Role
-    pfp_path: str
-    has_room: bool
-
-class UserShallowDto(BaseModel):
-    id: int
-    username: str
-    pfp_path: str
-    has_room: bool
 
 class User(Base):
     __tablename__ = "users"
@@ -53,7 +30,8 @@ class User(Base):
             username=self.username,
             role=self.role,
             pfp_path=self.pfp_path,
-            has_room=bool(self.room)
+            has_room=bool(self.room),
+            allowed_room_ids=[room.id for room in self.allowed_rooms]
         )
         return userdto
     

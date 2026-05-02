@@ -1,12 +1,10 @@
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, Enum
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
-from typing import Optional
 
 from Inksac_Data.database import Base
 from Inksac_Data.Common.Rotation import RotationMode
 from Inksac_Data.Common.BrushType import BrushType
-from Inksac_Data.Entities.Users import UserShallowDto
+from Inksac_Data.Entities.dtos import BrushGetDto, BrushShallowDto
 
 DEFAULT_BRUSH = "/user/brush/softShape.png"
 SYSTEM_BRUSH_ORDER = [
@@ -16,39 +14,6 @@ SYSTEM_BRUSH_ORDER = [
     "/user/brush/A_concrete.png",
     "/user/brush/A_crayon.png",
 ]
-
-class BrushCreateDto(BaseModel):
-    name: str
-    spacing: float
-    rotation_mode: RotationMode
-    rotation_jitter: float
-
-class BrushUpdateDto(BaseModel):
-    name: str
-    spacing: float
-    rotation_mode: RotationMode
-    rotation_jitter: float
-
-class BrushGetDto(BaseModel):
-    id: int
-    name: str
-    imgurl: str
-    spacing: float
-    rotation_mode: RotationMode
-    rotation_jitter: float
-    brush_type: BrushType
-    owner: Optional[UserShallowDto]
-    in_use: bool
-
-class BrushShallowDto(BaseModel):
-    id: int
-    name: str
-    imgurl: str
-    spacing: float
-    rotation_mode: RotationMode
-    rotation_jitter: float
-    brush_type: BrushType
-    in_use: bool
 
 class Brush(Base):
     __tablename__ = "brushes"
