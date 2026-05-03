@@ -4,14 +4,12 @@ import type { RoomGetDto } from "../../constants/types";
 
 interface RoomsListProps {
   rooms: RoomGetDto[];
-  currentUserId: number;
   onRoomAction?: () => void;
   onJoinRoom?: (roomId: number) => void; // ready to implement joining room logic
 }
 
 export const RoomsList = ({
   rooms,
-  currentUserId,
   onRoomAction,
   onJoinRoom,
 }: RoomsListProps) => {
@@ -21,7 +19,6 @@ export const RoomsList = ({
         <RoomCard
           key={room.id}
           room={room}
-          currentUserId={currentUserId}
           onRoomAction={onRoomAction}
           onJoinRoom={onJoinRoom}
         />
