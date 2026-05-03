@@ -56,15 +56,15 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
   return (
     <Card shadow="sm" p="sm" mb="sm" withBorder>
       <Stack gap="xs">
-        <Group justify="space-between" align="flex-start" wrap="nowrap">
+        <Group justify="space-between" wrap="nowrap" style={{ minWidth: 0 }}>
           {/* Always strong */}
           <Text
             fw={600}
+            truncate
+            title={room.name}
             style={{
               minWidth: 0,
               flex: 1,
-              wordBreak: "break-word",
-              overflowWrap: "anywhere",
             }}
           >
             {room.name}
@@ -87,7 +87,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
               <Text size="sm" c="dimmed">
                 Owner:
               </Text>
-              <Text size="sm" fw={500}>
+              <Text size="sm" fw={500} truncate maw={120}>
                 {room.owner.username}
               </Text>
             </Group>
