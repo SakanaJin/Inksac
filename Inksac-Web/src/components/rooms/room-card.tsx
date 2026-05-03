@@ -56,16 +56,31 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
   return (
     <Card shadow="sm" p="sm" mb="sm" withBorder>
       <Stack gap="xs">
-        <Group justify="space-between">
+        <Group justify="space-between" align="flex-start" wrap="nowrap">
           {/* Always strong */}
-          <Text fw={600}>{room.name}</Text>
+          <Text
+            fw={600}
+            style={{
+              minWidth: 0,
+              flex: 1,
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {room.name}
+          </Text>
 
           {isUserRoom ? (
-            <Badge color="blue" variant="outline">
+            <Badge color="blue" variant="outline" style={{ flexShrink: 0 }}>
               Your Room
             </Badge>
           ) : (
-            <Group gap={6} align="center">
+            <Group
+              gap={6}
+              align="center"
+              wrap="nowrap"
+              style={{ flexShrink: 0 }}
+            >
               <Badge variant="outline" color={room.private ? "red" : "blue"}>
                 {room.private ? "Private" : "Public"}
               </Badge>
