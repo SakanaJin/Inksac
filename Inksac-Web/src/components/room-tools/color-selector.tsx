@@ -1,7 +1,15 @@
-import { Box, ColorInput, ColorPicker, NumberInput, TextInput } from "@mantine/core";
+import {
+  ActionIcon,
+  Box,
+  ColorPicker,
+  ColorSwatch,
+  NumberInput,
+  TextInput,
+  Tooltip,
+} from "@mantine/core";
 import { useRoomLayout } from "../layout/room-layout";
 import { useEffect, useRef, useState } from "react";
-
+import { IconPlus } from "@tabler/icons-react";
 
 function toRgba(input: string): string {
   const hexMatch = input.trim().match(/^#?(?<hex>[0-9a-fA-F]{3,8})$/);
@@ -9,7 +17,10 @@ function toRgba(input: string): string {
     let h = hexMatch.groups!.hex;
 
     if (h.length === 3) {
-      h = h.split("").map(c => c + c).join("");
+      h = h
+        .split("")
+        .map((c) => c + c)
+        .join("");
     }
 
     const r = parseInt(h.slice(0, 2), 16);
@@ -24,18 +35,29 @@ function toRgba(input: string): string {
 export function ColorSelector() {
   const { color, setColor } = useRoomLayout();
   const normalizedColor = toRgba(color);
-  const [r,g,b,a = 1] = normalizedColor.match(/[\d.]+/g)!.map(Number);
+  const [r, g, b, a = 1] = normalizedColor.match(/[\d.]+/g)!.map(Number);
   const [localHex, setLocalHex] = useState(
-    `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`.toUpperCase()
+    `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`.toUpperCase(),
   );
   const hexInputFocus = useRef(false);
-  
+  const [swatchColors, setSwatchColors] = useState([
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+    "rgb(255, 255, 255, 0)",
+  ]);
 
   useEffect(() => {
     if (!hexInputFocus.current) {
       setLocalHex(
-        `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`.toUpperCase()
-      )
+        `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`.toUpperCase(),
+      );
     }
   }, [r, g, b]);
 
@@ -96,111 +118,151 @@ export function ColorSelector() {
         .sliders .mantine-ColorPicker-sliderOverlay {
           border-radius: 0;
         }
-
-        .responsive-color-picker .mantine-ColorPicker-swatch {
-          --cp-swatch-size: 30px;
-          grid-column: 1;
-          grid-row: 2;
-        }
-
       `}</style>
 
       <Box
-        className="responsive-color-picker"
         style={{
+          display: "flex",
+          flexDirection: "column",
           width: "100%",
           height: "100%",
           minHeight: 0,
-          overflow: "hidden",
         }}
       >
-        <Box style={{ position: "relative" }}>
-          <ColorPicker
-            fullWidth
-            format="rgba"
-            value={normalizedColor}
-            onChange={setColor}
-            mb={5}
-            pos={"relative"}
-            classNames={{
-              sliders: "sliders",
-              preview: "preview",
-              body: "body",
-              swatches: "swatches",
-              swatch: "swatch"
-            }}
-            styles={{
-              saturation: { height: 150 },
-              saturationOverlay: { borderRadius: 0 },
-              preview: { "--mantine-radius-sm": "0px" },
-              body: {paddingRight: 43},
-            }}
-          />
-          <Box 
-            style={{
-              position: "absolute",
-              bottom: 6,
-              right: 0
-            }}
-          >
-            <TextInput
-              value={localHex.replace("#", "")}
-              leftSection="#"
-              leftSectionWidth={13}
-              onFocus={() => { hexInputFocus.current = true;}}
-              onBlur={() => {
-                hexInputFocus.current = false;
-                setLocalHex(
-                  `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`.toUpperCase()
-                );
+        <Box
+          className="responsive-color-picker"
+          style={{
+            width: "100%",
+            minHeight: 160,
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <ColorPicker
+              fullWidth
+              format="rgba"
+              value={normalizedColor}
+              onChange={setColor}
+              mb={5}
+              classNames={{
+                sliders: "sliders",
+                preview: "preview",
+                body: "body",
+                swatches: "swatches",
+                swatch: "swatch",
               }}
-              radius={0}
-              size="18"
               styles={{
-                input: {
-                  fontSize: "70%"
-                }
+                saturation: { height: 150 },
+                saturationOverlay: { borderRadius: 0 },
+                preview: { "--mantine-radius-sm": "0px" },
+                body: { paddingRight: 43 },
               }}
+            />
+            <Box
               style={{
-                width: 65,
-                marginBottom: 6,
+                position: "absolute",
+                bottom: 6,
+                right: 0,
               }}
-              onChange={(e) => {
-                const val = e.currentTarget.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
-                setLocalHex("#" + val);
-                if (val.length !== 6) return;
+            >
+              <TextInput
+                value={localHex.replace("#", "")}
+                leftSection="#"
+                leftSectionWidth={13}
+                onFocus={() => {
+                  hexInputFocus.current = true;
+                }}
+                onBlur={() => {
+                  hexInputFocus.current = false;
+                  setLocalHex(
+                    `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`.toUpperCase(),
+                  );
+                }}
+                radius={0}
+                size="18"
+                styles={{
+                  input: {
+                    fontSize: "70%",
+                  },
+                }}
+                style={{
+                  width: 65,
+                  marginBottom: 6,
+                }}
+                onChange={(e) => {
+                  const val = e.currentTarget.value
+                    .replace(/[^0-9a-fA-F]/g, "")
+                    .slice(0, 6);
+                  setLocalHex("#" + val);
+                  if (val.length !== 6) return;
 
-                const newR = parseInt(val.slice(0,2), 16);
-                const newG = parseInt(val.slice(2,4), 16);
-                const newB = parseInt(val.slice(4,6), 16);
-                setColor(`rgba(${newR}, ${newG}, ${newB}, ${a})`);
+                  const newR = parseInt(val.slice(0, 2), 16);
+                  const newG = parseInt(val.slice(2, 4), 16);
+                  const newB = parseInt(val.slice(4, 6), 16);
+                  setColor(`rgba(${newR}, ${newG}, ${newB}, ${a})`);
+                }}
+              />
+              <NumberInput
+                suffix="%"
+                min={0}
+                max={100}
+                clampBehavior="strict"
+                defaultValue={100}
+                value={Math.round(a * 100)}
+                radius={0}
+                size="18.3"
+                className="mantine-focus-never"
+                styles={{
+                  input: {
+                    fontSize: "80%",
+                  },
+                }}
+                style={{
+                  width: 65,
+                }}
+                onChange={(val) => {
+                  const newAlpha = (Number(val) / 100).toFixed(2);
+                  setColor(`rgba(${r}, ${g}, ${b}, ${newAlpha})`);
+                }}
+              />
+            </Box>
+          </div>
+        </Box>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexShrink: 0,
+            width: "100%",
+            boxSizing: "border-box",
+            justifyContent: "space-between",
+          }}
+        >
+          {swatchColors.map((color, i) => (
+            <ColorSwatch
+              key={i}
+              radius={0}
+              color={color}
+              size={26}
+              onClick={() => {
+                setColor(color);
               }}
             />
-            <NumberInput
-              suffix="%"
-              min={0}
-              max={100}
-              clampBehavior="strict"
-              defaultValue={100}
-              value={Math.round(a * 100)}
-              radius={0}
-              size="18.3"
-              className="mantine-focus-never"
-              styles={{
-                input: { 
-                  fontSize: "80%"
-                }
+          ))}
+          <Tooltip label="Add swatch">
+            <ActionIcon
+              size={26}
+              onClick={() => {
+                setSwatchColors((prev) => [...prev.slice(1), normalizedColor]);
               }}
               style={{
-                width: 65
+                borderRadius: 0,
               }}
-              onChange={(val) => {
-                const newAlpha = (Number(val) / 100).toFixed(2);
-                setColor(`rgba(${r}, ${g}, ${b}, ${newAlpha})`);
-              }}
-            />
-          </Box>
-        </Box>
+            >
+              <IconPlus size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </div>
       </Box>
     </>
   );

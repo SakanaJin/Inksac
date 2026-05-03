@@ -663,7 +663,7 @@ export function RoomLayout() {
   } | null>(null);
   const hasInitializedBrushSplitRef = useRef(false);
 
-  const BRUSH_TOOLS_MIN_HEIGHT = 190;
+  const BRUSH_TOOLS_MIN_HEIGHT = 220;
   const BRUSH_TOOLS_MAX_HEIGHT = 360;
   const BRUSH_LIBRARY_MIN_HEIGHT = 0;
   const BRUSH_SECTION_DIVIDER_HEIGHT = 12;

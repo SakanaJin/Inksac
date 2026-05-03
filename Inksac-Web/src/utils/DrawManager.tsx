@@ -363,8 +363,8 @@ class DrawManager {
   }
 
   public setColor(color: string) {
-    const [r,g,b,a = 1] = color.match(/[\d.]+/g)!.map(Number);
-    this.activeColor = `rgb(${r}, ${g}, ${b})`;
+    const [r, g, b, a = 1] = color.match(/[\d.]+/g)!.map(Number);
+    this.activeColor = `rgba(${r}, ${g}, ${b}, ${a})`;
     this.activeOpacity = a;
   }
 
