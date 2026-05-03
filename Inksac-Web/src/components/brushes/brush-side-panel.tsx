@@ -18,6 +18,7 @@ import { notifications } from "@mantine/notifications";
 import {
   IconChevronRight,
   IconMinus,
+  IconPlus,
   IconPlus as IconPlusSmall,
 } from "@tabler/icons-react";
 import api from "../../config/axios";
@@ -534,7 +535,7 @@ export function BrushSidePanel({
             cursor: isguest || isAtBrushLimit ? "not-allowed" : "pointer",
           }}
         >
-          +
+          <IconPlus size={17} />
         </ActionIcon>
       </Group>
     </Stack>

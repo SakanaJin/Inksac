@@ -149,7 +149,7 @@ const RoomLayoutContext = createContext<RoomLayoutContextValue>({
   setActiveTool: () => {},
   shapeType: "line",
   setShapeType: () => {},
-  color: "#ffffffff",
+  color: "rgb(0, 0, 0)",
   toggleSidebar: () => {},
   erase: false,
   strokeScale: 16,
@@ -613,7 +613,7 @@ export function RoomLayout() {
   const { id } = useParams();
   const [canManageLayers, setCanManageLayers] = useState(false);
   const [roomName, setRoomName] = useState<string | undefined>(undefined);
-  const [color, setColor] = useState("#000000ff");
+  const [color, setColor] = useState("rgb(0, 0, 0)");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -663,7 +663,7 @@ export function RoomLayout() {
   } | null>(null);
   const hasInitializedBrushSplitRef = useRef(false);
 
-  const BRUSH_TOOLS_MIN_HEIGHT = 190;
+  const BRUSH_TOOLS_MIN_HEIGHT = 220;
   const BRUSH_TOOLS_MAX_HEIGHT = 360;
   const BRUSH_LIBRARY_MIN_HEIGHT = 0;
   const BRUSH_SECTION_DIVIDER_HEIGHT = 12;
