@@ -56,63 +56,76 @@ export const HomePage = () => {
   }, []);
 
   return (
-    <Container size="lg">
-      <Group justify="space-between" mb="md">
-        <Group gap="sm">
+    <Container size="lg" style={{ height: "100%", paddingBottom: 40 }}>
+      <Group justify="space-between" mb="md" wrap="nowrap">
+        <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 200 }}>
           <Title order={2}>Available Rooms</Title>
-          <Button
-            size="xs"
-            radius="md"
-            variant="outline"
-            onClick={() => refresh()}
-            leftSection={
-              <IconRefresh
-                size={16}
-                style={{
-                  transform: "scaleX(-1)",
-                  animation: isFetching ? "spin 1s linear infinite" : undefined,
-                }}
-              />
-            }
-          >
-            Refresh
-          </Button>
+          <Box>
+            <Button
+              size="xs"
+              radius="md"
+              variant="outline"
+              onClick={() => refresh()}
+              leftSection={
+                <IconRefresh
+                  size={16}
+                  style={{
+                    transform: "scaleX(-1)",
+                    animation: isFetching
+                      ? "spin 1s linear infinite"
+                      : undefined,
+                  }}
+                />
+              }
+            >
+              Refresh
+            </Button>
+          </Box>
         </Group>
-
-        <Tooltip label={createRoomTooltip} disabled={canCreateRoom}>
-          <Button
-            onClick={() =>
-              modals.openContextModal({
-                modal: "roomcreatemodal",
-                title: "Create Room",
-                innerProps: {
-                  defaultRoomName: `${user.username}'s Room`,
-                  onSuccess: (createdRoom: RoomGetDto) => {
-                    navigate(`/room/${createdRoom.id}`);
+        <Box>
+          <Tooltip label={createRoomTooltip} disabled={canCreateRoom}>
+            <Button
+              onClick={() =>
+                modals.openContextModal({
+                  modal: "roomcreatemodal",
+                  title: "Create Room",
+                  innerProps: {
+                    defaultRoomName: `${user.username}'s Room`,
+                    onSuccess: (createdRoom: RoomGetDto) => {
+                      navigate(`/room/${createdRoom.id}`);
+                    },
                   },
+                })
+              }
+              disabled={!canCreateRoom}
+              variant="gradient"
+              gradient={{ from: "indigo", to: "cyan", deg: 90 }}
+              radius="md"
+              size="sm"
+              leftSection={<FontAwesomeIcon icon={faDoorOpen} />}
+              styles={{
+                root: {
+                  fontWeight: 600,
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+                  transition: "all 150ms ease",
                 },
-              })
-            }
-            disabled={!canCreateRoom}
-            variant="gradient"
-            gradient={{ from: "indigo", to: "cyan", deg: 90 }}
-            radius="md"
-            size="sm"
-            leftSection={<FontAwesomeIcon icon={faDoorOpen} />}
-            styles={{
-              root: {
-                fontWeight: 600,
-                boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-                transition: "all 150ms ease",
-              },
-            }}
-          >
-            Create Room
-          </Button>
-        </Tooltip>
+              }}
+            >
+              Create Room
+            </Button>
+          </Tooltip>
+        </Box>
       </Group>
 
-      <Box mih={200}>{roomList}</Box>
+      <Box
+        style={{
+          height: "calc(100% - 52px)",
+          overflowY: "auto",
+          paddingRight: 8,
+        }}
+      >
+        {roomList}
+      </Box>
     </Container>
   );
 };
