@@ -16,17 +16,41 @@ export const AppHeader = ({
   actions,
 }: AppHeaderProps) => {
   return (
-    <Group h="100%" px="md" wrap="nowrap">
-      <Burger opened={opened} onClick={toggle} />
+    <Group h="100%" px="md" wrap="nowrap" style={{ minWidth: 0 }}>
+      <Burger opened={opened} onClick={toggle} style={{ flexShrink: 0 }} />
 
-      <Group gap="xs" wrap="nowrap" align="center">
-        <img src={logo} alt="logo" style={{ width: 90, height: 90 }} />
-        <Title order={3} size={40}>
+      <Group
+        gap="xs"
+        wrap="nowrap"
+        align="center"
+        style={{
+          minWidth: 0,
+          flex: 1,
+          overflow: "hidden",
+        }}
+      >
+        <img
+          src={logo}
+          alt="logo"
+          style={{ width: 90, height: 90, flexShrink: 0 }}
+        />
+
+        <Title
+          order={3}
+          size={40}
+          title={title}
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {title}
         </Title>
       </Group>
 
-      <Group gap="xs" wrap="nowrap" style={{ marginLeft: "auto" }}>
+      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
         {actions}
       </Group>
     </Group>

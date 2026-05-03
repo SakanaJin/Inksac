@@ -63,6 +63,10 @@ const getFileNameWithoutExtension = (filename: string) => {
   return filename.slice(0, lastDotIndex);
 };
 
+const limitRoomName = (value: string) => {
+  return value.slice(0, 255);
+};
+
 export const RoomCreateModal = ({
   context,
   id,
@@ -75,15 +79,24 @@ export const RoomCreateModal = ({
 
   const form = useForm({
     initialValues: {
-      name: innerProps.defaultRoomName,
+      name: limitRoomName(innerProps.defaultRoomName),
       width: 1920,
       height: 1080,
       canvas_color: "#f0f0f0",
       private: priv,
     },
     validate: {
-      name: (value) =>
-        value.trim().length === 0 ? "Room name cannot be empty" : null,
+      name: (value) => {
+        if (value.trim().length === 0) {
+          return "Room name cannot be empty";
+        }
+
+        if (value.length > 255) {
+          return `Room name cannot be longer than 255 characters`;
+        }
+
+        return null;
+      },
       width: (value) => {
         if (!value || value < 256) {
           return `Width must be at least ${256}`;
@@ -112,7 +125,7 @@ export const RoomCreateModal = ({
 
     form.setFieldValue("width", 2000);
     form.setFieldValue("height", 2000);
-    form.setFieldValue("name", innerProps.defaultRoomName);
+    form.setFieldValue("name", limitRoomName(innerProps.defaultRoomName));
   };
 
   const handleFileChange = async (file: FileWithPath | null) => {
@@ -143,7 +156,10 @@ export const RoomCreateModal = ({
         return;
       }
 
-      form.setFieldValue("name", getFileNameWithoutExtension(file.name));
+      form.setFieldValue(
+        "name",
+        limitRoomName(getFileNameWithoutExtension(file.name)),
+      );
       form.setFieldValue("width", width);
       form.setFieldValue("height", height);
       setSelectedFile(file);
@@ -162,7 +178,10 @@ export const RoomCreateModal = ({
     setSubmitting(true);
 
     try {
-      const response = await api.post<RoomGetDto>("/rooms", values);
+      const response = await api.post<RoomGetDto>("/rooms", {
+        ...values,
+        name: limitRoomName(values.name),
+      });
 
       if (response.data.has_errors) {
         const formErrors = response.data.errors.reduce((acc, err) => {
@@ -217,14 +236,21 @@ export const RoomCreateModal = ({
           key={form.key("name")}
           label="Room Name"
           placeholder="Enter room name"
+          maxLength={255}
+          description={`${form.values.name.length}/255 characters`}
           {...form.getInputProps("name")}
+          onChange={(event) =>
+            form.setFieldValue("name", limitRoomName(event.currentTarget.value))
+          }
         />
 
         <Switch
           label="Private"
-          value={priv}
-          onChange={() => togglePriv()}
-          {...form.getInputProps("private")}
+          checked={form.values.private}
+          onChange={(event) => {
+            togglePriv();
+            form.setFieldValue("private", event.currentTarget.checked);
+          }}
         />
 
         <Divider />
