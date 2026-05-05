@@ -25,9 +25,15 @@ import { useRoomLayout } from "../components/layout/room-layout";
 import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
 import { useUser } from "../authentication/use-auth";
+import { EnvVars } from "../config/env-vars";
+
+const build = EnvVars.name;
 
 const wsprotocol = window.location.protocol === "https:" ? "wss" : "ws";
-const wsbaseurl = `${wsprotocol}://${window.location.host}/ws`;
+const wsbaseurl =
+  build === "local"
+    ? EnvVars.wsBaseUrl
+    : `${wsprotocol}://${window.location.host}/ws`;
 const LOADER_MIN_DURATION_MS = 2000;
 
 export const RoomPage = () => {
