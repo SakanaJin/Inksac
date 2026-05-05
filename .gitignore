@@ -1,3 +1,9 @@
+# deployment files
+Dockerfile.backend
+Dockerfile.frontend
+docker-compose.yml
+nginx.conf
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
