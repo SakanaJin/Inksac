@@ -4,7 +4,6 @@ import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
 import { useNavigate, useParams } from "react-router-dom";
-import { EnvVars } from "../config/env-vars";
 import {
   type CloseHandlers,
   type MessageHandlers,
@@ -27,7 +26,8 @@ import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
 import { useUser } from "../authentication/use-auth";
 
-const wsbaseurl = EnvVars.wsBaseUrl;
+const wsprotocol = window.location.protocol === "https:" ? "wss" : "ws";
+const wsbaseurl = `${wsprotocol}://${window.location.host}/ws`;
 const LOADER_MIN_DURATION_MS = 2000;
 
 export const RoomPage = () => {
