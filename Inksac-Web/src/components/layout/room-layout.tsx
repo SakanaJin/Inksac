@@ -961,6 +961,19 @@ export function RoomLayout() {
     [id, canManageLayers, setLayers],
   );
 
+  const previewLayerOpacity = useCallback(
+    (layerId: number, opacityPercent: number) => {
+      const opacity = Math.max(0, Math.min(100, opacityPercent)) / 100;
+
+      setLayersState((prevLayers) =>
+        prevLayers.map((layer) =>
+          layer.id === layerId ? { ...layer, opacity } : layer,
+        ),
+      );
+    },
+    [],
+  );
+
   const updateLayerOpacity = useCallback(
     async (layerId: number, opacityPercent: number) => {
       if (!canManageLayers) return;
@@ -2100,6 +2113,7 @@ export function RoomLayout() {
                   onRenameLayer={renameLayer}
                   onDeleteLayer={deleteLayer}
                   onReorderLayers={reorderLayers}
+                  onPreviewLayerOpacity={previewLayerOpacity}
                   onUpdateLayerOpacity={updateLayerOpacity}
                 />
               </Box>

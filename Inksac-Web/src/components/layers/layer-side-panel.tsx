@@ -41,6 +41,7 @@ interface LayerSidePanelProps {
   onRenameLayer: (layerId: number) => void;
   onDeleteLayer: (layerId: number) => void;
   onReorderLayers: (orderedLayerIds: number[]) => void;
+  onPreviewLayerOpacity: (layerId: number, opacityPercent: number) => void;
   onUpdateLayerOpacity: (
     layerId: number,
     opacityPercent: number,
@@ -58,6 +59,7 @@ export function LayerSidePanel({
   onRenameLayer,
   onDeleteLayer,
   onReorderLayers,
+  onPreviewLayerOpacity,
   onUpdateLayerOpacity,
 }: LayerSidePanelProps) {
   const sortedLayers = useMemo(
@@ -90,6 +92,8 @@ export function LayerSidePanel({
   }, [sortedLayers]);
 
   useEffect(() => {
+    if (isOpacityDraggingRef.current) return;
+
     const activeLayer =
       layers.find((layer) => layer.id === activeLayerId) ?? null;
     setOpacityValue(Math.round((activeLayer?.opacity ?? 1) * 100));
@@ -198,21 +202,36 @@ export function LayerSidePanel({
     commitOrder(currentLayers);
   };
 
-  const updateOpacity = (nextValue: number) => {
+  const getActiveLayer = () => {
+    return layers.find((layer) => layer.id === activeLayerId) ?? null;
+  };
+
+  const previewOpacity = (nextValue: number) => {
     if (!canManageLayers) return;
 
-    const activeLayer =
-      layers.find((layer) => layer.id === activeLayerId) ?? null;
+    const activeLayer = getActiveLayer();
     if (!activeLayer) return;
 
     const clampedValue = Math.max(0, Math.min(100, nextValue));
     setOpacityValue(clampedValue);
+    onPreviewLayerOpacity(activeLayer.id, clampedValue);
+  };
+
+  const commitOpacity = (nextValue: number) => {
+    if (!canManageLayers) return;
+
+    const activeLayer = getActiveLayer();
+    if (!activeLayer) return;
+
+    const clampedValue = Math.max(0, Math.min(100, nextValue));
+    setOpacityValue(clampedValue);
+    onPreviewLayerOpacity(activeLayer.id, clampedValue);
     void onUpdateLayerOpacity(activeLayer.id, clampedValue);
   };
 
   const nudgeOpacity = (delta: number) => {
     if (!canManageLayers) return;
-    updateOpacity(opacityValue + delta);
+    commitOpacity(opacityValue + delta);
   };
 
   const getOpacityFromClientX = (clientX: number) => {
@@ -228,10 +247,14 @@ export function LayerSidePanel({
 
   const handleOpacityPointerMove = (e: PointerEvent) => {
     if (!isOpacityDraggingRef.current) return;
-    updateOpacity(getOpacityFromClientX(e.clientX));
+    previewOpacity(getOpacityFromClientX(e.clientX));
   };
 
-  const handleOpacityPointerUp = () => {
+  const handleOpacityPointerUp = (e: PointerEvent) => {
+    if (isOpacityDraggingRef.current) {
+      commitOpacity(getOpacityFromClientX(e.clientX));
+    }
+
     isOpacityDraggingRef.current = false;
     window.removeEventListener("pointermove", handleOpacityPointerMove);
     window.removeEventListener("pointerup", handleOpacityPointerUp);
@@ -244,7 +267,7 @@ export function LayerSidePanel({
     e.stopPropagation();
 
     isOpacityDraggingRef.current = true;
-    updateOpacity(getOpacityFromClientX(e.clientX));
+    previewOpacity(getOpacityFromClientX(e.clientX));
 
     window.addEventListener("pointermove", handleOpacityPointerMove);
     window.addEventListener("pointerup", handleOpacityPointerUp);
