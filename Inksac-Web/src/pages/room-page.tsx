@@ -918,13 +918,13 @@ export const RoomPage = () => {
 
       if (e.key === "[") {
         e.preventDefault();
-        setStrokeScale(Math.max(1, strokeScale - 4));
+        setStrokeScale(Math.max(1, strokeScale - 1));
         return;
       }
 
       if (e.key === "]") {
         e.preventDefault();
-        setStrokeScale(Math.min(512, strokeScale + 4));
+        setStrokeScale(Math.min(512, strokeScale + 1));
         return;
       }
 
