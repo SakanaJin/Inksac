@@ -35,7 +35,19 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
   const openDeleteModal = () => {
     modals.openContextModal({
       modal: "roomdeletemodal",
-      title: "Delete Room",
+      title: "Delete your room?",
+      centered: true,
+      styles: {
+        content: {
+          background: "rgba(20, 24, 31, 0.98)",
+        },
+        header: {
+          background: "rgba(20, 24, 31, 0.98)",
+        },
+        body: {
+          background: "rgba(20, 24, 31, 0.98)",
+        },
+      },
       innerProps: {
         onSuccess: onRoomAction,
       },
@@ -46,6 +58,18 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
     modals.openContextModal({
       modal: "roomupdatemodal",
       title: "Edit Room",
+      centered: true,
+      styles: {
+        content: {
+          background: "rgba(20, 24, 31, 0.98)",
+        },
+        header: {
+          background: "rgba(20, 24, 31, 0.98)",
+        },
+        body: {
+          background: "rgba(20, 24, 31, 0.98)",
+        },
+      },
       innerProps: {
         room,
         onSuccess: onRoomAction,
@@ -54,24 +78,35 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
   };
 
   return (
-    <Card shadow="sm" p="sm" mb="sm" withBorder>
+    <Card
+      shadow="sm"
+      p="md"
+      mb="sm"
+      radius="md"
+      style={{
+        background: "rgba(28, 33, 43, 0.96)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.16)",
+      }}
+    >
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap" style={{ minWidth: 0 }}>
           {/* Always strong */}
           <Text
-            fw={600}
+            fw={700}
             truncate
             title={room.name}
             style={{
               minWidth: 0,
               flex: 1,
+              letterSpacing: -0.2,
             }}
           >
             {room.name}
           </Text>
 
           {isUserRoom ? (
-            <Badge color="blue" variant="outline" style={{ flexShrink: 0 }}>
+            <Badge color="blue" variant="light" style={{ flexShrink: 0 }}>
               Your Room
             </Badge>
           ) : (
@@ -81,7 +116,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
               wrap="nowrap"
               style={{ flexShrink: 0 }}
             >
-              <Badge variant="outline" color={room.private ? "red" : "blue"}>
+              <Badge variant="light" color={room.private ? "red" : "blue"}>
                 {room.private ? "Private" : "Public"}
               </Badge>
               <Text size="sm" c="dimmed">
@@ -98,6 +133,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
           <Text size="sm" c="dimmed">
             Expires: {new Date(room.expiration).toLocaleString()}
           </Text>
+
           <Badge
             color={userCount > 0 ? "green" : "gray"}
             variant="light"
@@ -114,7 +150,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
             size="xs"
             radius="md"
             variant="light"
-            color="green"
+            color="blue"
             leftSection={<FontAwesomeIcon icon={faRightToBracket} />}
             onClick={handleJoinRoom}
             disabled={!canJoin}
@@ -127,8 +163,8 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
             <Button
               size="xs"
               radius="md"
-              variant="light"
-              color="blue"
+              variant="subtle"
+              color="gray"
               leftSection={<FontAwesomeIcon icon={faPen} />}
               onClick={openUpdateModal}
             >
@@ -141,7 +177,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
             <Button
               size="xs"
               radius="md"
-              variant="light"
+              variant="subtle"
               color="red"
               leftSection={<FontAwesomeIcon icon={faTrash} />}
               onClick={openDeleteModal}

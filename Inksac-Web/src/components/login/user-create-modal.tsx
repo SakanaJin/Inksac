@@ -7,7 +7,20 @@ import {
 } from "../../constants/types";
 import api from "../../config/axios";
 import { notifications } from "@mantine/notifications";
-import { Button, Flex, PasswordInput, TextInput } from "@mantine/core";
+import {
+  ActionIcon,
+  Anchor,
+  Box,
+  Button,
+  Divider,
+  Group,
+  PasswordInput,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from "@mantine/core";
+import { IconX } from "@tabler/icons-react";
 
 interface UserCreateModalProps {
   onSubmit: (logindto: LoginDto) => void;
@@ -29,17 +42,17 @@ export const UserCreateModal = ({
     validate: {
       username: (value) => {
         if (value.length === 0) {
-          return "username cannot be empty";
+          return "Username cannot be empty";
         }
         if (value.includes(" ")) {
-          return "username cannot have spaces";
+          return "Username cannot have spaces";
         }
         return null;
       },
-      email: (value) => (/^\S+@\S+$/.test(value) ? null : "invalid email"),
+      email: (value) => (/^\S+@\S+$/.test(value) ? null : "Invalid email"),
       confirm_password: matchesField(
         "password",
-        "password fields do not match",
+        "Password fields do not match",
       ),
     },
   });
@@ -67,37 +80,146 @@ export const UserCreateModal = ({
   };
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
-      <TextInput
-        autoFocus
-        key={form.key("username")}
-        label="Username"
-        {...form.getInputProps("username")}
+    <Box
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        padding: "28px 28px 24px",
+        borderRadius: 18,
+        background:
+          "linear-gradient(135deg, rgba(9, 9, 11, 0.98) 0%, rgba(17, 24, 39, 0.98) 45%, rgba(5, 5, 5, 0.98) 100%)",
+        border: "1px solid rgba(255,255,255,0.10)",
+      }}
+    >
+      <ActionIcon
+        variant="subtle"
+        radius="xl"
+        size="lg"
+        onClick={() => context.closeModal(id)}
+        style={{
+          position: "absolute",
+          top: 14,
+          right: 14,
+          zIndex: 3,
+          color: "rgba(255,255,255,0.82)",
+        }}
+      >
+        <IconX size={18} />
+      </ActionIcon>
+
+      <Box
+        style={{
+          position: "absolute",
+          width: 180,
+          height: 180,
+          borderRadius: "50%",
+          background: "rgba(34, 139, 230, 0.18)",
+          filter: "blur(26px)",
+          top: -80,
+          left: -70,
+        }}
       />
-      <TextInput
-        pt="sm"
-        key={form.key("email")}
-        label="Email"
-        {...form.getInputProps("email")}
+
+      <Box
+        style={{
+          position: "absolute",
+          width: 160,
+          height: 160,
+          borderRadius: "50%",
+          background: "rgba(250, 82, 82, 0.12)",
+          filter: "blur(26px)",
+          right: -60,
+          bottom: -70,
+        }}
       />
-      <PasswordInput
-        pt="sm"
-        key={form.key("password")}
-        label="Password"
-        {...form.getInputProps("password")}
-      />
-      <PasswordInput
-        pt="sm"
-        key={form.key("confirm_password")}
-        label="Confirm Password"
-        {...form.getInputProps("confirm_password")}
-      />
-      <Flex justify="space-between" pt="sm">
-        <Button variant="outline" onClick={() => context.closeModal(id)}>
-          Cancel
-        </Button>
-        <Button type="submit">Submit</Button>
-      </Flex>
-    </form>
+
+      <Stack gap="lg" style={{ position: "relative", zIndex: 1 }}>
+        <Stack gap={4} pr={32}>
+          <Text
+            size="xs"
+            fw={800}
+            tt="uppercase"
+            style={{
+              letterSpacing: 2,
+              color: "#74c0fc",
+            }}
+          >
+            Inksac
+          </Text>
+
+          <Title order={2}>Create your account</Title>
+
+          <Text size="sm" c="dimmed">
+            Start drawing with friends, save custom brushes, and create your own
+            shared rooms.
+          </Text>
+        </Stack>
+
+        <Divider color="rgba(255,255,255,0.10)" />
+
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack gap="md">
+            <TextInput
+              autoFocus
+              key={form.key("username")}
+              label="Username"
+              placeholder="Choose a username"
+              size="md"
+              radius="md"
+              {...form.getInputProps("username")}
+            />
+
+            <TextInput
+              key={form.key("email")}
+              label="Email"
+              placeholder="you@example.com"
+              size="md"
+              radius="md"
+              {...form.getInputProps("email")}
+            />
+
+            <PasswordInput
+              key={form.key("password")}
+              label="Password"
+              placeholder="Create a password"
+              size="md"
+              radius="md"
+              {...form.getInputProps("password")}
+            />
+
+            <PasswordInput
+              key={form.key("confirm_password")}
+              label="Confirm password"
+              placeholder="Re-enter your password"
+              size="md"
+              radius="md"
+              {...form.getInputProps("confirm_password")}
+            />
+
+            <Button
+              type="submit"
+              fullWidth
+              size="md"
+              radius="md"
+              mt="xs"
+              variant="gradient"
+              gradient={{ from: "blue", to: "grape", deg: 135 }}
+            >
+              Create account
+            </Button>
+
+            <Group justify="center" gap={6}>
+              <Text size="sm" c="dimmed">
+                Already have an account?
+              </Text>
+
+              <Anchor size="sm" fw={700} onClick={() => context.closeModal(id)}>
+                Log in
+              </Anchor>
+            </Group>
+          </Stack>
+        </form>
+      </Stack>
+    </Box>
   );
 };
