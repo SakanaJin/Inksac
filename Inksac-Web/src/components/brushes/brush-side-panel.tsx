@@ -408,7 +408,7 @@ export function BrushSidePanel({
             size={16}
             style={{ width: "100%", height: 16 }}
             disabled={strokeScale >= 512}
-            onClick={() => nudgeDiameter(5)}
+            onClick={() => nudgeDiameter(1)}
           >
             <IconPlusSmall size={12} />
           </ActionIcon>
@@ -423,7 +423,7 @@ export function BrushSidePanel({
               borderTop: "1px solid rgba(255,255,255,0.08)",
             }}
             disabled={strokeScale <= 1}
-            onClick={() => nudgeDiameter(-5)}
+            onClick={() => nudgeDiameter(-1)}
           >
             <IconMinus size={12} />
           </ActionIcon>

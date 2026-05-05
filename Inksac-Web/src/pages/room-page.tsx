@@ -4,7 +4,6 @@ import { modals } from "@mantine/modals";
 import * as pixi from "pixi.js";
 import DrawManager from "../utils/DrawManager";
 import { useNavigate, useParams } from "react-router-dom";
-import { EnvVars } from "../config/env-vars";
 import {
   type CloseHandlers,
   type MessageHandlers,
@@ -26,8 +25,15 @@ import { useRoomLayout } from "../components/layout/room-layout";
 import { RoomLoadingOverlay } from "../components/layout/room-loading-overlay";
 import api from "../config/axios";
 import { useUser } from "../authentication/use-auth";
+import { EnvVars } from "../config/env-vars";
 
-const wsbaseurl = EnvVars.wsBaseUrl;
+const build = EnvVars.name;
+
+const wsprotocol = window.location.protocol === "https:" ? "wss" : "ws";
+const wsbaseurl =
+  build === "local"
+    ? EnvVars.wsBaseUrl
+    : `${wsprotocol}://${window.location.host}/ws`;
 const LOADER_MIN_DURATION_MS = 2000;
 
 export const RoomPage = () => {
@@ -912,13 +918,13 @@ export const RoomPage = () => {
 
       if (e.key === "[") {
         e.preventDefault();
-        setStrokeScale(Math.max(1, strokeScale - 4));
+        setStrokeScale(Math.max(1, strokeScale - 1));
         return;
       }
 
       if (e.key === "]") {
         e.preventDefault();
-        setStrokeScale(Math.min(512, strokeScale + 4));
+        setStrokeScale(Math.min(512, strokeScale + 1));
         return;
       }
 

@@ -54,7 +54,11 @@ class ConnectionManager:
         if roomid not in [room.id for room in rooms]:
             raise WebSocketException(code=WSCodes.POLICY_VIOLATION, reason="room doesn't exist")
         if self.user_in_room(userid=userid, roomid=roomid):
-            raise WebSocketException(code=WSCodes.POLICY_VIOLATION, reason="user already in room")
+            # raise WebSocketException(code=WSCodes.POLICY_VIOLATION, reason="user already in room")
+            try:
+                await self.rooms[roomid][userid].close(code=WSCodes.FORCE_DC, reason="Second session opened")
+            except:
+                del self.rooms[roomid][userid]
         self.rooms.setdefault(roomid, dict())[userid] = websocket
 
     def disconnect(self, roomid: int, userid: int):
