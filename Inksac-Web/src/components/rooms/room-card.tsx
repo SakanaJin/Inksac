@@ -106,7 +106,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
           </Text>
 
           {isUserRoom ? (
-            <Badge color="blue" variant="light" style={{ flexShrink: 0 }}>
+            <Badge color="green" variant="light" style={{ flexShrink: 0 }}>
               Your Room
             </Badge>
           ) : (
@@ -135,7 +135,7 @@ export const RoomCard = ({ room, onRoomAction, onJoinRoom }: RoomCardProps) => {
           </Text>
 
           <Badge
-            color={userCount > 0 ? "green" : "gray"}
+            color={userCount > 0 ? "blue" : "gray"}
             variant="light"
             leftSection={<FontAwesomeIcon icon={faUsers} size="xs" />}
           >

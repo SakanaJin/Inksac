@@ -141,7 +141,7 @@ export const HomePage = () => {
         style={{
           height: "100%",
           paddingTop: 28,
-          paddingBottom: 40,
+          paddingBottom: 90,
           position: "relative",
           zIndex: 1,
         }}
@@ -157,18 +157,6 @@ export const HomePage = () => {
         >
           <Group justify="space-between" align="center" wrap="nowrap">
             <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                size="xs"
-                fw={800}
-                tt="uppercase"
-                style={{
-                  letterSpacing: 2,
-                  color: "#74c0fc",
-                }}
-              >
-                Inksac Rooms
-              </Text>
-
               <Title
                 order={2}
                 style={{
