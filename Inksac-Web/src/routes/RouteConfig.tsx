@@ -12,16 +12,18 @@ export const RouteConfig = () => (
     <Route
       element={
         <RoomProvider>
-          <AppLayout />
+          <AppLayout headerVariant="home" />
         </RoomProvider>
       }
     >
       <Route path={routes.home} element={<HomePage />} />
       <Route path={routes.root} element={<Navigate to={routes.home} />} />
     </Route>
+
     <Route element={<RoomLayout />}>
       <Route path={routes.room} element={<RoomPage />} />
     </Route>
+
     <Route path="*" element={<NotFoundPage />} />
   </Routes>
 );

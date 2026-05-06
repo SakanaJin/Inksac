@@ -1,8 +1,9 @@
-import { Stack, Text, Button } from "@mantine/core";
+import { Stack, Text, Button, Group, ThemeIcon, Paper } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import type { ContextModalProps } from "@mantine/modals";
 import api from "../../config/axios";
 import { useState } from "react";
+import { IconAlertTriangle } from "@tabler/icons-react";
 
 export interface RoomDeleteModalProps {
   onSuccess?: () => void;
@@ -45,18 +46,45 @@ export const RoomDeleteModal = ({
   };
 
   return (
-    <Stack>
-      <Text>
-        Are you sure you want to delete your room? This action cannot be undone.
-      </Text>
+    <Stack gap="md">
+      <Paper
+        radius="md"
+        p="md"
+        style={{
+          background: "rgba(28, 33, 43, 0.96)",
+          border: "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
+        <Group align="flex-start" wrap="nowrap">
+          <ThemeIcon color="red" variant="light" size="lg" radius="md">
+            <IconAlertTriangle size={20} />
+          </ThemeIcon>
+          <Text size="sm" c="dimmed">
+            This will permanently delete the room and its canvas data. This
+            action cannot be undone.
+          </Text>
+        </Group>
+      </Paper>
 
-      <Button color="red" onClick={handleDelete} loading={loading}>
-        Delete Room
-      </Button>
+      <Group justify="flex-end" gap="sm">
+        <Button
+          variant="subtle"
+          color="gray"
+          radius="md"
+          onClick={() => context.closeModal(id)}
+        >
+          Cancel
+        </Button>
 
-      <Button variant="outline" onClick={() => context.closeModal(id)}>
-        Cancel
-      </Button>
+        <Button
+          color="red"
+          radius="md"
+          onClick={handleDelete}
+          loading={loading}
+        >
+          Delete Room
+        </Button>
+      </Group>
     </Stack>
   );
 };

@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 type AppLayoutProps = {
   headerTitle?: string;
   headerActions?: ReactNode;
+  headerVariant?: "default" | "home";
   sidebarSlots?: SidebarSlots;
   sidebarWidth?: number;
   hideActions?: boolean;
@@ -27,6 +28,7 @@ type AppLayoutProps = {
 export const AppLayout = ({
   headerTitle,
   headerActions,
+  headerVariant = "default",
   sidebarSlots,
   sidebarWidth = 260,
   hideActions = false,
@@ -50,10 +52,12 @@ export const AppLayout = ({
   const showNavbar = !leftPanel;
   const effectiveLeftPanelWidth = leftPanel ? leftPanelWidth : 0;
   const effectiveRightPanelWidth = rightPanel ? rightPanelWidth : 0;
+
   const mainContentWidth =
     effectiveLeftPanelWidth > 0 || effectiveRightPanelWidth > 0
       ? `calc(100% - ${effectiveLeftPanelWidth + effectiveRightPanelWidth}px)`
       : "100%";
+
   const mainContentLeft =
     effectiveLeftPanelWidth > 0 ? effectiveLeftPanelWidth : 0;
 
@@ -69,7 +73,7 @@ export const AppLayout = ({
             }
           : undefined
       }
-      padding={overlayNavbar ? 0 : "md"}
+      padding={0}
       styles={
         overlayNavbar
           ? {
@@ -86,6 +90,7 @@ export const AppLayout = ({
           toggle={toggle}
           title={headerTitle}
           actions={headerActions}
+          variant={headerVariant}
         />
       </AppShell.Header>
 
@@ -113,7 +118,7 @@ export const AppLayout = ({
       <AppShell.Main
         style={{
           position: "relative",
-          height: "calc(100vh - 60px - var(--mantine-spacing-md) * 2)",
+          height: "calc(100vh - 60px)",
           overflow: "hidden",
         }}
       >
