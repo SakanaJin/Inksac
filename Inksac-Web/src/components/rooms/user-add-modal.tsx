@@ -5,17 +5,18 @@ import api from "../../config/axios";
 import {
   ActionIcon,
   Avatar,
+  Box,
   Card,
   Group,
   Loader,
   ScrollArea,
   Select,
   Stack,
-  Title,
+  Text,
   Tooltip,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { IconX } from "@tabler/icons-react";
+import { IconSearch, IconUserPlus, IconX } from "@tabler/icons-react";
 import { EnvVars } from "../../config/env-vars";
 
 export interface UserAddModalProps {
@@ -108,10 +109,25 @@ export const UserAddModal = ({
         ),
       )
       .finally(() => setLoading(false));
-  }, [debounced]);
+  }, [debounced, innerProps.roomid]);
+
+  const visibleAllowedUsers = allowedUsers.filter(
+    (auser) => auser.id !== innerProps.userid,
+  );
 
   return (
-    <Stack>
+    <Stack gap="md">
+      <Box>
+        <Group gap="xs" mb={4}>
+          <IconUserPlus size={18} />
+          <Text fw={700}>Manage room access</Text>
+        </Group>
+
+        <Text size="sm" c="dimmed">
+          Search for users to add them to this private room.
+        </Text>
+      </Box>
+
       <Select
         value={value}
         data={options}
@@ -120,6 +136,7 @@ export const UserAddModal = ({
           allowUser(+value);
           setSearch("");
           setValue(null);
+          setOptions([]);
         }}
         searchable
         searchValue={search}
@@ -128,32 +145,99 @@ export const UserAddModal = ({
           if (!val.trim()) setOptions([]);
         }}
         placeholder="Search users..."
+        leftSection={<IconSearch size={16} />}
         rightSection={loading ? <Loader size="xs" /> : null}
         nothingFoundMessage={
           debounced ? "No users found" : "Start typing to search"
         }
         clearable
+        radius="md"
+        size="md"
       />
-      <ScrollArea h="20rem">
-        {allowedUsers.map((auser) => {
-          if (auser.id == innerProps.userid) return;
-          return (
-            <Card m="xs">
-              <Group justify="space-between">
-                <Group>
-                  <Avatar src={mediabaseurl + auser.pfp_path} />
-                  <Title>{auser.username}</Title>
-                </Group>
-                <Tooltip label="remove user">
-                  <ActionIcon color="red" onClick={() => removeUser(auser.id)}>
-                    <IconX />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
+
+      <Box>
+        <Group justify="space-between" mb="xs">
+          <Text size="sm" fw={700}>
+            Allowed users
+          </Text>
+
+          <Text size="xs" c="dimmed">
+            {visibleAllowedUsers.length} user
+            {visibleAllowedUsers.length === 1 ? "" : "s"}
+          </Text>
+        </Group>
+
+        <ScrollArea h="20rem" offsetScrollbars scrollbarSize={8}>
+          {visibleAllowedUsers.length === 0 ? (
+            <Card
+              withBorder
+              radius="md"
+              p="lg"
+              style={{
+                background: "rgba(255,255,255,0.025)",
+              }}
+            >
+              <Stack gap={4} align="center">
+                <Text fw={600}>No users added yet</Text>
+                <Text size="sm" c="dimmed" ta="center">
+                  Search above to add users who can access this room.
+                </Text>
+              </Stack>
             </Card>
-          );
-        })}
-      </ScrollArea>
+          ) : (
+            <Stack gap="xs">
+              {visibleAllowedUsers.map((auser) => (
+                <Card
+                  key={auser.id}
+                  withBorder
+                  radius="md"
+                  p="sm"
+                  style={{
+                    background: "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                      <Avatar
+                        src={mediabaseurl + auser.pfp_path}
+                        radius="xl"
+                        size="md"
+                        style={{ flexShrink: 0 }}
+                      />
+
+                      <Box style={{ minWidth: 0 }}>
+                        <Text
+                          fw={600}
+                          truncate
+                          title={auser.username}
+                          style={{ maxWidth: 220 }}
+                        >
+                          {auser.username}
+                        </Text>
+
+                        <Text size="xs" c="dimmed">
+                          Can access this room
+                        </Text>
+                      </Box>
+                    </Group>
+
+                    <Tooltip label="Remove user">
+                      <ActionIcon
+                        color="red"
+                        variant="subtle"
+                        radius="xl"
+                        onClick={() => removeUser(auser.id)}
+                      >
+                        <IconX size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                </Card>
+              ))}
+            </Stack>
+          )}
+        </ScrollArea>
+      </Box>
     </Stack>
   );
 };

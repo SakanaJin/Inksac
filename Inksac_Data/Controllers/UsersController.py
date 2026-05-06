@@ -18,14 +18,18 @@ from Inksac_Data.database import get_db, MEDIA_DIR
 
 PFP_PATH = "/user/pfp"
 MAX_PFP_SIZE = 5 * 1024 * 1024 # 5MB
+USERNAME_MAX_LENGTH = 50
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
 @router.post("")
 def create_user(userdto: UserCreateDto, db: Session = Depends(get_db)):
     response = Response()
-    if len(userdto.username) == 0:
+
+    if len(userdto.username.strip()) == 0:
         response.add_error("username", "username cannot be empty")
+    if len(userdto.username) > USERNAME_MAX_LENGTH:
+        response.add_error("username", f"username cannot be longer than {USERNAME_MAX_LENGTH} characters")
     if len(userdto.email) == 0:
         response.add_error("email", "email cannot be empty")
     if not re.fullmatch(EMAIL_PATTERN, userdto.email):

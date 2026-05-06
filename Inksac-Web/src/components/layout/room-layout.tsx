@@ -611,6 +611,12 @@ function TaperPreview({
 export function RoomLayout() {
   const user = useUser();
   const { id } = useParams();
+
+  useEffect(() => {
+    return () => {
+      modals.closeAll();
+    };
+  }, []);
   const [canManageLayers, setCanManageLayers] = useState(false);
   const [roomName, setRoomName] = useState<string | undefined>(undefined);
   const [color, setColor] = useState("rgb(0, 0, 0)");
