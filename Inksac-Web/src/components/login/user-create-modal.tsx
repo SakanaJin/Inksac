@@ -26,6 +26,12 @@ interface UserCreateModalProps {
   onSubmit: (logindto: LoginDto) => void;
 }
 
+const USERNAME_MAX_LENGTH = 50;
+
+const limitUsername = (value: string) => {
+  return value.slice(0, USERNAME_MAX_LENGTH);
+};
+
 export const UserCreateModal = ({
   context,
   id,
@@ -41,12 +47,18 @@ export const UserCreateModal = ({
     },
     validate: {
       username: (value) => {
-        if (value.length === 0) {
+        if (value.trim().length === 0) {
           return "Username cannot be empty";
         }
+
         if (value.includes(" ")) {
           return "Username cannot have spaces";
         }
+
+        if (value.length > USERNAME_MAX_LENGTH) {
+          return `Username cannot be longer than ${USERNAME_MAX_LENGTH} characters`;
+        }
+
         return null;
       },
       email: (value) => (/^\S+@\S+$/.test(value) ? null : "Invalid email"),
@@ -58,7 +70,10 @@ export const UserCreateModal = ({
   });
 
   const handleSubmit = async (values: UserCreateDto) => {
-    const response = await api.post<UserGetDto>(`/users`, values);
+    const response = await api.post<UserGetDto>(`/users`, {
+      ...values,
+      username: limitUsername(values.username),
+    });
 
     if (response.data.has_errors) {
       const formerrors = response.data.errors.reduce((obj, err) => {
@@ -74,7 +89,12 @@ export const UserCreateModal = ({
         message: "Successfully signed up",
         color: "green",
       });
-      innerProps.onSubmit({ ...values } as LoginDto);
+
+      innerProps.onSubmit({
+        username: values.username,
+        password: values.password,
+      });
+
       context.closeModal(id);
     }
   };
@@ -166,7 +186,20 @@ export const UserCreateModal = ({
               placeholder="Choose a username"
               size="md"
               radius="md"
+              maxLength={USERNAME_MAX_LENGTH}
+              rightSection={
+                <Text size="xs" c="dimmed" pr={8}>
+                  {form.values.username.length}/{USERNAME_MAX_LENGTH}
+                </Text>
+              }
+              rightSectionWidth={52}
               {...form.getInputProps("username")}
+              onChange={(event) =>
+                form.setFieldValue(
+                  "username",
+                  limitUsername(event.currentTarget.value),
+                )
+              }
             />
 
             <TextInput

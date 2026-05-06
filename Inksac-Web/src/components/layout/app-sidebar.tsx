@@ -116,7 +116,15 @@ export function AppSidebar({
             </AvatarOverlay>
 
             <Box style={{ minWidth: 0, flex: 1 }}>
-              <Text fw={700} lineClamp={1}>
+              <Text
+                fw={700}
+                truncate
+                title={user.username}
+                style={{
+                  minWidth: 0,
+                  maxWidth: "100%",
+                }}
+              >
                 {user.username}
               </Text>
 
