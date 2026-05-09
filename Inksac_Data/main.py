@@ -1,4 +1,5 @@
 import json
+import os
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import delete, select, exists
 from datetime import datetime, timedelta
 
-from Inksac_Data.database import Base, engine, db_session, ALLOWORIGINSLIST
+from Inksac_Data.database import Base, engine, db_session, ALLOWORIGINSLIST, MEDIA_DIR
 
 from Inksac_Data.Common.Response import HttpException
 from Inksac_Data.Common.WSManager import WSManager
@@ -86,6 +87,10 @@ async def expired_room_cleanup():
         ).scalars().all()
         for room in rooms:
             await WSManager.disconnect_room(roomid=room.id)
+            if room.imgurl:
+                img_path = MEDIA_DIR / room.imgurl[1:]
+                if img_path.exists():
+                    os.remove(img_path)
             db.delete(room)
         db.commit()
 
