@@ -11,7 +11,7 @@ This setup is for a development environment only.
 Inksac was created using **python3.14.2** and **node24.10.0**, while other versions may work we recommend these versions.
 Inksac was created with **mysql** in mind. Other sql databases may work, but we recommend **mysql**.
 
-The project contains a Makefile that can be used to create a local dev environment. The make file offers the following commands.
+The project contains a Makefile that can be used to create a local dev environment. The Makefile offers the following commands.
 
 Setup: `make setup`</br>
 Database Reset: `make resetdb`</br>
